@@ -61,14 +61,34 @@ export default function Header() {
           {!user ? (
             <div className="flex items-center gap-3 sm:gap-5">
               <Link
-                to="/about"
+                to="/blog"
                 className={`text-sm font-medium transition-colors ${
+                  pathname === "/blog" || pathname.startsWith("/blog/")
+                    ? "text-ink-primary"
+                    : "text-ink-lightgray hover:text-ink-primary"
+                }`}
+              >
+                Blog
+              </Link>
+              <Link
+                to="/about"
+                className={`hidden sm:inline text-sm font-medium transition-colors ${
                   pathname === "/about"
                     ? "text-ink-primary"
                     : "text-ink-lightgray hover:text-ink-primary"
                 }`}
               >
                 About
+              </Link>
+              <Link
+                to="/services"
+                className={`hidden sm:inline text-sm font-medium transition-colors ${
+                  pathname === "/services"
+                    ? "text-ink-primary"
+                    : "text-ink-lightgray hover:text-ink-primary"
+                }`}
+              >
+                Services
               </Link>
               <Link
                 to="/login"
@@ -171,11 +191,27 @@ export default function Header() {
                         </Link>
 
                         <Link
+                          to="/blog"
+                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                          onClick={() => setShowDropdown(false)}
+                        >
+                          Blog
+                        </Link>
+
+                        <Link
                           to="/about"
                           className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
                           onClick={() => setShowDropdown(false)}
                         >
                           About
+                        </Link>
+
+                        <Link
+                          to="/services"
+                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                          onClick={() => setShowDropdown(false)}
+                        >
+                          Services
                         </Link>
 
                         <div className="border-t border-ink-lightgray mt-2 pt-2">
@@ -270,11 +306,27 @@ export default function Header() {
                       </Link>
 
                       <Link
+                        to="/blog"
+                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        Blog
+                      </Link>
+
+                      <Link
                         to="/about"
                         className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
                         onClick={() => setShowDropdown(false)}
                       >
                         About
+                      </Link>
+
+                      <Link
+                        to="/services"
+                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        Services
                       </Link>
 
                       <div className="border-t border-ink-lightgray mt-2 pt-2">

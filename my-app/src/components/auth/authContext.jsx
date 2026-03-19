@@ -28,32 +28,26 @@ export function AuthProvider({ children }) {
         });
 
         if (res.status === 401) {
-          // User not authenticated
           setUser(null);
           localStorage.removeItem("user");
         } else if (res.ok) {
           const data = await res.json();
-          setUser(data.user);
+          // getMe returns the user object directly (not wrapped in { user })
+          const freshUser = data.user ?? data;
+          setUser(freshUser);
         } else {
-          // Other errors
           setUser(null);
           localStorage.removeItem("user");
         }
       } catch (error) {
+        // Network error — keep the cached localStorage user so the app still works offline
         console.error("Auth check failed:", error);
-        setUser(null);
-        localStorage.removeItem("user");
       } finally {
         setIsLoading(false);
       }
     }
 
-    // Only fetch if we don't already have user from localStorage
-    if (!user) {
-      fetchUser();
-    } else {
-      setIsLoading(false);
-    }
+    fetchUser();
   }, []);
 
   const logout = async () => {

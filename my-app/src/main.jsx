@@ -24,6 +24,10 @@ import Profile from './components/profile/profile';
 import NotFound from './components/NotFound';
 import About from './components/about/about';
 import Missions from './components/missions/missions';
+import Services from './components/services/services';
+import Blog from './components/blog/blog';
+import BlogPost from './components/blog/blogPost';
+import AdminBlog from './components/blog/adminBlog';
 import App from './App'
 
 if ("serviceWorker" in navigator) {
@@ -98,6 +102,22 @@ const router = createBrowserRouter([
   {
     path: "/missions",
     element: <Missions />
+  },
+  // {
+  //   path: "/services",
+  //   element: <Services />
+  // },
+  {
+    path: "/blog",
+    element: <Blog />
+  },
+  {
+    path: "/blog/:postId",
+    element: <BlogPost />
+  },
+  {
+    path: "/admin/blog",
+    element: <AdminBlog />
   },
   {
     path: "*",
