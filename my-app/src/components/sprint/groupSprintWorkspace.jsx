@@ -8,7 +8,7 @@ import { Room, Track } from "livekit-client";
 
 // ─── Constants ────────────────────────────────────────────────
 const SOUNDSCAPES = {
-  rain:  { label: "Rain",   icon: "🌧️", url: "/cold-city-288972.mp3" },
+  rain:  { label: "Rain",   icon: "🌧️", url: "/universfield-relaxing-rain-and-thunder-ambience-351014.mp3" },
   birds: { label: "Birds",  icon: "🐦", url: "https://cdn.pixabay.com/audio/2021/09/06/audio_e84e5c5d46.mp3" },
   cafe:  { label: "Café",   icon: "☕", url: "https://cdn.pixabay.com/audio/2022/10/16/audio_3a8b67dc77.mp3" },
 };
