@@ -240,3 +240,70 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   COZY ADDITIONS — append these to the bottom of index.css
+   ───────────────────────────────────────────────────────────── */
+
+   @layer utilities {
+    /* Warm page background (replaces plain #fafaf9 with a hint of parchment) */
+    .bg-cozy-page {
+      background-color: #faf7f2;
+    }
+  
+    /* Warm text colours */
+    .text-cozy-warm {
+      color: #6b5c4a;
+    }
+    .text-cozy-muted {
+      color: #9a8c7a;
+    }
+    .text-cozy-hint {
+      color: #b8a898;
+    }
+  
+    /* Border colours */
+    .border-cozy {
+      border-color: #e8e0d0;
+    }
+    .border-cozy-light {
+      border-color: #f0ebe3;
+    }
+  }
+  
+  @layer components {
+    /* ── The main reusable card ── */
+    .cozy-card {
+      @apply bg-white rounded-3xl border border-[#e8e0d0] p-6 sm:p-7;
+      box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.04),
+        0 4px 12px rgba(45, 35, 20, 0.05);
+    }
+  
+    /* ── Small icon badge (emoji in a pill) ── */
+    .cozy-icon-badge {
+      @apply w-9 h-9 rounded-xl bg-[#fdf3d8] border border-[#f0d98a]
+             flex items-center justify-center text-base flex-shrink-0;
+    }
+  
+    /* ── Gold accent divider ── */
+    .cozy-divider {
+      @apply flex items-center gap-3 my-5;
+    }
+    .cozy-divider::before,
+    .cozy-divider::after {
+      content: "";
+      @apply flex-1 h-px bg-[#e8e0d0];
+    }
+  
+    /* ── Weekly schedule pill ── */
+    .schedule-pill {
+      @apply flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-sm transition-all;
+    }
+    .schedule-pill-pending {
+      @apply schedule-pill bg-[#faf7f2] border border-[#e8e0d0] text-[#2d3748];
+    }
+    .schedule-pill-done {
+      @apply schedule-pill bg-[#f0fdf4] border border-[#bbf7d0] text-[#6b7280];
+    }
+  }

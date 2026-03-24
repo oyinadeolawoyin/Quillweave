@@ -7,29 +7,28 @@ export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
     if (user) {
       fetchNotificationCount();
-      // Poll every 30 seconds for new notifications
       const interval = setInterval(fetchNotificationCount, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   async function fetchNotificationCount() {
     try {
-      const res = await fetch(`${API_URL}/notifications`, {
-        credentials: "include",
-      });
+      const res = await fetch(`${API_URL}/notifications`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
-        // Count unread notifications (where read is false or null)
-        const unreadCount = data.notifications.filter(
-          n => n.read === false || n.read === null
-        ).length;
+        const unreadCount = data.notifications.filter(n => n.read === false || n.read === null).length;
         setNotificationCount(unreadCount);
       }
     } catch (error) {
@@ -40,311 +39,209 @@ export default function Header() {
   async function handleLogout() {
     await logout();
     navigate("/login");
+    setMobileOpen(false);
+  }
+
+  const navItems = [
+    { to: "/snippets", label: "Snippets" },
+    { to: "/blog", label: "Blog" },
+    { to: "/services", label: "Services" },
+  ];
+
+  function isActive(to) {
+    return pathname === to || pathname.startsWith(to + "/");
   }
 
   return (
-    <header className="bg-white border-b border-ink-lightgray sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
-          {/* Logo */}
-          <Link
-            to="/"
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          >
-            <span className="text-2xl sm:text-3xl">🖋️</span>
-            <h1 className="text-xl sm:text-2xl font-serif text-ink-primary">
-              Inkwell
-            </h1>
-          </Link>
+    <>
+      <header className="bg-white border-b border-[#e5e5e5] sticky top-0 z-50 shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-16 sm:h-[4.5rem]">
 
-          {/* Not Authenticated */}
-          {!user ? (
-            <div className="flex items-center gap-3 sm:gap-5">
-              <Link
-                to="/blog"
-                className={`text-sm font-medium transition-colors ${
-                  pathname === "/blog" || pathname.startsWith("/blog/")
-                    ? "text-ink-primary"
-                    : "text-ink-lightgray hover:text-ink-primary"
-                }`}
-              >
-                Blog
-              </Link>
-              <Link
-                to="/about"
-                className={`hidden sm:inline text-sm font-medium transition-colors ${
-                  pathname === "/about"
-                    ? "text-ink-primary"
-                    : "text-ink-lightgray hover:text-ink-primary"
-                }`}
-              >
-                About
-              </Link>
-              <Link
-                to="/services"
-                className={`hidden sm:inline text-sm font-medium transition-colors ${
-                  pathname === "/services"
-                    ? "text-ink-primary"
-                    : "text-ink-lightgray hover:text-ink-primary"
-                }`}
-              >
-                Services
-              </Link>
-              <Link
-                to="/login"
-                className="hidden sm:inline text-sm text-ink-gray hover:text-ink-primary transition-colors font-medium"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/signup"
-                className="px-4 sm:px-6 py-2 sm:py-2.5 bg-ink-primary text-white rounded-lg font-medium
-                         hover:bg-opacity-90 transition-all shadow-soft text-sm"
-              >
-                Get Started
-              </Link>
-            </div>
-          ) : (
-            <>
-              {/* Authenticated - Desktop */}
-              <div className="hidden sm:flex items-center gap-4 lg:gap-6">
-                {/* Notification Bell with Badge */}
+            {/* ── Logo ── */}
+            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
+              <span className="text-2xl">🖋️</span>
+              <span className="text-xl font-serif text-[#2d3748] tracking-tight">Inkwell</span>
+            </Link>
+
+            {/* ── Desktop Nav ── */}
+            <nav className="hidden sm:flex items-center gap-1">
+              {navItems.map(({ to, label }) => (
                 <Link
-                  to="/notifications"
-                  className="relative p-2 text-ink-gray hover:text-ink-primary transition-colors rounded-lg hover:bg-ink-cream"
-                  aria-label="Notifications"
+                  key={to}
+                  to={to}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(to)
+                      ? "text-[#2d3748] bg-[#f7f4ee]"
+                      : "text-[#737373] hover:text-[#2d3748] hover:bg-[#fafaf9]"
+                  }`}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  {/* Notification Badge */}
-                  {notificationCount > 0 && (
-                    <span className="absolute top-1 right-1 w-5 h-5 bg-ink-gold text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm">
-                      {notificationCount > 9 ? '9+' : notificationCount}
-                    </span>
-                  )}
+                  {label}
                 </Link>
+              ))}
+            </nav>
 
-                {/* Profile Dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowDropdown(!showDropdown)}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-ink-cream transition-colors"
+            {/* ── Desktop Right Side ── */}
+            <div className="hidden sm:flex items-center gap-2">
+              {user ? (
+                <>
+                  {/* Notifications */}
+                  <Link
+                    to="/notifications"
+                    className="relative p-2 rounded-lg text-[#737373] hover:text-[#2d3748] hover:bg-[#f7f4ee] transition-colors"
+                    aria-label="Notifications"
                   >
-                    {/* Avatar */}
-                    <div className="w-9 h-9 rounded-full bg-ink-primary flex items-center justify-center text-white font-medium">
-                      {user?.username?.charAt(0).toUpperCase() || 'U'}
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    {notificationCount > 0 && (
+                      <span className="absolute top-1 right-1 w-4 h-4 bg-[#d4af37] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {notificationCount > 9 ? "9+" : notificationCount}
+                      </span>
+                    )}
+                  </Link>
+
+                  {/* Profile link — just the avatar, goes straight to profile */}
+                  <Link
+                    to={`/profile/${user.id}`}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-[#f7f4ee] transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+                      {user?.username?.charAt(0).toUpperCase() || "U"}
                     </div>
-                    {/* Username */}
-                    <span className="text-sm font-medium text-ink-primary hidden lg:block">
+                    <span className="text-sm font-medium text-[#2d3748] hidden lg:block max-w-[120px] truncate">
                       {user?.username}
                     </span>
-                    {/* Dropdown arrow */}
-                    <svg
-                      className={`w-4 h-4 text-ink-gray transition-transform ${showDropdown ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                  </Link>
+
+                  {/* Sign out — subtle */}
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 text-sm text-[#737373] hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                  >
+                    Out
                   </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="px-4 py-2 text-sm font-medium text-[#737373] hover:text-[#2d3748] transition-colors rounded-lg hover:bg-[#fafaf9]"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="px-5 py-2 bg-[#2d3748] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm"
+                  >
+                    Get Started
+                  </Link>
+                </>
+              )}
+            </div>
 
-                  {/* Dropdown Menu */}
-                  {showDropdown && (
-                    <>
-                      {/* Backdrop */}
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowDropdown(false)}
-                      />
-
-                      {/* Menu */}
-                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-soft-lg border border-ink-lightgray z-20 py-2">
-                        <div className="px-4 py-3 border-b border-ink-lightgray">
-                          <p className="text-sm font-medium text-ink-primary">{user?.username}</p>
-                          <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                        </div>
-
-                        <Link
-                          to={`/profile/${user.id}`}
-                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                          onClick={() => setShowDropdown(false)}
-                        >
-                          Profile
-                        </Link>
-
-                        <Link
-                          to="/dashboard"
-                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                          onClick={() => setShowDropdown(false)}
-                        >
-                          Dashboard
-                        </Link>
-
-                        <Link
-                          to="/missions"
-                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                          onClick={() => setShowDropdown(false)}
-                        >
-                          Missions
-                        </Link>
-
-                        <Link
-                          to="/blog"
-                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                          onClick={() => setShowDropdown(false)}
-                        >
-                          Blog
-                        </Link>
-
-                        <Link
-                          to="/about"
-                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                          onClick={() => setShowDropdown(false)}
-                        >
-                          About
-                        </Link>
-
-                        <Link
-                          to="/services"
-                          className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                          onClick={() => setShowDropdown(false)}
-                        >
-                          Services
-                        </Link>
-
-                        <div className="border-t border-ink-lightgray mt-2 pt-2">
-                          <button
-                            onClick={handleLogout}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                          >
-                            Sign Out
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Authenticated - Mobile */}
-              <div className="flex sm:hidden items-center gap-3 relative">
-                {/* Notification Bell - Mobile */}
+            {/* ── Mobile Right Side ── */}
+            <div className="flex sm:hidden items-center gap-2">
+              {user && (
                 <Link
                   to="/notifications"
-                  className="relative p-2 text-ink-gray hover:text-ink-primary transition-colors"
+                  className="relative p-2 text-[#737373]"
                   aria-label="Notifications"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  {/* Notification Badge - Mobile */}
                   {notificationCount > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-ink-gold text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                      {notificationCount > 9 ? '9+' : notificationCount}
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-[#d4af37] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {notificationCount > 9 ? "9+" : notificationCount}
                     </span>
                   )}
                 </Link>
+              )}
 
-                {/* Profile Avatar - Mobile */}
-                <button
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="w-8 h-8 rounded-full bg-ink-primary flex items-center justify-center text-white font-medium text-sm"
-                >
-                  {user?.username?.charAt(0).toUpperCase() || 'U'}
-                </button>
-
-                {/* Dropdown Menu - Mobile */}
-                {showDropdown && (
-                  <>
-                    {/* Backdrop */}
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowDropdown(false)}
-                    />
-
-                    {/* Menu */}
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-soft-lg border border-ink-lightgray z-20 py-2 top-full">
-                      <div className="px-4 py-3 border-b border-ink-lightgray">
-                        <p className="text-sm font-medium text-ink-primary">{user?.username}</p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                      </div>
-
-                      <Link
-                        to={`/profile/${user.id}`}
-                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        Profile
-                      </Link>
-
-                      <Link
-                        to="/dashboard"
-                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        Dashboard
-                      </Link>
-
-                      <Link
-                        to="/missions"
-                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        Missions
-                      </Link>
-
-                      <Link
-                        to="/blog"
-                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        Blog
-                      </Link>
-
-                      <Link
-                        to="/about"
-                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        About
-                      </Link>
-
-                      <Link
-                        to="/services"
-                        className="block px-4 py-2 text-sm text-ink-gray hover:bg-ink-cream transition-colors"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        Services
-                      </Link>
-
-                      <div className="border-t border-ink-lightgray mt-2 pt-2">
-                        <button
-                          onClick={handleLogout}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  </>
+              {/* Hamburger */}
+              <button
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="p-2 rounded-lg text-[#2d3748] hover:bg-[#f7f4ee] transition-colors"
+                aria-label="Toggle menu"
+              >
+                {mobileOpen ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
                 )}
-              </div>
-            </>
-          )}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+
+        {/* ── Mobile Menu ── */}
+        {mobileOpen && (
+          <div className="sm:hidden border-t border-[#e5e5e5] bg-white">
+            <div className="max-w-5xl mx-auto px-4 py-3 space-y-1">
+
+              {/* Nav links */}
+              {navItems.map(({ to, label }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`block px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive(to)
+                      ? "text-[#2d3748] bg-[#f7f4ee]"
+                      : "text-[#4a4a4a] hover:bg-[#fafaf9]"
+                  }`}
+                >
+                  {label}
+                </Link>
+              ))}
+
+              <div className="border-t border-[#e5e5e5] my-2" />
+
+              {user ? (
+                <>
+                  <Link
+                    to={`/profile/${user.id}`}
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-[#4a4a4a] hover:bg-[#fafaf9]"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                      {user?.username?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                    <span>{user?.username}</span>
+                    <span className="ml-auto text-xs text-[#737373]">Profile</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="block px-4 py-2.5 rounded-xl text-sm font-medium text-[#4a4a4a] hover:bg-[#fafaf9]"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="block px-4 py-2.5 rounded-xl text-sm font-medium text-center bg-[#2d3748] text-white hover:opacity-90"
+                  >
+                    Get Started
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </header>
+    </>
   );
 }

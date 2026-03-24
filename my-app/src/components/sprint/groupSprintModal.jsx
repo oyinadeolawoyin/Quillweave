@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+
+// ─── Shared helpers ───────────────────────────────────────────
 
 function Spinner() {
   return (
@@ -23,25 +27,29 @@ function ErrorBanner({ message }) {
 }
 
 const DURATIONS = [
-  { value: 1,  label: "1 min", description:  "Micro focus" },
-  { value: 10, label: "10 min", description: "Micro focus" },
-  { value: 15, label: "15 min", description: "Quick sprint" },
-  { value: 25, label: "25 min", description: "Classic pomodoro" },
-  { value: 30, label: "30 min", description: "Focused flow" },
+  { value: 1,  label: "1 min",  description: "Quick sprint" },
+  { value: 10, label: "10 min", description: "Quick sprint" },
+  { value: 15, label: "15 min", description: "Focused burst" },
+  { value: 25, label: "25 min", description: "Pomodoro" },
+  { value: 30, label: "30 min", description: "Steady flow" },
   { value: 45, label: "45 min", description: "Deep work" },
-  { value: 60, label: "60 min", description: "Marathon session" },
+  { value: 60, label: "60 min", description: "Marathon" },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// START GROUP SPRINT MODAL (host)
-// Step 1: purpose + duration → creates GroupSprint
-// Step 2: host intro + check-in → creates their Sprint linked to the group
-// ─────────────────────────────────────────────────────────────────────────────
+const SOUNDSCAPES = [
+  { value: null,    label: "None",  icon: "🔇", description: "Silent" },
+  { value: "rain",  label: "Rain",  icon: "🌧️", description: "Soft rainfall" },
+  { value: "birds", label: "Birds", icon: "🐦", description: "Morning birds" },
+  { value: "cafe",  label: "Café",  icon: "☕", description: "Coffee shop hum" },
+];
+
+const SOUNDSCAPE_ICONS = { rain: "🌧️", birds: "🐦", cafe: "☕" };
+
+// ─── START GROUP SPRINT MODAL ─────────────────────────────────
 export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   const [step, setStep] = useState(1);
-  const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState(25);
-  const [intro, setIntro] = useState("");
+  const [soundscape, setSoundscape] = useState(null);
   const [checkin, setCheckin] = useState("");
   const [startWordCount, setStartWordCount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -49,43 +57,61 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   const [groupSprint, setGroupSprint] = useState(null);
 
   function handleClose() {
-    setStep(1); setPurpose(""); setDuration(25);
-    setIntro(""); setCheckin(""); setStartWordCount(""); setError(null); setGroupSprint(null);
+    setStep(1); setDuration(25); setSoundscape(null);
+    setCheckin(""); setStartWordCount(""); setError(null); setGroupSprint(null);
     onClose();
   }
 
   async function handleCreateGroup(e) {
     e.preventDefault();
-    if (!purpose.trim()) { setError("Please add a purpose for the sprint."); return; }
     setIsLoading(true); setError(null);
     try {
       const res = await fetch(`${API_URL}/sprint/startGroupSprint`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ sprintPurpose: purpose.trim(), duration }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ duration, soundscape }),
       });
-      if (res.ok) { const data = await res.json(); setGroupSprint(data.groupSprint); setStep(2); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't create the group sprint. Please try again."); }
-    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
-    finally { setIsLoading(false); }
+      if (res.ok) {
+        const data = await res.json();
+        setGroupSprint(data.groupSprint);
+        setStep(2);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setError(body.message || "Couldn't create the sprint. Please try again.");
+      }
+    } catch {
+      setError("Couldn't reach the server. Please check your connection.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function handleHostCheckin(e) {
     e.preventDefault(); setIsLoading(true); setError(null);
     try {
-      const res = await fetch(`${API_URL}/sprint/startSprint`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+      const res = await fetch(`${API_URL}/sprint/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          duration: groupSprint.duration,
-          intro: intro.trim() || null,
-          checkin: checkin.trim() || null,
           groupSprintId: groupSprint.id,
-          startWordCount: startWordCount ? Number(startWordCount) : 0,
+          checkin: checkin.trim() || null,
+          startWords: startWordCount ? Number(startWordCount) : 0,
         }),
       });
-      if (res.ok) { const data = await res.json(); onCreated(groupSprint, data.sprint); handleClose(); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't start the sprint. Please try again."); }
-    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
-    finally { setIsLoading(false); }
+      if (res.ok) {
+        onCreated(groupSprint);
+        handleClose();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setError(body.message || "Couldn't start the sprint. Please try again.");
+      }
+    } catch {
+      setError("Couldn't reach the server. Please check your connection.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   if (!isOpen) return null;
@@ -93,55 +119,57 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        <div className="bg-ink-primary px-6 py-5 flex items-center justify-between">
+        <div className="bg-[#2d3748] px-6 py-5 flex items-center justify-between">
           <div>
-            <p className="text-xs text-ink-gold uppercase tracking-widest font-medium mb-0.5">
+            <p className="text-xs text-[#d4af37] uppercase tracking-widest font-medium mb-0.5">
               {step === 1 ? "Step 1 of 2" : "Step 2 of 2"}
             </p>
             <h2 className="text-xl font-serif text-white">
-              {step === 1 ? "Start a Group Sprint" : "Your Introduction"}
+              {step === 1 ? "Open the Shop" : "Your Check-in"}
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${step >= 1 ? "bg-ink-gold" : "bg-white/30"}`} />
-            <div className={`w-2 h-2 rounded-full ${step >= 2 ? "bg-ink-gold" : "bg-white/30"}`} />
+            <div className={`w-2 h-2 rounded-full ${step >= 1 ? "bg-[#d4af37]" : "bg-white/30"}`} />
+            <div className={`w-2 h-2 rounded-full ${step >= 2 ? "bg-[#d4af37]" : "bg-white/30"}`} />
           </div>
         </div>
 
         {step === 1 && (
           <form onSubmit={handleCreateGroup} className="p-6 space-y-6">
             <div>
-              <label className="block text-sm font-medium text-ink-primary mb-2">
-                What's the purpose of this sprint?
-              </label>
-              <textarea
-                value={purpose} onChange={(e) => setPurpose(e.target.value)}
-                placeholder="e.g. Let's finish our chapters before the week starts 🌙"
-                rows={3} maxLength={200}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm resize-none transition-all bg-ink-cream"
-              />
-              <p className="mt-1 text-xs text-gray-400 text-right">{purpose.length}/200</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-primary mb-3">Sprint duration</label>
+              <label className="block text-sm font-medium text-[#2d3748] mb-3">Sprint duration</label>
               <div className="grid grid-cols-3 gap-2">
                 {DURATIONS.map((dur) => (
                   <button key={dur.value} type="button" onClick={() => setDuration(dur.value)}
-                    className={`p-3 rounded-xl border-2 transition-all text-center ${duration === dur.value ? "border-ink-gold bg-amber-50 shadow-soft" : "border-gray-200 hover:border-ink-primary"}`}>
-                    <div className={`text-lg font-bold ${duration === dur.value ? "text-ink-primary" : "text-ink-gray"}`}>{dur.value}</div>
-                    <div className={`text-xs ${duration === dur.value ? "text-ink-primary" : "text-gray-400"}`}>{dur.description}</div>
+                    className={`p-3 rounded-xl border-2 transition-all text-center ${duration === dur.value ? "border-[#d4af37] bg-amber-50" : "border-gray-200 hover:border-[#2d3748]"}`}>
+                    <div className={`text-base font-bold ${duration === dur.value ? "text-[#2d3748]" : "text-gray-500"}`}>{dur.value}m</div>
+                    <div className={`text-xs mt-0.5 ${duration === dur.value ? "text-[#2d3748]" : "text-gray-400"}`}>{dur.description}</div>
                   </button>
                 ))}
               </div>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#2d3748] mb-1">Soundscape</label>
+              <p className="text-xs text-gray-400 mb-3">Everyone in the room will hear this. They can mute it.</p>
+              <div className="grid grid-cols-2 gap-2">
+                {SOUNDSCAPES.map((s) => (
+                  <button key={String(s.value)} type="button" onClick={() => setSoundscape(s.value)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${soundscape === s.value ? "border-[#d4af37] bg-amber-50" : "border-gray-200 hover:border-[#2d3748]"}`}>
+                    <span className="text-xl">{s.icon}</span>
+                    <div>
+                      <p className={`text-sm font-medium ${soundscape === s.value ? "text-[#2d3748]" : "text-gray-600"}`}>{s.label}</p>
+                      <p className="text-xs text-gray-400">{s.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <ErrorBanner message={error} />
             <div className="flex gap-3 pt-1">
-              <button type="button" onClick={handleClose}
-                className="flex-1 py-3 border-2 border-gray-200 text-ink-gray rounded-xl text-sm font-medium hover:border-ink-primary transition-all">
-                Cancel
-              </button>
-              <button type="submit" disabled={isLoading}
-                className="flex-1 py-3 bg-ink-primary text-white rounded-xl text-sm font-medium hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              <button type="button" onClick={handleClose} className="flex-1 py-3 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:border-[#2d3748] transition-all">Cancel</button>
+              <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                 {isLoading ? <><Spinner /> Creating...</> : "Continue →"}
               </button>
             </div>
@@ -150,65 +178,39 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
 
         {step === 2 && (
           <form onSubmit={handleHostCheckin} className="p-6 space-y-5">
-            <div className="bg-ink-cream rounded-xl p-4 border-l-4 border-ink-gold">
-              <p className="text-xs text-ink-lightgray uppercase tracking-wide mb-1">Sprint purpose</p>
-              <p className="text-sm text-ink-primary font-medium italic">"{groupSprint?.groupPurpose}"</p>
-              <p className="text-xs text-gray-400 mt-1">{groupSprint?.duration} min · share the link so others can join</p>
+            <div className="bg-gray-50 rounded-xl p-4 border-l-4 border-[#d4af37]">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Your session</p>
+              <p className="text-sm text-[#2d3748] font-medium">
+                {groupSprint?.duration} min{groupSprint?.soundscape && ` · ${SOUNDSCAPE_ICONS[groupSprint.soundscape]} ${groupSprint.soundscape}`}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">Share the link so others can join</p>
             </div>
 
-            {/* Intro */}
             <div>
-              <label className="block text-sm font-medium text-ink-primary mb-2">
-                Introduce yourself <span className="text-gray-400 font-normal">(optional)</span>
+              <label className="block text-sm font-medium text-[#2d3748] mb-2">
+                What are you writing today? <span className="text-gray-400 font-normal">(optional)</span>
               </label>
-              <input
-                type="text" value={intro} onChange={(e) => setIntro(e.target.value)}
-                placeholder="e.g. Fantasy writer, working on my debut novel 📖"
-                maxLength={100}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
-              />
-              <p className="mt-1 text-xs text-gray-400 text-right">{intro.length}/100</p>
-            </div>
-
-            {/* Check-in */}
-            <div>
-              <label className="block text-sm font-medium text-ink-primary mb-2">
-                What are <span className="italic">you</span> writing on today?{" "}
-                <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <textarea
-                value={checkin} onChange={(e) => setCheckin(e.target.value)}
-                placeholder="e.g. Chapter 12 — the confrontation scene..."
-                rows={3} maxLength={200}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm resize-none transition-all bg-ink-cream"
-              />
+              <textarea value={checkin} onChange={(e) => setCheckin(e.target.value)}
+                placeholder="e.g. Chapter 12 — the confrontation scene..." rows={3} maxLength={200}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm resize-none transition-all bg-gray-50" />
               <p className="mt-1 text-xs text-gray-400 text-right">{checkin.length}/200</p>
             </div>
 
-            {/* Start word count */}
             <div>
-              <label className="block text-sm font-medium text-ink-primary mb-1">
-                What's your current word count? <span className="text-gray-400 font-normal">(optional)</span>
+              <label className="block text-sm font-medium text-[#2d3748] mb-1">
+                Starting word count <span className="text-gray-400 font-normal">(optional)</span>
               </label>
-              <p className="text-xs text-gray-400 mb-2">
-                We'll use this to calculate how many words you add this sprint.
-              </p>
-              <input
-                type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
+              <p className="text-xs text-gray-400 mb-2">We'll use this to calculate how many words you write.</p>
+              <input type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
                 placeholder="e.g. 3400" min={0}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
-              />
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm transition-all bg-gray-50" />
             </div>
 
             <ErrorBanner message={error} />
             <div className="flex gap-3 pt-1">
-              <button type="button" onClick={() => { setStep(1); setError(null); }}
-                className="px-5 py-3 border-2 border-gray-200 text-ink-gray rounded-xl text-sm font-medium hover:border-ink-primary transition-all">
-                ← Back
-              </button>
-              <button type="submit" disabled={isLoading}
-                className="flex-1 py-3 bg-ink-primary text-white rounded-xl text-sm font-medium hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {isLoading ? <><Spinner /> Starting...</> : "Start Writing ✍️"}
+              <button type="button" onClick={() => { setStep(1); setError(null); }} className="px-5 py-3 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:border-[#2d3748] transition-all">← Back</button>
+              <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                {isLoading ? <><Spinner /> Starting...</> : "Open the Shop ☕"}
               </button>
             </div>
           </form>
@@ -218,308 +220,166 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   );
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// JOIN GROUP SPRINT MODAL (members)
-// intro + check-in → joins the sprint
-// ─────────────────────────────────────────────────────────────────────────────
-export function JoinGroupSprintModal({ isOpen, onClose, onJoined, groupSprint }) {
-  const [intro, setIntro] = useState("");
+// ─── JOIN GROUP SPRINT MODAL ──────────────────────────────────
+export function JoinGroupSprintModal({ onClose }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [step, setStep] = useState(1);
+  const [activeSprints, setActiveSprints] = useState([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [selectedSprint, setSelectedSprint] = useState(null);
   const [checkin, setCheckin] = useState("");
   const [startWordCount, setStartWordCount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  function handleClose() { setIntro(""); setCheckin(""); setStartWordCount(""); setError(null); onClose(); }
+  useEffect(() => {
+    async function fetchRooms() {
+      setLoadingRooms(true);
+      try {
+        const res = await fetch(`${API_URL}/sprint/activeGroupSprints?limit=10`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setActiveSprints(data.groupSprints || []);
+        }
+      } catch {}
+      finally { setLoadingRooms(false); }
+    }
+    fetchRooms();
+  }, []);
+
+  function handleClose() {
+    setStep(1); setSelectedSprint(null);
+    setCheckin(""); setStartWordCount(""); setError(null);
+    onClose();
+  }
 
   async function handleJoin(e) {
     e.preventDefault(); setIsLoading(true); setError(null);
     try {
-      const res = await fetch(`${API_URL}/sprint/startSprint`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+      const res = await fetch(`${API_URL}/sprint/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          duration: groupSprint.duration,
-          intro: intro.trim() || null,
+          groupSprintId: selectedSprint.id,
           checkin: checkin.trim() || null,
-          groupSprintId: groupSprint.id,
-          startWordCount: startWordCount ? Number(startWordCount) : 0,
+          startWords: startWordCount ? Number(startWordCount) : 0,
         }),
       });
-      if (res.ok) { const data = await res.json(); onJoined(data.sprint); handleClose(); }
-      else if (res.status === 401) { setError("Your session has expired. Please log in or sign up to continue."); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't join the sprint. Please try again."); }
-    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
-    finally { setIsLoading(false); }
-  }
-
-  if (!isOpen || !groupSprint) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-ink-primary px-6 py-5">
-          <p className="text-xs text-ink-gold uppercase tracking-widest font-medium mb-0.5">Joining sprint</p>
-          <h2 className="text-xl font-serif text-white">Your Introduction</h2>
-        </div>
-
-        <form onSubmit={handleJoin} className="p-6 space-y-5">
-          <div className="bg-ink-cream rounded-xl p-4 border-l-4 border-ink-gold">
-            <p className="text-xs text-ink-lightgray uppercase tracking-wide mb-1">Sprint purpose</p>
-            <p className="text-sm text-ink-primary font-medium italic">"{groupSprint.groupPurpose}"</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Started by <strong>@{groupSprint.user?.username}</strong> · {groupSprint.duration} min
-            </p>
-          </div>
-
-          {/* Intro */}
-          <div>
-            <label className="block text-sm font-medium text-ink-primary mb-2">
-              Introduce yourself <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <input
-              type="text" value={intro} onChange={(e) => setIntro(e.target.value)}
-              placeholder="e.g. Poet, first sprint ever — excited to be here! ✨"
-              maxLength={100}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
-            />
-            <p className="mt-1 text-xs text-gray-400 text-right">{intro.length}/100</p>
-          </div>
-
-          {/* Check-in */}
-          <div>
-            <label className="block text-sm font-medium text-ink-primary mb-2">
-              What are you writing on today?{" "}
-              <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <textarea
-              value={checkin} onChange={(e) => setCheckin(e.target.value)}
-              placeholder="e.g. Blog post about slow living, just vibing 😌"
-              rows={3} maxLength={200}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm resize-none transition-all bg-ink-cream"
-            />
-            <p className="mt-1 text-xs text-gray-400 text-right">{checkin.length}/200</p>
-          </div>
-
-          {/* Start word count */}
-          <div>
-            <label className="block text-sm font-medium text-ink-primary mb-1">
-              What's your current word count? <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <p className="text-xs text-gray-400 mb-2">
-              We'll use this to calculate how many words you add this sprint.
-            </p>
-            <input
-              type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
-              placeholder="e.g. 3400" min={0}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream"
-            />
-          </div>
-
-          <ErrorBanner message={error} />
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={handleClose}
-              className="flex-1 py-3 border-2 border-gray-200 text-ink-gray rounded-xl text-sm font-medium hover:border-ink-primary transition-all">
-              Cancel
-            </button>
-            <button type="submit" disabled={isLoading}
-              className="flex-1 py-3 bg-ink-primary text-white rounded-xl text-sm font-medium hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {isLoading ? <><Spinner /> Joining...</> : "Start Writing ✍️"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// END GROUP SPRINT MODAL (host only)
-// Step 1: checkout + words → Step 2: thank note → ends sprint for everyone
-// ─────────────────────────────────────────────────────────────────────────────
-export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, sprintId }) {
-  const [step, setStep] = useState(1);
-  const [checkout, setCheckout] = useState("");
-  const [endWordCount, setEndWordCount] = useState("");
-  const [wordsWritten, setWordsWritten] = useState("");
-  const [thankNote, setThankNote] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [completedMissions, setCompletedMissions] = useState([]);
-
-  function handleClose() {
-    setStep(1); setCheckout(""); setEndWordCount(""); setWordsWritten(""); setThankNote(""); setError(null); setCompletedMissions([]); onClose();
-  }
-
-  async function handleCheckout(e) {
-    e.preventDefault(); setIsLoading(true); setError(null);
-    try {
-      const res = await fetch(`${API_URL}/sprint/${sprintId}/endSprint`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ checkout: checkout.trim() || null, endWordCount: endWordCount ? Number(endWordCount) : null }),
-      });
-      if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't submit your check-out. Please try again."); return; }
-
-      const endData = await res.json();
-      let missions = endData.completedMissions || [];
-
-      if (wordsWritten) {
-        const wordsRes = await fetch(`${API_URL}/sprint/${sprintId}/words`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-          body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
-        });
-        if (wordsRes.ok) {
-          const wordsData = await wordsRes.json();
-          missions = wordsData.completedMissions || missions;
-        }
+      if (res.ok) {
+        handleClose();
+        navigate(`/group-sprint/${selectedSprint.id}`);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setError(body.message || "Couldn't join. Please try again.");
       }
-
-      setCompletedMissions(missions);
-      setStep(2);
-    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
-    finally { setIsLoading(false); }
+    } catch {
+      setError("Couldn't reach the server. Please check your connection.");
+    } finally {
+      setIsLoading(false);
+    }
   }
-
-  async function handleEndGroup(e) {
-    e.preventDefault(); setIsLoading(true); setError(null);
-    try {
-      const res = await fetch(`${API_URL}/sprint/${groupSprintId}/endGroupSprint`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ ThankyouNote: thankNote.trim() || null }),
-      });
-      if (res.ok) { onEnded(); handleClose(); }
-      else { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't end the group sprint. Please try again."); }
-    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
-    finally { setIsLoading(false); }
-  }
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-ink-primary px-6 py-5 flex items-center justify-between">
+        <div className="bg-[#2d3748] px-6 py-5 flex items-center justify-between">
           <div>
-            <p className="text-xs text-ink-gold uppercase tracking-widest font-medium mb-0.5">
-              {step === 1 ? "Step 1 of 2" : "Step 2 of 2"}
+            <p className="text-xs text-[#d4af37] uppercase tracking-widest font-medium mb-0.5">
+              {step === 1 ? "Active sessions" : "Your check-in"}
             </p>
             <h2 className="text-xl font-serif text-white">
-              {step === 1 ? "Your Check-out" : "Thank Your Writers"}
+              {step === 1 ? "Enter the Shop" : `Joining @${selectedSprint?.user?.username}'s sprint`}
             </h2>
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${step >= 1 ? "bg-ink-gold" : "bg-white/30"}`} />
-            <div className={`w-2 h-2 rounded-full ${step >= 2 ? "bg-ink-gold" : "bg-white/30"}`} />
-          </div>
+          <button onClick={handleClose} className="text-white/50 hover:text-white text-2xl leading-none transition-colors">×</button>
         </div>
 
         {step === 1 && (
-          <form onSubmit={handleCheckout} className="p-6 space-y-5">
-            <p className="text-sm text-ink-lightgray">
-              ⏰ Time's up! Share how <span className="italic">your</span> session went before ending the sprint for everyone.
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-ink-primary mb-2">
-                How did the sprint go? <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <textarea value={checkout} onChange={(e) => setCheckout(e.target.value)}
-                placeholder="Got the scene drafted! It's rough but the bones are there..."
-                rows={3} maxLength={300}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm resize-none transition-all bg-ink-cream"
-              />
-              <p className="mt-1 text-xs text-gray-400 text-right">{checkout.length}/300</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-primary mb-1">
-                What's your total word count now? <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <p className="text-xs text-gray-400 mb-2">
-                Your document's current total. We'll subtract your starting count to calculate what you wrote this sprint.
-              </p>
-              <input type="number" value={endWordCount}
-                onChange={(e) => { setEndWordCount(e.target.value); if (e.target.value) setWordsWritten(""); }}
-                placeholder="e.g. 3742" min={0}
-                disabled={!!wordsWritten}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-              />
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs text-gray-400 font-medium">OR</span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-ink-primary mb-1">
-                How many words did you write this sprint? <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <p className="text-xs text-gray-400 mb-2">
-                Use this if you didn't track your starting word count.
-              </p>
-              <input type="number" value={wordsWritten}
-                onChange={(e) => { setWordsWritten(e.target.value); if (e.target.value) setEndWordCount(""); }}
-                placeholder="e.g. 412" min={0}
-                disabled={!!endWordCount}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-              />
-            </div>
-
-            <ErrorBanner message={error} />
-            <div className="flex gap-3 pt-1">
-              <button type="button" onClick={handleClose}
-                className="px-5 py-3 border-2 border-gray-200 text-ink-gray rounded-xl text-sm font-medium hover:border-ink-primary transition-all">
-                Cancel
-              </button>
-              <button type="submit" disabled={isLoading}
-                className="flex-1 py-3 bg-ink-primary text-white rounded-xl text-sm font-medium hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {isLoading ? <><Spinner /> Saving...</> : "Continue →"}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {step === 2 && (
-          <form onSubmit={handleEndGroup} className="p-6 space-y-5">
-            {completedMissions.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-ink-gold uppercase tracking-wide font-medium">
-                  {completedMissions.length === 1 ? "Mission complete! 🏆" : "Missions complete! 🏆"}
-                </p>
-                {completedMissions.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                    <span className="text-lg">✅</span>
-                    <div>
-                      <p className="text-sm font-semibold text-ink-primary">{m.title}</p>
-                      <p className="text-xs text-gray-500">+{m.xp} XP earned</p>
-                    </div>
-                  </div>
-                ))}
+          <div className="p-6">
+            {loadingRooms ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-gray-400 text-sm"><Spinner /> Loading active rooms...</div>
+            ) : activeSprints.length === 0 ? (
+              <div className="text-center py-10">
+                <p className="text-3xl mb-3">☕</p>
+                <p className="font-serif text-[#2d3748] text-lg mb-1">No active sprints right now</p>
+                <p className="text-sm text-gray-400 mb-5">Check Discord for the next session.</p>
+                <button onClick={handleClose} className="text-sm text-gray-400 hover:text-[#2d3748] transition-colors">Close</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-400 mb-4">{activeSprints.length} active session{activeSprints.length !== 1 ? "s" : ""} — pick one to join</p>
+                {activeSprints.map((gs) => {
+                  const alreadyJoined = user && gs.sprints?.some(
+                    (s) => Number(s.userId) === Number(user.id) && s.isActive !== false
+                  );
+                  return (
+                    <button key={gs.id}
+                      onClick={() => {
+                        if (alreadyJoined) { handleClose(); navigate(`/group-sprint/${gs.id}`); }
+                        else { setSelectedSprint(gs); setStep(2); }
+                      }}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all group ${
+                        alreadyJoined ? "border-[#d4af37] bg-amber-50 hover:bg-amber-100" : "border-gray-200 hover:border-[#d4af37] hover:bg-amber-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live
+                            </span>
+                            <span className="text-xs text-gray-400">· @{gs.user?.username} · {gs.duration} min</span>
+                            {gs.soundscape && <span className="text-xs">{SOUNDSCAPE_ICONS[gs.soundscape]}</span>}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">{gs._count?.sprints || 0} writer{(gs._count?.sprints || 0) !== 1 ? "s" : ""} inside</p>
+                        </div>
+                        {alreadyJoined ? (
+                          <span className="text-xs font-semibold text-[#d4af37] flex-shrink-0 flex items-center gap-1">✓ Joined · Continue writing →</span>
+                        ) : (
+                          <span className="text-gray-300 group-hover:text-[#d4af37] text-xl transition-colors flex-shrink-0">→</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
-            <p className="text-sm text-ink-lightgray">
-              Leave a thank you note for everyone who joined. It'll appear at the bottom of the sprint feed 💛
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-ink-primary mb-2">
-                Thank note <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <textarea value={thankNote} onChange={(e) => setThankNote(e.target.value)}
-                placeholder="Thank you all so much for joining tonight. I love how this community shows up for each other..."
-                rows={4} maxLength={400}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm resize-none transition-all bg-ink-cream"
-              />
-              <p className="mt-1 text-xs text-gray-400 text-right">{thankNote.length}/400</p>
+          </div>
+        )}
+
+        {step === 2 && selectedSprint && (
+          <form onSubmit={handleJoin} className="p-6 space-y-5">
+            <div className="bg-gray-50 rounded-xl p-4 border-l-4 border-[#d4af37]">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Joining</p>
+              <p className="text-sm text-[#2d3748] font-medium">@{selectedSprint.user?.username}'s sprint · {selectedSprint.duration} min</p>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#2d3748] mb-2">
+                What are you writing today? <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <textarea value={checkin} onChange={(e) => setCheckin(e.target.value)}
+                placeholder="e.g. Blog post about slow living..." rows={3} maxLength={200}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm resize-none transition-all bg-gray-50" />
+              <p className="mt-1 text-xs text-gray-400 text-right">{checkin.length}/200</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#2d3748] mb-1">
+                Starting word count <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
+                placeholder="e.g. 3400" min={0}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm transition-all bg-gray-50" />
+            </div>
+
             <ErrorBanner message={error} />
             <div className="flex gap-3 pt-1">
-              <button type="button" onClick={() => { setStep(1); setError(null); }}
-                className="px-5 py-3 border-2 border-gray-200 text-ink-gray rounded-xl text-sm font-medium hover:border-ink-primary transition-all">
-                ← Back
-              </button>
-              <button type="submit" disabled={isLoading}
-                className="flex-1 py-3 bg-ink-gold text-ink-primary rounded-xl text-sm font-semibold hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {isLoading ? <><Spinner /> Ending...</> : "End Sprint for Everyone 🏁"}
+              <button type="button" onClick={() => { setStep(1); setError(null); }} className="px-5 py-3 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:border-[#2d3748] transition-all">← Back</button>
+              <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                {isLoading ? <><Spinner /> Joining...</> : "Enter the Shop ☕"}
               </button>
             </div>
           </form>
@@ -529,157 +389,119 @@ export function EndGroupSprintModal({ isOpen, onClose, onEnded, groupSprintId, s
   );
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MEMBER CHECKOUT MODAL
-// Non-host members when sprint timer ends
-// ─────────────────────────────────────────────────────────────────────────────
-export function MemberCheckoutModal({ isOpen, onClose, onCheckedOut, sprintId }) {
-  const [checkout, setCheckout] = useState("");
-  const [endWordCount, setEndWordCount] = useState("");
-  const [wordsWritten, setWordsWritten] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [completedMissions, setCompletedMissions] = useState(null);
-
-  function handleClose() { setCheckout(""); setEndWordCount(""); setWordsWritten(""); setError(null); setCompletedMissions(null); onClose(); }
-
-  async function handleSubmit(e) {
-    e.preventDefault(); setIsLoading(true); setError(null);
-    try {
-      const res = await fetch(`${API_URL}/sprint/${sprintId}/endSprint`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ checkout: checkout.trim() || null, endWordCount: endWordCount ? Number(endWordCount) : null }),
-      });
-      if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.message || "We couldn't submit your check-out. Please try again."); return; }
-
-      const endData = await res.json();
-      let missions = endData.completedMissions || [];
-
-      if (wordsWritten) {
-        const wordsRes = await fetch(`${API_URL}/sprint/${sprintId}/words`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-          body: JSON.stringify({ wordsWritten: Number(wordsWritten) }),
-        });
-        if (wordsRes.ok) {
-          const wordsData = await wordsRes.json();
-          missions = wordsData.completedMissions || missions;
-        }
-      }
-
-      onCheckedOut(endData.sprint);
-      if (missions.length > 0) {
-        setCompletedMissions(missions);
-      } else {
-        handleClose();
-      }
-    } catch { setError("We couldn't reach the server. Please check your connection and try again."); }
-    finally { setIsLoading(false); }
-  }
-
+// ─── RE-ENTER MODAL ───────────────────────────────────────────
+export function ReEnterShopModal({ isOpen, onClose, onEnter, groupSprint }) {
   if (!isOpen) return null;
-
-  if (completedMissions) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div className="bg-ink-primary px-6 py-5">
-            <p className="text-xs text-ink-gold uppercase tracking-widest font-medium mb-0.5">Achievement</p>
-            <h2 className="text-xl font-serif text-white">
-              {completedMissions.length === 1 ? "Mission Complete!" : "Missions Complete!"}
-            </h2>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="bg-[#2d3748] px-6 py-5">
+          <p className="text-xs text-[#d4af37] uppercase tracking-widest font-medium mb-0.5">Welcome back ✍️</p>
+          <h2 className="text-xl font-serif text-white">Your seat is still warm</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+            <p className="text-sm text-[#2d3748] leading-relaxed">
+              You already checked in to this sprint — no need to fill out the form again. Just jump back in and keep writing.
+            </p>
+            {groupSprint?.soundscape && (
+              <p className="text-xs text-gray-400 mt-2">
+                {SOUNDSCAPE_ICONS[groupSprint.soundscape]} {groupSprint.soundscape} · {groupSprint.duration} min session
+              </p>
+            )}
           </div>
-          <div className="p-6 space-y-3">
-            <p className="text-sm text-ink-lightgray">You unlocked something new. Keep writing! 🌱</p>
-            {completedMissions.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                <span className="text-xl">✅</span>
-                <div>
-                  <p className="text-sm font-semibold text-ink-primary">{m.title}</p>
-                  <p className="text-xs text-gray-500">+{m.xp} XP earned</p>
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={handleClose}
-              className="w-full py-3 bg-ink-primary text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all mt-2"
-            >
-              Continue →
-            </button>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-4 py-3 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:border-[#2d3748] transition-all">Leave</button>
+            <button onClick={onEnter} className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all">Continue writing ✍️</button>
           </div>
         </div>
       </div>
-    );
+    </div>
+  );
+}
+
+// ─── CHECKOUT MODAL ───────────────────────────────────────────
+// isEarly=false → navigates to /snippets?new=post-sprint after
+//   checkout so the feed auto-opens the modal with POST_SPRINT.
+// isEarly=true  → just calls onSubmit and stays (no redirect).
+export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = false }) {
+  const navigate = useNavigate();
+  const [currentWords, setCurrentWords] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [capturedSprintId, setCapturedSprintId] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentWords(""); setError(""); setSubmitting(false);
+      if (sprintId) setCapturedSprintId(sprintId);
+    }
+  }, [isOpen, sprintId]);
+
+  useEffect(() => {
+    if (sprintId && !capturedSprintId) setCapturedSprintId(sprintId);
+  }, [sprintId, capturedSprintId]);
+
+  if (!isOpen) return null;
+
+  const effectiveId = capturedSprintId || sprintId;
+
+  async function handleSubmit() {
+    const val = parseInt(currentWords, 10);
+    if (isNaN(val) || val < 0) { setError("Please enter a valid word count (0 or more)."); return; }
+    if (!effectiveId) { setError("Still loading your session — please wait a moment and try again."); return; }
+    setSubmitting(true); setError("");
+    try {
+      const res = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentWordCount: val }),
+      });
+      if (!res.ok) throw new Error("Checkout failed");
+
+      onSubmit(); // notify parent (marks hasCheckedOut in workspace)
+
+      if (!isEarly) {
+        navigate("/snippets?new=post-sprint");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-ink-primary px-6 py-5">
-          <p className="text-xs text-ink-gold uppercase tracking-widest font-medium mb-0.5">Time's up ⏰</p>
-          <h2 className="text-xl font-serif text-white">Your Check-out</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+        <p className="text-4xl mb-3">{isEarly ? "✍️" : "🏁"}</p>
+        <h3 className="font-serif text-[#2d3748] text-xl mb-1">
+          {isEarly ? "Leaving early?" : "Sprint complete!"}
+        </h3>
+        <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+          {isEarly
+            ? "No worries — enter your current word count before you go."
+            : "Every word counts. Enter your current word count, then share a snippet of what you wrote today 🌱"}
+        </p>
+        <div className="text-left mb-4">
+          <label className="text-xs font-medium text-[#2d3748] mb-1.5 block">Current word count</label>
+          <input type="number" min="0" value={currentWords}
+            onChange={(e) => setCurrentWords(e.target.value)}
+            placeholder="e.g. 1240" autoFocus
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-[#2d3748] focus:outline-none focus:border-[#2d3748] transition-colors" />
+          {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <p className="text-sm text-ink-lightgray">Great sprint! Share how it went with the group.</p>
-          <div>
-            <label className="block text-sm font-medium text-ink-primary mb-2">
-              How did the sprint feel? <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <textarea value={checkout} onChange={(e) => setCheckout(e.target.value)}
-              placeholder="Productive! Finally got unstuck on that scene..."
-              rows={3} maxLength={300}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm resize-none transition-all bg-ink-cream"
-            />
-            <p className="mt-1 text-xs text-gray-400 text-right">{checkout.length}/300</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-ink-primary mb-1">
-              What's your total word count now? <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <p className="text-xs text-gray-400 mb-2">
-              Your document's current total. We'll subtract your starting count to calculate what you wrote this sprint.
-            </p>
-            <input type="number" value={endWordCount}
-              onChange={(e) => { setEndWordCount(e.target.value); if (e.target.value) setWordsWritten(""); }}
-              placeholder="e.g. 3742" min={0}
-              disabled={!!wordsWritten}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 font-medium">OR</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink-primary mb-1">
-              How many words did you write this sprint? <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <p className="text-xs text-gray-400 mb-2">
-              Use this if you didn't track your starting word count.
-            </p>
-            <input type="number" value={wordsWritten}
-              onChange={(e) => { setWordsWritten(e.target.value); if (e.target.value) setEndWordCount(""); }}
-              placeholder="e.g. 287" min={0}
-              disabled={!!endWordCount}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-ink-gold focus:border-ink-gold text-ink-gray placeholder-gray-400 text-sm transition-all bg-ink-cream disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          <ErrorBanner message={error} />
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={handleClose}
-              className="px-5 py-3 border-2 border-gray-200 text-ink-gray rounded-xl text-sm font-medium hover:border-ink-primary transition-all">
-              Skip
-            </button>
-            <button type="submit" disabled={isLoading}
-              className="flex-1 py-3 bg-ink-primary text-white rounded-xl text-sm font-medium hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {isLoading ? <><Spinner /> Submitting...</> : "Submit Check-out 🏁"}
-            </button>
-          </div>
-        </form>
+        <div className="flex gap-3">
+          {isEarly && (
+            <button onClick={onClose} className="flex-1 py-3 border border-gray-200 text-gray-500 text-sm rounded-xl hover:border-gray-300 transition-all">Stay</button>
+          )}
+          <button onClick={handleSubmit} disabled={submitting || !currentWords}
+            className="flex-1 py-3 bg-[#2d3748] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all disabled:opacity-40">
+            {submitting ? "Saving..." : isEarly ? "Check out ✓" : "Check out & share ✨"}
+          </button>
+        </div>
+        {!isEarly && <p className="text-[10px] text-gray-400 mt-3">You'll be taken to share a snippet after this.</p>}
       </div>
     </div>
   );

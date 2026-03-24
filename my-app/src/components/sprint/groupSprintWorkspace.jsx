@@ -1,11 +1,27 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import Header from "../profile/header";
 import API_URL from "@/config/api";
-import { EndGroupSprintModal, MemberCheckoutModal } from "./groupSprintModal";
+import { CheckoutModal } from "./groupSprintModal";
+import { Room, Track } from "livekit-client";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────
+const SOUNDSCAPES = {
+  rain:  { label: "Rain",   icon: "🌧️", url: "/cold-city-288972.mp3" },
+  birds: { label: "Birds",  icon: "🐦", url: "https://cdn.pixabay.com/audio/2021/09/06/audio_e84e5c5d46.mp3" },
+  cafe:  { label: "Café",   icon: "☕", url: "https://cdn.pixabay.com/audio/2022/10/16/audio_3a8b67dc77.mp3" },
+};
+
+const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL;
+const POLL_INTERVAL = 8000;
+
+// ─── Data-channel message type ────────────────────────────────
+// We use LiveKit's publishData() to broadcast small JSON payloads.
+// { type: "sc", muted: boolean }
+const DC_SOUNDSCAPE = "sc";
+
+// ─── Helpers ──────────────────────────────────────────────────
 function getInitials(username = "") {
   return username.slice(0, 2).toUpperCase();
 }
@@ -16,738 +32,788 @@ function formatTime(seconds) {
   return `${m}:${s}`;
 }
 
-function playNotificationSound() {
+function playRing() {
   try {
-    const audio = new Audio('/notification.mp3');
-    audio.volume = 0.5;
-    audio.play().catch(() => {
-      // fallback: try again with a fresh instance
-      try {
-        new Audio('/notification.mp3').play().catch(() => {});
-      } catch { /* silently fail */ }
-    });
-  } catch {
-    // silently fail
-  }
+    const audio = new Audio("/notification.mp3");
+    audio.volume = 0.7;
+    audio.play().catch(() => {});
+  } catch {}
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
-function Avatar({ username, avatar, isHost, size = "md" }) {
-  const dim = size === "lg" ? "w-11 h-11" : size === "sm" ? "w-7 h-7 text-[10px]" : "w-8 h-8 text-xs";
-  if (avatar) {
-    return (
-      <img
-        src={avatar}
-        alt={username}
-        className={`${dim} rounded-full object-cover flex-shrink-0 ${isHost ? "ring-2 ring-[#d4af37]" : ""}`}
-      />
-    );
+// Encode a plain object → Uint8Array for LiveKit publishData
+function encodeMsg(obj) {
+  return new TextEncoder().encode(JSON.stringify(obj));
+}
+
+// ─── Soundscape hook ──────────────────────────────────────────
+// Manages local audio playback.
+// Returns muted/started state + setters so the workspace can
+// broadcast mute changes to other participants.
+function useSoundscape(soundscape, isActive) {
+  const audioRef = useRef(null);
+  const [muted, setMuted] = useState(false);
+  const [started, setStarted] = useState(false);
+  const scape = SOUNDSCAPES[soundscape];
+
+  useEffect(() => {
+    if (!scape || !isActive) return;
+    if (!audioRef.current) {
+      audioRef.current = new Audio(scape.url);
+      audioRef.current.loop = true;
+      audioRef.current.volume = 0.35;
+    }
+    audioRef.current.play().then(() => setStarted(true)).catch(() => setStarted(false));
+    return () => { audioRef.current?.pause(); };
+  }, [scape, isActive]);
+
+  useEffect(() => {
+    if (!isActive && audioRef.current) audioRef.current.pause();
+  }, [isActive]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.muted = muted;
+  }, [muted]);
+
+  return { muted, setMuted, started, setStarted, scape, audioRef };
+}
+
+// ─── Soundscape Controls (top bar) ────────────────────────────
+function SoundscapeControls({
+  soundscape, isActive,
+  muted, setMuted,
+  started, setStarted,
+  audioRef, scape,
+  onMuteToggle, // (muted: boolean) => void — broadcast to room
+}) {
+  if (!scape || !isActive) return null;
+
+  function handleToggleMute() {
+    setMuted((prev) => {
+      const next = !prev;
+      onMuteToggle(next);
+      return next;
+    });
   }
+
   return (
-    <div className={`${dim} rounded-full flex items-center justify-center font-semibold flex-shrink-0
-      ${isHost ? "bg-[#d4af37] text-[#2d3748]" : "bg-[#2d3748] text-white"}`}>
-      {getInitials(username)}
+    <div className="flex items-center gap-2">
+      <span className="text-base">{scape.icon}</span>
+      <span className="text-xs text-[#7a6a50] hidden sm:inline font-medium">{scape.label}</span>
+      {!started ? (
+        <button
+          onClick={() =>
+            audioRef.current
+              ?.play()
+              .then(() => { setStarted(true); onMuteToggle(false); })
+              .catch(() => {})
+          }
+          className="text-xs text-[#c9a227] underline underline-offset-2 hover:text-[#a07c10] transition-colors font-medium"
+        >
+          Play sounds
+        </button>
+      ) : (
+        <button
+          onClick={handleToggleMute}
+          className={`text-xs px-2.5 py-1 rounded-full border transition-all font-medium ${
+            muted
+              ? "border-[#ddd0bb] text-[#9a8a70] hover:border-[#c9b090] bg-[#f5ede0]"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          }`}
+        >
+          {muted ? "🔇 Muted" : "🔊 On"}
+        </button>
+      )}
     </div>
   );
 }
 
-// ── Like button ───────────────────────────────────────────────────────────────
-function LikeButton({ sprintId, initialCount = 0, initialLiked = false }) {
-  const [liked, setLiked] = useState(initialLiked);
-  const [count, setCount] = useState(initialCount);
-  const [busy, setBusy] = useState(false);
+// ─── Screen Share Button ──────────────────────────────────────
+function ScreenShareButton({ roomRef, isActive }) {
+  const [sharing, setSharing] = useState(false);
 
-  async function toggle() {
-    if (busy) return;
-    setBusy(true);
-    const nextLiked = !liked;
-    setLiked(nextLiked);
-    setCount((c) => nextLiked ? c + 1 : c - 1);
-    try {
-      const res = await fetch(`${API_URL}/sprint/${sprintId}/like`, {
-        method: "POST", credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLiked(data.liked);
-        setCount(data.likesCount);
-      } else {
-        setLiked(!nextLiked);
-        setCount((c) => nextLiked ? c - 1 : c + 1);
-      }
-    } catch {
-      setLiked(!nextLiked);
-      setCount((c) => nextLiked ? c - 1 : c + 1);
-    } finally {
-      setBusy(false);
+  async function toggleShare() {
+    if (!roomRef.current) return;
+    if (sharing) {
+      try { await roomRef.current.localParticipant.setScreenShareEnabled(false); } catch (e) { console.error(e); }
+      setSharing(false);
+    } else {
+      try { await roomRef.current.localParticipant.setScreenShareEnabled(true); setSharing(true); } catch (e) { console.error(e); }
     }
   }
 
+  if (!isActive) return null;
   return (
     <button
-      onClick={toggle}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-all
-        ${liked ? "border-red-200 bg-red-50 text-red-400" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
+      onClick={toggleShare}
+      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
+        sharing
+          ? "border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100"
+          : "border-[#ddd0bb] text-[#7a6a50] hover:border-[#c9b090] hover:text-[#5a4a30] bg-[#faf5ed]"
+      }`}
     >
-      <span>{liked ? "♥" : "♡"}</span>
-      {count > 0 && <span>{count}</span>}
+      <span>🖥️</span>
+      <span className="hidden sm:inline">{sharing ? "Stop sharing" : "Share screen"}</span>
     </button>
   );
 }
 
-// ── Check-in bubble ───────────────────────────────────────────────────────────
-function CheckinBubble({ sprint, isHost }) {
-  const user = sprint.user;
+// ─── Stopwatch-face Timer ─────────────────────────────────────
+function StopwatchTimer({ secondsLeft, totalSeconds, ended }) {
+  const radius = 44;
+  const circumference = 2 * Math.PI * radius;
+  const progress = ended ? 0 : secondsLeft / totalSeconds;
+  const offset = circumference * (1 - progress);
+
+  const ticks = Array.from({ length: 60 }, (_, i) => {
+    const angle = (i / 60) * 360;
+    const isMain = i % 5 === 0;
+    const rad = (angle - 90) * (Math.PI / 180);
+    const r1 = isMain ? 36 : 38;
+    const r2 = 42;
+    return {
+      x1: 50 + r1 * Math.cos(rad), y1: 50 + r1 * Math.sin(rad),
+      x2: 50 + r2 * Math.cos(rad), y2: 50 + r2 * Math.sin(rad),
+      isMain,
+    };
+  });
+
   return (
-    <div className="flex items-start gap-4">
-      <Link to={`/profile/${user?.username}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-        <Avatar username={user?.username} avatar={user?.avatar} isHost={isHost} size="lg" />
-      </Link>
-      <div className="max-w-[85%]">
-        <p className="text-xs text-gray-400 mb-1.5">
-          <Link to={`/profile/${user?.username}`} className="hover:text-[#2d3748] transition-colors font-medium">
-            @{user?.username}
-          </Link>
-          {isHost && <span className="ml-1.5 text-[#d4af37]">· host</span>}
-        </p>
-        <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm">
-          {sprint.checkin ? (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-xl">{ended ? "🏁" : "⏱️"}</span>
+      <div
+        className="relative flex items-center justify-center"
+        style={{
+          width: 110, height: 110, borderRadius: "50%",
+          background: "radial-gradient(circle at 35% 35%, #fffdf8, #f0e8d8)",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.13), inset 0 1px 3px rgba(255,255,255,0.8), 0 0 0 3px #e8d8b8, 0 0 0 5px #c9b090",
+        }}
+      >
+        <svg viewBox="0 0 100 100" width="100" height="100" className="absolute inset-0" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx="50" cy="50" r={radius} fill="none" stroke="#e8dcc8" strokeWidth="4" />
+          <circle cx="50" cy="50" r={radius} fill="none"
+            stroke={ended ? "#10b981" : "#c9a227"} strokeWidth="4" strokeLinecap="round"
+            strokeDasharray={circumference} strokeDashoffset={offset}
+            style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s ease" }} />
+          {ticks.map((t, i) => (
+            <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+              stroke={t.isMain ? "#a09070" : "#d0c0a0"} strokeWidth={t.isMain ? 1.5 : 0.8}
+              style={{ transform: "rotate(90deg)", transformOrigin: "50px 50px" }} />
+          ))}
+        </svg>
+        <div className="z-10 text-center select-none">
+          {ended ? (
+            <p className="text-xs text-emerald-600 font-bold tracking-wide" style={{ fontFamily: "'Georgia', serif" }}>Done!</p>
+          ) : (
             <>
-              <p className="text-xs font-semibold text-[#d4af37] uppercase tracking-wide mb-1.5">writing on</p>
-              <p className="text-base text-[#2d3748] leading-relaxed">{sprint.checkin}</p>
+              <p className="text-xl font-bold text-[#2d3748] leading-none tabular-nums"
+                style={{ fontFamily: "'Georgia', 'Times New Roman', serif", letterSpacing: "-0.5px" }}>
+                {formatTime(secondsLeft)}
+              </p>
+              <p className="text-[9px] text-[#9a8a70] mt-0.5 tracking-widest uppercase">left</p>
             </>
-          ) : (
-            <p className="text-base text-gray-400 italic">Joined quietly</p>
           )}
-          {sprint.startWordCount > 0 && (
-            <p className="text-xs text-gray-400 mt-3 pt-2.5 border-t border-gray-100">
-              Starting at <span className="font-medium text-[#2d3748]">{sprint.startWordCount.toLocaleString()}</span> words
-            </p>
-          )}
-        </div>
-        <div className="mt-2 ml-1">
-          <LikeButton sprintId={sprint.id} initialCount={sprint._count?.likes || 0} initialLiked={sprint.userLiked || false} />
         </div>
       </div>
     </div>
   );
 }
 
-// ── Check-out bubble ──────────────────────────────────────────────────────────
-function CheckoutBubble({ sprint, isHost }) {
-  const user = sprint.user;
-  return (
-    <div className="flex items-start gap-4 flex-row-reverse">
-      <Link to={`/profile/${user?.username}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-        <Avatar username={user?.username} avatar={user?.avatar} isHost={isHost} size="lg" />
-      </Link>
-      <div className="max-w-[85%] flex flex-col items-end">
-        <p className="text-xs text-gray-400 mb-1.5">
-          <Link to={`/profile/${user?.username}`} className="hover:text-[#2d3748] transition-colors font-medium">
-            @{user?.username}
-          </Link>
-          {isHost && <span className="ml-1.5 text-[#d4af37]">· host</span>}
-        </p>
-        <div className="bg-[#2d3748] rounded-2xl rounded-tr-sm px-5 py-4">
-          <p className="text-xs font-semibold text-[#d4af37] uppercase tracking-wide mb-1.5">how it went</p>
-          {sprint.checkout ? (
-            <p className="text-base text-white leading-relaxed">{sprint.checkout}</p>
-          ) : (
-            <p className="text-base text-white/50 italic">Finished quietly</p>
-          )}
-          {sprint.wordsWritten > 0 && (
-            <p className="text-xs text-[#d4af37] mt-2.5">{sprint.wordsWritten.toLocaleString()} words written</p>
-          )}
-        </div>
-        <div className="mt-2 mr-1">
-          <LikeButton sprintId={sprint.id} initialCount={sprint._count?.likes || 0} initialLiked={sprint.userLiked || false} />
-        </div>
+// ─── Participant Video (screen share) ────────────────────────
+function ParticipantVideo({ track }) {
+  const videoRef = useRef(null);
+  useEffect(() => {
+    if (!videoRef.current || !track) return;
+    const el = track.attach();
+    el.style.width = "100%"; el.style.height = "100%";
+    el.style.objectFit = "cover"; el.style.position = "absolute";
+    el.style.inset = "0"; el.style.borderRadius = "inherit";
+    videoRef.current.appendChild(el);
+    return () => { track.detach(el); el.remove(); };
+  }, [track]);
+  return <div ref={videoRef} className="absolute inset-0 z-10 rounded-2xl overflow-hidden" />;
+}
+
+// ─── Soundscape Badge ─────────────────────────────────────────
+// Shown on each desk card. Three visual states:
+//   isUnknown=true  → faint 🎧 (no data received yet)
+//   muted=true      → 🔇 grey pill
+//   muted=false     → 🎧 green pill
+function SoundscapeBadge({ hasSoundscape, muted, isUnknown }) {
+  if (!hasSoundscape) return null;
+
+  if (isUnknown) {
+    return (
+      <div
+        title="Soundscape status unknown"
+        className="absolute bottom-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-sm
+                   bg-white/70 border border-[#e0d0b8] shadow-sm opacity-40 select-none"
+      >
+        🎧
       </div>
+    );
+  }
+
+  return (
+    <div
+      title={muted ? "Soundscape muted" : "Listening to soundscape"}
+      className={`absolute bottom-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-sm
+                  shadow-sm border select-none transition-all duration-300 ${
+        muted
+          ? "bg-white/90 border-gray-200 opacity-70"
+          : "bg-emerald-50/95 border-emerald-200"
+      }`}
+    >
+      {muted ? "🔇" : "🎧"}
     </div>
   );
 }
 
-// ── Section divider ───────────────────────────────────────────────────────────
-function Divider({ label }) {
+// ─── Desk Card ────────────────────────────────────────────────
+function DeskCard({ sprint, groupSprint, user, screenTrack, soundscapeStates, myMuted }) {
+  const isMe = user && Number(sprint.userId) === Number(user.id);
+  const isSprintHost = Number(sprint.userId) === Number(groupSprint.userId);
+  const isCheckedOut = !sprint.isActive;
+  const hasScreen = !!screenTrack;
+  const hasSoundscape = !!groupSprint.soundscape;
+
+  // Determine soundscape display state for this card:
+  // Local user  → use live myMuted (most up-to-date, no round-trip needed)
+  // Others      → read from soundscapeStates map (populated by data channel)
+  let scMuted = false;
+  let scUnknown = false;
+
+  if (hasSoundscape && !isCheckedOut) {
+    if (isMe) {
+      scMuted = myMuted;
+    } else {
+      const username = sprint.user?.username;
+      if (soundscapeStates[username] === undefined) {
+        scUnknown = true; // haven't received a broadcast from them yet
+      } else {
+        scMuted = soundscapeStates[username];
+      }
+    }
+  }
+
   return (
-    <div className="flex items-center gap-3 my-7">
-      <div className="flex-1 h-px bg-gray-100" />
-      <p className="text-xs text-gray-400 uppercase tracking-widest">{label}</p>
-      <div className="flex-1 h-px bg-gray-100" />
-    </div>
-  );
-}
+    <div className="flex flex-col gap-0">
+      {/* Desk square */}
+      <div
+        className={`relative rounded-2xl overflow-hidden transition-all duration-300 ${
+          isMe ? "ring-2 ring-[#c9a227] shadow-lg" : "ring-1 ring-[#e0d0b8] shadow-md"
+        } ${isCheckedOut ? "opacity-55" : ""}`}
+        style={{ aspectRatio: "1 / 1" }}
+      >
+        {/* Warm background */}
+        <div className="absolute inset-0" style={{
+          background: isMe
+            ? "linear-gradient(145deg, #fffbef 0%, #fef3c7 60%, #fde68a22 100%)"
+            : "linear-gradient(145deg, #faf7f0 0%, #f0e8d8 70%, #e8dcc822 100%)",
+        }} />
 
-// ── Writers Sidebar ───────────────────────────────────────────────────────────
-function WritersSidebar({ sprints, hostUserId, isCollapsed, onToggle, mySprint, hasCheckedOut, onEarlyCheckout, isActive }) {
-  const writerCount = sprints.length;
+        {/* Wood-grain texture */}
+        <div className="absolute inset-0 opacity-[0.06]" style={{
+          backgroundImage: "repeating-linear-gradient(175deg, transparent, transparent 18px, #8B6914 19px)",
+        }} />
 
-  return (
-    <div className={`
-      flex flex-col bg-white border-l border-gray-100 transition-all duration-300 flex-shrink-0 h-full
-      ${isCollapsed ? "w-14" : "w-72"}
-    `}>
-      {/* Sidebar header */}
-      <div className={`flex items-center border-b border-gray-100 px-3 py-4 ${isCollapsed ? "justify-center" : "justify-between"}`}>
-        {!isCollapsed && (
-          <div>
-            <p className="text-xs font-semibold text-[#2d3748]">Writers in room</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {writerCount} {writerCount === 1 ? "writer" : "writers"}
-            </p>
-          </div>
-        )}
-        <button
-          onClick={onToggle}
-          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 text-gray-400 hover:text-[#2d3748] transition-all flex-shrink-0"
-          title={isCollapsed ? "Show writers" : "Collapse sidebar"}
-        >
-          {/* chevron icon flips direction */}
-          <svg className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
+        {/* Screen share */}
+        {hasScreen && <ParticipantVideo track={screenTrack} />}
 
-      {/* Writer count bubble when collapsed */}
-      {isCollapsed && writerCount > 0 && (
-        <div className="flex justify-center pt-3">
-          <span className="text-[10px] font-bold bg-[#2d3748] text-white rounded-full w-5 h-5 flex items-center justify-center">
-            {writerCount}
-          </span>
-        </div>
-      )}
-
-      {/* Writers list */}
-      <div className="flex-1 overflow-y-auto">
-        {sprints.length === 0 ? (
-          !isCollapsed && (
-            <div className="px-4 py-8 text-center">
-              <p className="text-xs text-gray-400">No writers yet</p>
-            </div>
-          )
-        ) : (
-          <div className={`py-3 ${isCollapsed ? "px-2 space-y-3" : "px-4 space-y-4"}`}>
-            {sprints.map((sprint) => {
-              const isHost = sprint.userId === hostUserId;
-              const isMe = sprint.id === mySprint?.id;
-              return isCollapsed ? (
-                // Collapsed: just avatar stacked
-                <div key={sprint.id} className="flex justify-center" title={`@${sprint.user?.username}${isHost ? " (host)" : ""}`}>
-                  <Avatar username={sprint.user?.username} avatar={sprint.user?.avatar} isHost={isHost} size="sm" />
-                </div>
+        {/* Avatar */}
+        {!hasScreen && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Link to={`/profile/${sprint.user?.username}`} className="group/avatar">
+              {sprint.user?.avatar ? (
+                <img src={sprint.user.avatar} alt={sprint.user?.username}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-white shadow-lg group-hover/avatar:scale-105 transition-transform" />
               ) : (
-                // Expanded: full writer card
-                <div key={sprint.id} className={`rounded-xl p-3 ${isMe ? "bg-blue-50 border border-blue-100" : "bg-gray-50"}`}>
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <Link to={`/profile/${sprint.user?.username}`} className="hover:opacity-80 transition-opacity flex-shrink-0">
-                      <Avatar username={sprint.user?.username} avatar={sprint.user?.avatar} isHost={isHost} size="sm" />
-                    </Link>
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/profile/${sprint.user?.username}`}
-                        className="text-xs font-semibold text-[#2d3748] hover:underline truncate block"
-                      >
-                        @{sprint.user?.username}
-                      </Link>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {isHost && (
-                          <span className="text-[10px] font-medium text-[#d4af37]">host</span>
-                        )}
-                        {isMe && (
-                          <span className="text-[10px] font-medium text-blue-500">you</span>
-                        )}
-                        {!sprint.isActive && (
-                          <span className="text-[10px] text-emerald-600 font-medium">✓ checked out</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {/* Intro only — no check-in */}
-                  {sprint.intro && (
-                    <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2 italic pl-0.5">
-                      "{sprint.intro}"
-                    </p>
-                  )}
+                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold border-4 border-white shadow-lg group-hover/avatar:scale-105 transition-transform ${
+                  isSprintHost ? "bg-[#d4af37] text-[#2d3748]" : "bg-[#2d3748] text-white"
+                }`}>
+                  {getInitials(sprint.user?.username)}
                 </div>
-              );
-            })}
+              )}
+            </Link>
           </div>
         )}
+
+        {/* Coffee cup */}
+        {!hasScreen && <div className="absolute top-2.5 right-2.5 text-base opacity-40 select-none">☕</div>}
+
+        {/* Online dot */}
+        {!isCheckedOut && <span className="absolute top-2.5 left-2.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white shadow" />}
+
+        {/* Checked-out badge */}
+        {isCheckedOut && (
+          <div className="absolute top-2.5 left-2.5 bg-white/90 rounded-full px-2 py-0.5 text-[10px] text-gray-500 font-medium border border-gray-200 shadow-sm">
+            ✓ done
+          </div>
+        )}
+
+        {/* Host crown */}
+        {isSprintHost && <div className="absolute top-2.5 right-8 text-sm select-none opacity-80">👑</div>}
       </div>
 
-      {/* Early checkout button — for members who haven't checked out yet */}
-      {!isCollapsed && mySprint && !hasCheckedOut && (
-        <div className="border-t border-gray-100 p-3">
-          <button
-            onClick={onEarlyCheckout}
-            className="w-full py-2.5 text-xs font-semibold text-[#2d3748] border border-[#2d3748] rounded-xl hover:bg-[#2d3748] hover:text-white transition-all"
-          >
-            {isActive ? "Submit Check-out early" : "Submit Check-out"}
-          </button>
-          {isActive && <p className="text-[10px] text-gray-400 text-center mt-1.5">Can't wait for the sprint to end?</p>}
-        </div>
-      )}
-    </div>
-  );
-}
+      {/* Info panel below desk */}
+      <div className="bg-white rounded-b-2xl border border-t-0 border-[#e8dcc8] px-3 pt-2.5 pb-3 shadow-sm">
+        {/* Name row */}
+        <Link to={`/profile/${sprint.user?.username}`}
+          className="text-sm font-bold text-[#2d3748] hover:underline truncate block leading-tight">
+          @{sprint.user?.username}
+          {isSprintHost && <span className="text-[#b8962e] font-normal text-xs ml-1">· host</span>}
+          {isMe && <span className="text-[#9a8a70] font-normal text-xs ml-1">· you</span>}
+        </Link>
 
-// ── Mobile Writers Drawer ─────────────────────────────────────────────────────
-function MobileWritersDrawer({ sprints, hostUserId, isOpen, onClose, mySprint, hasCheckedOut, onEarlyCheckout, isActive }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-40 flex">
-      {/* Backdrop */}
-      <div className="flex-1 bg-black/30" onClick={onClose} />
-      {/* Drawer */}
-      <div className="w-72 bg-white flex flex-col shadow-2xl animate-slide-in-right">
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-          <div>
-            <p className="text-sm font-semibold text-[#2d3748]">Writers in room</p>
-            <p className="text-xs text-gray-400">{sprints.length} {sprints.length === 1 ? "writer" : "writers"}</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 text-gray-400">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-          {sprints.map((sprint) => {
-            const isHost = sprint.userId === hostUserId;
-            const isMe = sprint.id === mySprint?.id;
-            return (
-              <div key={sprint.id} className={`rounded-xl p-3 ${isMe ? "bg-blue-50 border border-blue-100" : "bg-gray-50"}`}>
-                <div className="flex items-center gap-2.5 mb-2">
-                  <Link to={`/profile/${sprint.user?.username}`} onClick={onClose} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-                    <Avatar username={sprint.user?.username} avatar={sprint.user?.avatar} isHost={isHost} size="sm" />
-                  </Link>
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={`/profile/${sprint.user?.username}`}
-                      onClick={onClose}
-                      className="text-xs font-semibold text-[#2d3748] hover:underline truncate block"
-                    >
-                      @{sprint.user?.username}
-                    </Link>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      {isHost && <span className="text-[10px] font-medium text-[#d4af37]">host</span>}
-                      {isMe && <span className="text-[10px] font-medium text-blue-500">you</span>}
-                      {!sprint.isActive && <span className="text-[10px] text-emerald-600 font-medium">✓ checked out</span>}
-                    </div>
-                  </div>
-                </div>
-                {sprint.intro && (
-                  <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2 italic">"{sprint.intro}"</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {isActive && mySprint && !hasCheckedOut && (
-          <div className="border-t border-gray-100 p-4">
-            <button
-              onClick={() => { onEarlyCheckout(); onClose(); }}
-              className="w-full py-2.5 text-sm font-semibold text-[#2d3748] border border-[#2d3748] rounded-xl hover:bg-[#2d3748] hover:text-white transition-all"
+        {/* Working-on text + soundscape indicator on the same row */}
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <p className="text-xs text-[#7a6a50] leading-snug line-clamp-2 min-h-[2.5em] flex-1">
+            {isCheckedOut
+              ? `✓ wrapped up${sprint.wordsWritten > 0 ? ` · ${sprint.wordsWritten.toLocaleString()} words` : ""}`
+              : sprint.checkin
+              ? <><span className="text-[#9a8a70]">working on </span><span className="font-medium text-[#5a4a30]">"{sprint.checkin}"</span></>
+              : <span className="italic text-[#aaa090]">writing quietly...</span>
+            }
+          </p>
+
+          {/* Soundscape indicator — always visible here, even during screen share */}
+          {!isCheckedOut && hasSoundscape && (
+            <div
+              title={scUnknown ? "Soundscape status unknown" : scMuted ? "Soundscape muted" : "Listening to soundscape"}
+              className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs border transition-all duration-300 ${
+                scUnknown
+                  ? "bg-gray-50 border-gray-200 opacity-50"
+                  : scMuted
+                  ? "bg-white border-gray-200 opacity-70"
+                  : "bg-emerald-50 border-emerald-200"
+              }`}
             >
-              Submit Check-out early
-            </button>
-          </div>
-        )}
+              {scUnknown ? "🎧" : scMuted ? "🔇" : "🎧"}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ─── Main Workspace ───────────────────────────────────────────
 export default function GroupSprintWorkspace() {
   const { groupSprintId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const [groupSprint, setGroupSprint] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [sprints, setSprints] = useState([]);
+  const [mySprint, setMySprint] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [sprintEnded, setSprintEnded] = useState(false);
+  const ringFiredRef = useRef(false);
   const timerRef = useRef(null);
-  const beepedRef = useRef(false);
 
-  const [showEndModal, setShowEndModal] = useState(false);
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const roomRef = useRef(null);
+  const livekitJoinedRef = useRef(false);
+  const [screenTracks, setScreenTracks] = useState({});
 
-  const [mySprint, setMySprint] = useState(null);
-  const [hasCheckedOut, setHasCheckedOut] = useState(false);
+  // ── Soundscape states received from OTHER participants ──────
+  // { [username]: boolean }  true = muted, false = listening
+  // Populated when we receive a DC_SOUNDSCAPE data message.
+  const [soundscapeStates, setSoundscapeStates] = useState({});
 
-  // Sidebar state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [showEarlyCheckout, setShowEarlyCheckout] = useState(false);
 
-  const isHost = groupSprint?.userId === user?.id;
+  const isHost = user && groupSprint && Number(groupSprint.userId) === Number(user.id);
+  const hasCheckedOut = mySprint ? !mySprint.isActive : false;
 
-  // ── Preload & unlock audio (mirrors solo sprint) ───────────────────────────
-  useEffect(() => {
-    const audio = new Audio('/notification.mp3');
-    audio.preload = 'auto';
-    audio.volume = 0.5;
-    const unlock = () => {
-      audio.play().then(() => audio.pause()).catch(() => {});
-      document.removeEventListener('click', unlock);
-      document.removeEventListener('touchstart', unlock);
-    };
-    document.addEventListener('click', unlock);
-    document.addEventListener('touchstart', unlock);
-    return () => {
-      document.removeEventListener('click', unlock);
-      document.removeEventListener('touchstart', unlock);
-    };
+  const soundscapeState = useSoundscape(
+    groupSprint?.soundscape,
+    groupSprint?.isActive ?? false
+  );
+
+  // ── Broadcast our soundscape state to every peer in the room ─
+  // Called on mute toggle and immediately after joining the room.
+  const broadcastSoundscapeState = useCallback((muted) => {
+    const room = roomRef.current;
+    if (!room) return;
+    try {
+      room.localParticipant.publishData(
+        encodeMsg({ type: DC_SOUNDSCAPE, muted }),
+        { reliable: true } // reliable = guaranteed delivery, good for state
+      );
+    } catch (e) {
+      console.warn("[DataChannel] broadcast failed:", e);
+    }
   }, []);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-  async function fetchGroupSprint() {
+  // ── Fetch ───────────────────────────────────────────────────
+  const fetchGroupSprint = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/sprint/${groupSprintId}`, { credentials: "include" });
-      if (res.ok) {
-        
-        const data = await res.json();
-        console.log("sprints", data);
-        const gs = data.groupSprint;
-        setGroupSprint(gs);
+      if (!res.ok) { setError("Sprint not found."); return; }
+      const data = await res.json();
+      setGroupSprint(data.groupSprint);
+      setSprints(data.groupSprint.sprints || []);
+    } catch { setError("Failed to load sprint."); }
+    finally { setLoading(false); }
+  }, [groupSprintId]);
 
-        const mine = gs.sprints?.find((s) => s.userId === user?.id);
-        if (mine) {
-          setMySprint(mine);
-          if (!mine.isActive) setHasCheckedOut(true);
-        }
+  const fetchMySprint = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_URL}/sprint/loginUserSession`, { credentials: "include" });
+      if (res.ok) { const data = await res.json(); setMySprint(data.sprint); }
+    } catch {}
+  }, [user]);
 
-        if (gs.isActive) {
-          const elapsed = Math.floor((Date.now() - new Date(gs.startedAt).getTime()) / 1000);
-          const remaining = Math.max(0, gs.duration * 60 - elapsed);
-          setSecondsLeft(remaining);
-          if (remaining === 0) setSprintEnded(true);
-        } else {
-          setSprintEnded(true);
-          setSecondsLeft(0);
-        }
-      } else if (res.status === 404) {
-        setError("This group sprint doesn't exist or may have been removed.");
-      } else {
-        setError("We couldn't load this sprint. Please refresh and try again.");
-      }
-    } catch {
-      setError("We couldn't reach the server. Please check your connection and try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  useEffect(() => { fetchGroupSprint(); fetchMySprint(); }, [fetchGroupSprint, fetchMySprint]);
 
-  useEffect(() => { fetchGroupSprint(); }, [groupSprintId]);
-
-  // ── Countdown ──────────────────────────────────────────────────────────────
+  // ── LiveKit ──────────────────────────────────────────────────
   useEffect(() => {
-    if (sprintEnded || !groupSprint?.isActive) return;
-    timerRef.current = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          setSprintEnded(true);
-          if (!beepedRef.current) { beepedRef.current = true; playNotificationSound(); }
-          if (mySprint && !hasCheckedOut) {
-            if (isHost) setShowEndModal(true);
-            else setShowCheckoutModal(true);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [sprintEnded, groupSprint?.isActive, mySprint, hasCheckedOut, isHost]);
+    if (!groupSprint?.isActive || !groupSprint?.liveKitRoomName) return;
+    if (livekitJoinedRef.current) return;
+    livekitJoinedRef.current = true;
 
-  // Poll every 15s while active
+    async function joinRoom() {
+      try {
+        if (!LIVEKIT_URL) { livekitJoinedRef.current = false; return; }
+
+        const res = await fetch(`${API_URL}/sprint/${groupSprintId}/livekit-token`, { credentials: "include" });
+        if (!res.ok) { return; }
+        const { token } = await res.json();
+
+        const room = new Room();
+        roomRef.current = room;
+
+        // ── Screen share ───────────────────────────────────────
+        room.on("trackSubscribed", (track, _pub, participant) => {
+          if (track.source === Track.Source.ScreenShare) {
+            setScreenTracks((prev) => ({ ...prev, [participant.identity]: track }));
+          }
+        });
+        room.on("trackUnsubscribed", (track, _pub, participant) => {
+          if (track.source === Track.Source.ScreenShare) {
+            setScreenTracks((prev) => { const next = { ...prev }; delete next[participant.identity]; return next; });
+          }
+        });
+        room.localParticipant.on("localTrackPublished", (pub) => {
+          if (pub.track?.source === Track.Source.ScreenShare) {
+            setScreenTracks((prev) => ({ ...prev, [room.localParticipant.identity]: pub.track }));
+          }
+        });
+        room.localParticipant.on("localTrackUnpublished", (pub) => {
+          if (pub.track?.source === Track.Source.ScreenShare) {
+            setScreenTracks((prev) => { const next = { ...prev }; delete next[room.localParticipant.identity]; return next; });
+          }
+        });
+
+        // ── Data channel: receive soundscape state from peers ──
+        // participant.identity === their username (set in the LiveKit token on the server)
+        room.on("dataReceived", (rawData, participant) => {
+          if (!participant) return;
+          try {
+            const msg = JSON.parse(new TextDecoder().decode(rawData));
+            if (msg.type === DC_SOUNDSCAPE) {
+              // Update the sender's mute state on all other desks
+              setSoundscapeStates((prev) => ({
+                ...prev,
+                [participant.identity]: msg.muted,
+              }));
+            }
+            if (msg.type === "sc_request") {
+              // A new participant is asking everyone to re-broadcast their state.
+              // Reply with our current muted state so their desk cards update.
+              broadcastSoundscapeState(soundscapeState.muted);
+            }
+          } catch {
+            // malformed — ignore silently
+          }
+        });
+
+        // When a NEW participant connects, they won't know our state yet.
+        // Re-broadcast immediately so their desk card shows the right icon.
+        room.on("participantConnected", () => {
+          broadcastSoundscapeState(soundscapeState.muted);
+        });
+
+        await room.connect(LIVEKIT_URL, token);
+
+        // After connecting, broadcast our state AND ask existing participants
+        // to re-send theirs so we can populate their desk cards right away.
+        setTimeout(() => {
+          // Tell everyone our mute state
+          broadcastSoundscapeState(soundscapeState.muted);
+          // Ask existing participants to reply with their state
+          try {
+            room.localParticipant.publishData(
+              encodeMsg({ type: "sc_request" }),
+              { reliable: true }
+            );
+          } catch (e) {
+            console.warn("[DataChannel] sc_request failed:", e);
+          }
+        }, 600);
+
+      } catch (err) {
+        console.error("[LiveKit] connection error:", err);
+        livekitJoinedRef.current = false;
+      }
+    }
+
+    joinRoom();
+    // soundscapeState.muted intentionally not in deps — we only join once.
+    // The initial broadcast uses a closure snapshot which is fine here.
+  }, [groupSprint?.liveKitRoomName, groupSprint?.isActive, groupSprintId, broadcastSoundscapeState]);
+
+  useEffect(() => {
+    return () => { if (roomRef.current) { roomRef.current.disconnect(); roomRef.current = null; } };
+  }, []);
+
+  // ── Re-broadcast our soundscape state whenever it changes ───
+  // This covers the case where we mute/unmute while someone is already
+  // in the room, ensuring their desk card updates instantly.
+  useEffect(() => {
+    if (!roomRef.current || !groupSprint?.isActive) return;
+    broadcastSoundscapeState(soundscapeState.muted);
+  }, [soundscapeState.muted, broadcastSoundscapeState, groupSprint?.isActive]);
+
+  // ── Poll ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!groupSprint?.isActive) return;
-    const poll = setInterval(fetchGroupSprint, 15000);
+    const poll = setInterval(() => { fetchGroupSprint(); fetchMySprint(); }, POLL_INTERVAL);
     return () => clearInterval(poll);
-  }, [groupSprint?.isActive]);
+  }, [groupSprint?.isActive, fetchGroupSprint, fetchMySprint]);
 
-  // ── Event handlers ─────────────────────────────────────────────────────────
-  function handleCheckedOut(sprint) {
-    setHasCheckedOut(true);
-    setMySprint(sprint);
-    setGroupSprint((prev) => ({
-      ...prev,
-      sprints: prev.sprints.map((s) => s.id === sprint.id ? { ...s, ...sprint } : s),
-    }));
-  }
+  // ── Timer ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!groupSprint?.isActive) return;
+    const startedAt = new Date(groupSprint.startedAt).getTime();
+    const endsAt = startedAt + groupSprint.duration * 60 * 1000;
 
-  function handleGroupEnded() {
-    setSprintEnded(true);
-    setGroupSprint((prev) => ({ ...prev, isActive: false }));
+    function tick() {
+      const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining === 0 && !sprintEnded) {
+        setSprintEnded(true);
+        if (!hasCheckedOut && !ringFiredRef.current) {
+          ringFiredRef.current = true;
+          playRing();
+          if (isHost) {
+            fetch(`${API_URL}/sprint/${groupSprintId}/endGroupSprint`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              credentials: "include", body: JSON.stringify({}),
+            }).then(() => { fetchGroupSprint(); setShowCheckout(true); }).catch(() => { setShowCheckout(true); });
+          } else {
+            setShowCheckout(true);
+          }
+        }
+      }
+    }
+
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [groupSprint, sprintEnded, hasCheckedOut, isHost, groupSprintId, fetchGroupSprint]);
+
+  function handleCheckedOut() {
+    setShowCheckout(false);
+    setShowEarlyCheckout(false);
+    fetchMySprint();
     fetchGroupSprint();
   }
 
-  // ── Loading / error states ─────────────────────────────────────────────────
-  if (isLoading) {
+  // ── Loading / Error ──────────────────────────────────────────
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#fafaf9] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f5f0e8" }}>
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-[#2d3748] border-t-transparent mb-4" />
-          <p className="text-gray-500 text-sm">Loading sprint room...</p>
+          <div className="text-4xl mb-4 animate-bounce">☕</div>
+          <p className="text-sm text-[#7a6a50] font-medium" style={{ fontFamily: "'Georgia', serif" }}>Setting the mood...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !groupSprint) {
     return (
-      <div className="min-h-screen bg-[#fafaf9] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f5f0e8" }}>
         <div className="text-center">
-          <p className="font-serif text-[#2d3748] text-xl mb-2">Oops</p>
-          <p className="text-gray-500 text-sm mb-6">{error}</p>
-          <button onClick={() => navigate("/dashboard")} className="text-sm text-[#2d3748] underline">
-            ← Back to Dashboard
-          </button>
+          <p className="text-4xl mb-3">☕</p>
+          <p className="text-[#2d3748] font-serif text-lg">{error || "Sprint not found."}</p>
+          <button onClick={() => navigate("/")} className="mt-4 text-sm text-[#9a8a70] hover:text-[#2d3748] transition-colors">← Back home</button>
         </div>
       </div>
     );
   }
 
-  const sprints = groupSprint.sprints || [];
-  const checkedOutSprints = sprints.filter((s) => !s.isActive);
   const totalSeconds = groupSprint.duration * 60;
-  const circumference = 2 * Math.PI * 45;
-  const strokeOffset = circumference * (1 - Math.max(0, secondsLeft / totalSeconds));
+  const soundscape = groupSprint.soundscape;
+  const activeWriters = sprints.filter((s) => s.isActive).length;
 
   return (
-    <div className="min-h-screen bg-[#fafaf9] flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: "#f5f0e8" }}>
       <Header />
 
-      {/* ── Main layout: content + sidebar ── */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* ── Main content area ── */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-xl mx-auto px-4 sm:px-6 py-8">
-
-            {/* Mobile: writers button */}
-            <div className="flex items-center justify-between mb-6 lg:hidden">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="text-sm text-gray-400 hover:text-[#2d3748] transition-colors"
-              >
-                ← Dashboard
-              </button>
-              <button
-                onClick={() => setMobileDrawerOpen(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-[#2d3748] hover:border-[#2d3748] transition-all"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {sprints.length} writers
-              </button>
-            </div>
-
-            {/* Purpose + meta */}
-            <div className="text-center mb-8">
-              {groupSprint.groupPurpose && (
-                <h1 className="text-xl sm:text-2xl font-serif text-[#2d3748] italic mb-3 leading-snug">
-                  "{groupSprint.groupPurpose}"
-                </h1>
-              )}
-              <div className="flex items-center justify-center gap-3 flex-wrap text-xs text-gray-400">
-                {groupSprint.isActive ? (
-                  <span className="flex items-center gap-1.5 text-emerald-600 font-medium bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    Live
-                  </span>
-                ) : (
-                  <span className="text-gray-500 bg-gray-100 border border-gray-200 px-3 py-1 rounded-full">
-                    Ended
-                  </span>
-                )}
-                <span>
-                  by{" "}
-                  <Link to={`/profile/${groupSprint.user?.username}`} className="hover:text-[#2d3748] font-medium transition-colors">
-                    @{groupSprint.user?.username}
-                  </Link>
-                </span>
-                <span>·</span>
-                <span>{groupSprint.duration} min</span>
-                <span>·</span>
-                <span>{groupSprint._count?.sprints || 0} writer{(groupSprint._count?.sprints || 0) !== 1 ? "s" : ""}</span>
-              </div>
-            </div>
-
-            {/* Timer */}
-            {groupSprint.isActive && (
-              <div className="flex flex-col items-center mb-8 gap-2">
-                <div className="relative w-28 h-28 flex items-center justify-center">
-                  <svg className="absolute inset-0 -rotate-90" width="112" height="112" viewBox="0 0 112 112">
-                    <circle cx="56" cy="56" r="45" fill="none" stroke="#e5e5e5" strokeWidth="4" />
-                    <circle
-                      cx="56" cy="56" r="45" fill="none"
-                      stroke={sprintEnded ? "#10b981" : "#d4af37"}
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeOffset}
-                      style={{ transition: "stroke-dashoffset 1s linear" }}
-                    />
-                  </svg>
-                  <div className="z-10 text-center">
-                    <p className="text-2xl font-serif font-semibold text-[#2d3748] leading-none">
-                      {sprintEnded ? "Done!" : formatTime(secondsLeft)}
-                    </p>
-                    {!sprintEnded && <p className="text-xs text-gray-400 mt-0.5">left</p>}
-                  </div>
-                </div>
-                {sprintEnded && (
-                  <p className="text-sm text-emerald-600 font-medium">⏰ Time's up — great sprint!</p>
-                )}
-              </div>
-            )}
-
-            {/* Action buttons */}
-            {(isHost || mySprint) && (
-              <div className="flex items-center justify-center gap-3 mb-8 flex-wrap">
-                {isHost && groupSprint.isActive && sprintEnded && (
-                  <button
-                    onClick={() => setShowEndModal(true)}
-                    className="px-6 py-2.5 bg-[#d4af37] text-[#2d3748] text-sm font-semibold rounded-xl hover:opacity-90 transition-all shadow-sm"
-                  >
-                    End Sprint for Everyone 🏁
-                  </button>
-                )}
-                {!isHost && mySprint && sprintEnded && !hasCheckedOut && (
-                  <button
-                    onClick={() => setShowCheckoutModal(true)}
-                    className="px-6 py-2.5 bg-[#2d3748] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all"
-                  >
-                    Submit Check-out
-                  </button>
-                )}
-                {groupSprint.isActive && (
-                  <button
-                    onClick={() => navigator.clipboard?.writeText(window.location.href)}
-                    className="px-5 py-2.5 border border-gray-200 text-gray-500 text-sm rounded-xl hover:border-[#2d3748] hover:text-[#2d3748] transition-all"
-                  >
-                    Copy Invite Link
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Feed */}
-            {sprints.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-3xl mb-3">✍️</p>
-                <p className="font-serif text-[#2d3748] text-lg mb-1">Waiting for writers...</p>
-                <p className="text-sm text-gray-400">Share the link so others can join</p>
-              </div>
+      {/* ── Sticky top bar ─────────────────────────────────────── */}
+      <div
+        className="sticky top-0 z-30 border-b border-[#e0d0b8]"
+        style={{ background: "rgba(250, 245, 237, 0.96)", backdropFilter: "blur(8px)" }}
+      >
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            {groupSprint.isActive ? (
+              <span className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full flex-shrink-0">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live
+              </span>
             ) : (
-              <>
-                <Divider label="check-ins" />
-                <div className="space-y-5">
-                  {sprints.map((sprint) => (
-                    <CheckinBubble
-                      key={`in-${sprint.id}`}
-                      sprint={sprint}
-                      isHost={sprint.userId === groupSprint.userId}
-                    />
-                  ))}
-                </div>
-
-                {(sprintEnded || !groupSprint.isActive) && checkedOutSprints.length > 0 && (
-                  <>
-                    <Divider label="check-outs" />
-                    <div className="space-y-5">
-                      {checkedOutSprints.map((sprint) => (
-                        <CheckoutBubble
-                          key={`out-${sprint.id}`}
-                          sprint={sprint}
-                          isHost={sprint.userId === groupSprint.userId}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {!groupSprint.isActive && groupSprint.groupThankNote && (
-                  <>
-                    <Divider label="from the host" />
-                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex gap-4">
-                      <Link to={`/profile/${groupSprint.user?.username}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-                        <Avatar username={groupSprint.user?.username} avatar={groupSprint.user?.avatar} isHost />
-                      </Link>
-                      <div>
-                        <p className="text-sm font-serif text-[#2d3748] italic leading-relaxed mb-1.5">
-                          "{groupSprint.groupThankNote}"
-                        </p>
-                        <Link to={`/profile/${groupSprint.user?.username}`} className="text-xs text-gray-400 hover:text-[#2d3748] transition-colors">
-                          — @{groupSprint.user?.username}
-                        </Link>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </>
+              <span className="text-xs text-[#7a6a50] bg-[#ede8df] border border-[#ddd0bb] px-2.5 py-1 rounded-full flex-shrink-0">Session ended</span>
             )}
-
-            <div className="text-center mt-10 hidden lg:block">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="text-sm text-gray-400 hover:text-[#2d3748] transition-colors"
-              >
-                ← Back to Dashboard
-              </button>
-            </div>
-            <div className="pb-10" />
+            <span className="text-xs text-[#9a8a70] hidden sm:block truncate font-medium">
+              {activeWriters} writer{activeWriters !== 1 ? "s" : ""} at the table
+              {groupSprint.duration && ` · ${groupSprint.duration} min`}
+            </span>
           </div>
-        </main>
 
-        {/* ── Desktop sidebar ── */}
-        <aside className="hidden lg:flex h-screen sticky top-0">
-          <WritersSidebar
-            sprints={sprints}
-            hostUserId={groupSprint.userId}
-            isCollapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed((v) => !v)}
-            mySprint={mySprint}
-            hasCheckedOut={hasCheckedOut}
-            onEarlyCheckout={() => setShowCheckoutModal(true)}
-            isActive={groupSprint.isActive}
-          />
-        </aside>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {soundscape && (
+              <SoundscapeControls
+                soundscape={soundscape}
+                isActive={groupSprint.isActive}
+                {...soundscapeState}
+                onMuteToggle={broadcastSoundscapeState}
+              />
+            )}
+            <ScreenShareButton roomRef={roomRef} isActive={groupSprint.isActive} />
+            {groupSprint.isActive && (
+              <button
+                onClick={() => navigator.clipboard?.writeText(window.location.href)}
+                className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#ddd0bb] text-[#7a6a50] rounded-full hover:border-[#c9b090] hover:text-[#5a4a30] transition-all font-medium bg-[#faf5ed]"
+              >
+                🔗 <span>Invite</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* ── Mobile drawer ── */}
-      <MobileWritersDrawer
-        sprints={sprints}
-        hostUserId={groupSprint.userId}
-        isOpen={mobileDrawerOpen}
-        onClose={() => setMobileDrawerOpen(false)}
-        mySprint={mySprint}
-        hasCheckedOut={hasCheckedOut}
-        onEarlyCheckout={() => setShowCheckoutModal(true)}
-        isActive={groupSprint.isActive}
-      />
+      {/* ── Body ────────────────────────────────────────────────── */}
+      <div className="flex flex-1 overflow-y-auto justify-center w-full">
+        <main className="w-full max-w-3xl px-4 sm:px-6 py-8 sm:py-10 space-y-8">
+
+          {/* Timer card */}
+          {groupSprint.isActive && (
+            <div className="rounded-3xl border border-[#e0d0b8] shadow-md p-6 sm:p-8"
+              style={{ background: "linear-gradient(160deg, #fffdf8 0%, #faf3e4 100%)" }}>
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="flex-shrink-0">
+                  <StopwatchTimer secondsLeft={secondsLeft} totalSeconds={totalSeconds} ended={sprintEnded} />
+                </div>
+                <div className="flex flex-col gap-4 flex-1 w-full">
+                  {sprints.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {sprints.filter(s => s.isActive).map((s) => (
+                        <div key={s.id} className="flex items-center gap-1.5 bg-white border border-[#e8dcc8] rounded-full px-2.5 py-1 shadow-sm">
+                          {s.user?.avatar
+                            ? <img src={s.user.avatar} alt={s.user?.username} className="w-5 h-5 rounded-full object-cover" />
+                            : <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${Number(s.userId) === Number(groupSprint.userId) ? "bg-[#d4af37] text-[#2d3748]" : "bg-[#2d3748] text-white"}`}>{getInitials(s.user?.username)}</div>
+                          }
+                          <span className="text-xs text-[#5a4a30] font-medium">@{s.user?.username}</span>
+                          {Number(s.userId) === Number(groupSprint.userId) && <span className="text-[10px] text-[#b8962e]">host</span>}
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    {!hasCheckedOut && !sprintEnded && (
+                      <button onClick={() => setShowEarlyCheckout(true)}
+                        className="px-5 py-2 border border-[#ddd0bb] text-[#7a6a50] text-sm rounded-xl hover:border-[#c9a227] hover:text-[#5a4a30] transition-all font-medium bg-white">
+                        {isHost ? "End sprint early" : "Check out early"}
+                      </button>
+                    )}
+                    <button onClick={() => navigator.clipboard?.writeText(window.location.href)}
+                      className="sm:hidden px-5 py-2 border border-[#ddd0bb] text-[#7a6a50] text-sm rounded-xl hover:border-[#c9a227] transition-all font-medium bg-white">
+                      🔗 Copy invite
+                    </button>
+                  </div>
+                  {hasCheckedOut && <p className="text-sm text-emerald-700 font-medium">✓ You've checked out — great session!</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* "At the table" desks */}
+          <div className="rounded-3xl border border-[#e0d0b8] shadow-md p-5 sm:p-7"
+            style={{ background: "linear-gradient(160deg, #faf7f0 0%, #f0e8d8 100%)" }}>
+            <div className="flex items-center gap-2 mb-6">
+              <h2 className="font-serif text-2xl text-[#2d3748]"
+                style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
+                {groupSprint.isActive ? "At the table..." : "The session"}
+              </h2>
+              <span className="text-xl">☕</span>
+            </div>
+
+            {sprints.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-4xl mb-3">☕</p>
+                <p className="font-serif text-[#2d3748] text-lg mb-1" style={{ fontFamily: "'Georgia', serif" }}>The café is empty...</p>
+                <p className="text-sm text-[#9a8a70]">Share the invite link so others can join</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {sprints.map((sprint) => (
+                  <DeskCard
+                    key={sprint.id}
+                    sprint={sprint}
+                    groupSprint={groupSprint}
+                    user={user}
+                    screenTrack={screenTracks[sprint.user?.username] || null}
+                    soundscapeStates={soundscapeStates}
+                    myMuted={soundscapeState.muted}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Session ended: total words */}
+          {!groupSprint.isActive && groupSprint.totalWordsWritten > 0 && (
+            <div className="rounded-3xl border border-[#e0d0b8] shadow-md p-8 text-center"
+              style={{ background: "linear-gradient(160deg, #fffdf8 0%, #faf3e4 100%)" }}>
+              <p className="text-5xl mb-2">🏁</p>
+              <p className="text-5xl font-bold text-[#2d3748] mb-2"
+                style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
+                {groupSprint.totalWordsWritten.toLocaleString()}
+              </p>
+              <p className="text-sm text-[#7a6a50] font-medium">words written together in this session</p>
+            </div>
+          )}
+
+          <div className="text-center pb-8">
+            <button onClick={() => navigate("/")}
+              className="text-sm text-[#9a8a70] hover:text-[#2d3748] transition-colors font-medium">
+              ← Back to the shop
+            </button>
+          </div>
+        </main>
+      </div>
 
       {/* ── Modals ── */}
-      <EndGroupSprintModal
-        isOpen={showEndModal}
-        onClose={() => setShowEndModal(false)}
-        onEnded={handleGroupEnded}
-        groupSprintId={groupSprint?.id}
+      <CheckoutModal
+        isOpen={showCheckout && !hasCheckedOut}
+        onClose={() => setShowCheckout(false)}
+        onSubmit={handleCheckedOut}
         sprintId={mySprint?.id}
+        isEarly={false}
       />
-      <MemberCheckoutModal
-        isOpen={showCheckoutModal}
-        onClose={() => setShowCheckoutModal(false)}
-        onCheckedOut={handleCheckedOut}
+      <CheckoutModal
+        isOpen={showEarlyCheckout}
+        onClose={() => setShowEarlyCheckout(false)}
+        onSubmit={handleCheckedOut}
         sprintId={mySprint?.id}
+        isEarly={true}
       />
     </div>
   );

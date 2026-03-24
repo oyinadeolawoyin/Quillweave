@@ -11,24 +11,20 @@ import ForgotPassword from './components/auth/forgotPassword';
 import ResetPassword from './components/auth/resetPassword';
 import Welcome from './components/auth/welcome';
 
-import SetupPlan from './components/writingPlan/setupPlan';
-import Dashboard from './components/dashboard/dashboard';
-
-import ActiveSprint from './components/sprint/workspace';
-import StartSprint from './components/sprint/startSprint';
 import GroupSprintWorkspace from './components/sprint/groupSprintWorkspace';
 
 import Notification from './components/notification/notification';
-import Profile from './components/profile/profile';
 // import EditProfile from './components/profile/editProfile';
 import NotFound from './components/NotFound';
 import About from './components/about/about';
-import Missions from './components/missions/missions';
 import Services from './components/services/services';
 import Blog from './components/blog/blog';
 import BlogPost from './components/blog/blogPost';
 import AdminBlog from './components/blog/adminBlog';
+import AdminQuote from './components/quote/adminquote';
 import App from './App'
+import SnippetFeed from './components/sprint/snippetfeed';
+import AdminSchedule from './components/sprint/adminschedule';
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
@@ -61,32 +57,12 @@ const router = createBrowserRouter([
     element: <Welcome />
   },
   {
-    path: "/setup-plan",
-    element: <SetupPlan />
+    path: "/snippets",
+    element: <SnippetFeed />
   },
-  {
-    path: "/dashboard",
-    element: <Dashboard />
-  },
-  {
-    path: "/profile/:userId",
-    element: <Profile />,
-    // children: [
-     
-    // ]
-  },
-  // {
-  //   path: "/profile/edit",
-  //   element: <EditProfile />
-  // },
-  {
-    path: "/sprint/:sprintId",
-    element: <ActiveSprint />,
-  },
-  {
-    path: "/start-sprint",
-    element: <StartSprint />
-  },
+  { 
+    path: "/admin/schedule", 
+    element: <AdminSchedule /> },
   {
     path: "group-sprint/:groupSprintId",
     element: <GroupSprintWorkspace />
@@ -98,10 +74,6 @@ const router = createBrowserRouter([
   {
     path: "/about",
     element: <About />
-  },
-  {
-    path: "/missions",
-    element: <Missions />
   },
   // {
   //   path: "/services",
@@ -118,6 +90,10 @@ const router = createBrowserRouter([
   {
     path: "/admin/blog",
     element: <AdminBlog />
+  },
+  {
+    path: "/admin/quote",
+    element: <AdminQuote />
   },
   {
     path: "*",
