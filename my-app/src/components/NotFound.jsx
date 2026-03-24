@@ -26,13 +26,6 @@ export default function NotFound() {
           >
             ← Back to Home
           </button>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="px-6 py-3 bg-white border-2 border-ink-lightgray text-ink-primary
-                     font-medium rounded-xl hover:border-ink-primary transition-all"
-          >
-            Go to Dashboard
-          </button>
         </div>
       </div>
     </div>

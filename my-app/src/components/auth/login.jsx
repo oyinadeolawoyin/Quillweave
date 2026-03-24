@@ -47,7 +47,7 @@ export default function Login() {
         setUser(data.user);
         localStorage.setItem("user", JSON.stringify(data.user));
         // Navigate to dashboard
-        navigate("/dashboard");
+        navigate("/");
       } else {
         setServerError(
           data.message || "That email or password doesn't look right. Please check and try again."

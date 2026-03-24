@@ -56,7 +56,7 @@ export default function Signup() {
       if (res.ok) {
         setUser(data.user);
         localStorage.setItem("user", JSON.stringify(data.user));
-        navigate("/welcome"); // Redirect after successful signup
+        navigate("/"); // Redirect after successful signup
       } else {
         // Handle both array of errors and single message
         if (data.errors && Array.isArray(data.errors)) {
