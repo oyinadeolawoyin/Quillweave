@@ -60,9 +60,6 @@ const router = createBrowserRouter([
     path: "/snippets",
     element: <SnippetFeed />
   },
-  { 
-    path: "/admin/schedule", 
-    element: <AdminSchedule /> },
   {
     path: "group-sprint/:groupSprintId",
     element: <GroupSprintWorkspace />
@@ -94,6 +91,10 @@ const router = createBrowserRouter([
   {
     path: "/admin/quote",
     element: <AdminQuote />
+  },
+  { 
+    path: "/admin/schedule", 
+    element: <AdminSchedule /> 
   },
   {
     path: "*",
