@@ -9,7 +9,6 @@ import Signup from './components/auth/signup';
 import Login from './components/auth/login';
 import ForgotPassword from './components/auth/forgotPassword';
 import ResetPassword from './components/auth/resetPassword';
-import Welcome from './components/auth/welcome';
 
 import GroupSprintWorkspace from './components/sprint/groupSprintWorkspace';
 
@@ -53,11 +52,7 @@ const router = createBrowserRouter([
     element: <ResetPassword />
   },
   {
-    path: "/welcome",
-    element: <Welcome />
-  },
-  {
-    path: "/snippets",
+    path: "/snippets/share",
     element: <SnippetFeed />
   },
   {

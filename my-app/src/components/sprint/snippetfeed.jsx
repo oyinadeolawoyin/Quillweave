@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import Header from "../profile/header";
 import { AppMetaTags } from "../utilis/metatags";
@@ -194,7 +194,7 @@ function CreateSnippetModal({ onClose, onCreated, defaultSourceType = "STANDALON
           <textarea
             value={context}
             onChange={e => setContext(e.target.value)}
-            placeholder="What are you proud of or struggling with in your writing today? Or what writing tip did you just learn and want to share with others who visit this page?"
+            placeholder="How is your writing today? Any wins or struggles worth sharing with the community?"
             rows={6}
             className="w-full text-ink-primary text-sm leading-relaxed placeholder-gray-300 resize-none border border-gray-100 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-ink-gold/30 focus:border-ink-gold transition-all bg-ink-cream"
           />
@@ -802,7 +802,6 @@ function SnippetCard({ snippet, currentUser, onDeleted }) {
 
 export default function SnippetFeed() {
   const { user } = useAuth();
-  const location = useLocation();
   const [snippets, setSnippets] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -811,12 +810,8 @@ export default function SnippetFeed() {
   const [error, setError] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  const fromSprint = location.state?.fromSprint === true;
-  const [defaultSourceType] = useState(fromSprint ? "POST_SPRINT" : "STANDALONE");
-
   useEffect(() => {
     fetchSnippets(1);
-    if (fromSprint && user) setShowCreate(true);
   }, []);
 
   async function fetchSnippets(p) {
@@ -863,7 +858,7 @@ export default function SnippetFeed() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative">
           <p className="text-ink-gold text-xs font-bold uppercase tracking-widest mb-3">Inkwell Community</p>
           <h1 className="text-3xl sm:text-5xl font-serif text-white leading-tight mb-4">
-            What are you proud of or struggling<br className="hidden sm:block" /> with in your writing today?
+            How is your writing today?<br className="hidden sm:block" /> Any wins or struggles?
           </h1>
           <p className="text-white/60 text-base sm:text-lg max-w-xl mb-8">
             Writing tips, honest reflections, and lessons from writers in the community.
@@ -889,10 +884,12 @@ export default function SnippetFeed() {
         </div>
       </div>
 
-      {fromSprint && (
-        <div className="bg-emerald-600 text-white text-center py-3 px-4">
-          <p className="text-sm font-medium">🏁 Great sprint! Your reflection modal is open — share with the community below.</p>
-        </div>
+      {showCreate && (
+        <CreateSnippetModal
+          onClose={() => setShowCreate(false)}
+          onCreated={handleCreated}
+          defaultSourceType="STANDALONE"
+        />
       )}
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
@@ -975,14 +972,215 @@ export default function SnippetFeed() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
 
-      {showCreate && (
-        <CreateSnippetModal
-          onClose={() => setShowCreate(false)}
-          onCreated={handleCreated}
-          defaultSourceType={defaultSourceType}
-        />
-      )}
+// ── Share Sprint Page (full-page, thread-style) ───────────────────────────────
+
+export function ShareSprintPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [context, setContext] = useState("");
+  const [tags, setTags] = useState("");
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaPreview, setMediaPreview] = useState(null);
+  const [mediaType, setMediaType] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [recentShares, setRecentShares] = useState([]);
+  const [loadingFeed, setLoadingFeed] = useState(true);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    fetchRecent();
+  }, []);
+
+  async function fetchRecent() {
+    setLoadingFeed(true);
+    try {
+      const res = await fetch(`${API_URL}/snippets?page=1&limit=6`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setRecentShares(data.snippets || []);
+      }
+    } catch {}
+    finally { setLoadingFeed(false); }
+  }
+
+  function handleMediaChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) { setError("Only images and videos are supported."); return; }
+    setMediaFile(file);
+    setMediaType(isImage ? "image" : "video");
+    setMediaPreview(URL.createObjectURL(file));
+    setError("");
+  }
+
+  function removeMedia() {
+    setMediaFile(null); setMediaPreview(null); setMediaType(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleShare(e) {
+    e.preventDefault();
+    setSubmitting(true); setError("");
+    try {
+      const formData = new FormData();
+      if (context.trim()) formData.append("context", context.trim());
+      if (tags.trim()) formData.append("tags", tags.trim());
+      formData.append("sourceType", "POST_SPRINT");
+      if (mediaFile) formData.append("media", mediaFile);
+      const res = await fetch(`${API_URL}/snippets`, { method: "POST", credentials: "include", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Something went wrong.");
+      // Navigate to snippets feed after sharing
+      navigate("/snippets", { state: { shared: true } });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-ink-cream">
+      <AppMetaTags
+        title="Share Your Sprint – Inkwell"
+        description="How was your writing today? Share a win, a struggle, or a reflection."
+      />
+      <Header />
+
+      {/* ── Top Banner ── */}
+      <div className="bg-emerald-700 text-white text-center py-3 px-4">
+        <p className="text-sm font-medium">🏁 Sprint complete — how did it go?</p>
+      </div>
+
+      {/* ── Thread-style layout ── */}
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
+        {/* Page heading */}
+        <div className="mb-8">
+          <p className="text-ink-gold text-xs font-bold uppercase tracking-widest mb-2">Post-sprint reflection</p>
+          <h1 className="text-3xl sm:text-4xl font-serif text-ink-primary leading-snug mb-2">
+            How is your writing today?
+          </h1>
+          <p className="text-gray-500 text-sm">Any wins or struggles? Share with the community.</p>
+        </div>
+
+        {/* ── Composer (thread "New Share" box) ── */}
+        <div className="bg-white rounded-2xl shadow-soft border border-gray-100 overflow-hidden mb-8">
+          {/* Composer header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <Avatar username={user?.username} avatar={user?.avatar} />
+              <div>
+                <p className="text-sm font-semibold text-ink-primary">{user?.username}</p>
+                <p className="text-xs text-gray-400">New share</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate("/snippets")}
+              className="text-xs text-gray-400 hover:text-ink-primary transition-colors font-medium"
+            >
+              Skip for now
+            </button>
+          </div>
+
+          {/* Composer form */}
+          <form onSubmit={handleShare} className="px-5 py-5 space-y-4">
+            <textarea
+              value={context}
+              onChange={e => setContext(e.target.value)}
+              placeholder="How is your writing today? Any wins or struggles worth sharing with the community?"
+              rows={5}
+              className="w-full text-ink-primary text-sm leading-relaxed placeholder-gray-300 resize-none border border-gray-100 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-ink-gold/30 focus:border-ink-gold transition-all bg-ink-cream"
+            />
+
+            <input
+              type="text"
+              value={tags}
+              onChange={e => setTags(e.target.value)}
+              placeholder="Tags: pacing, dialogue, worldbuilding (optional)"
+              className="w-full text-sm text-ink-primary placeholder-gray-300 border border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ink-gold/30 focus:border-ink-gold transition-all bg-white"
+            />
+
+            {/* Media */}
+            <div>
+              {mediaPreview ? (
+                <div className="relative rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
+                  {mediaType === "image"
+                    ? <img src={mediaPreview} alt="Preview" className="w-full max-h-64 object-cover" />
+                    : <video src={mediaPreview} controls className="w-full max-h-64 rounded-xl" />}
+                  <button type="button" onClick={removeMedia} className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-all">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 rounded-xl py-4 flex items-center justify-center gap-3 text-gray-400 hover:border-ink-gold hover:text-ink-gold transition-all">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm">Attach an image or video (optional)</span>
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleMediaChange} className="hidden" />
+            </div>
+
+            {error && <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{error}</p>}
+
+            {/* Submit row */}
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-gray-400">🏁 Post-sprint · visible to all</p>
+              <button
+                type="submit"
+                disabled={submitting || !context.trim()}
+                className="px-6 py-2.5 bg-ink-primary text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Sharing..." : "Share"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* ── Recent community shares (thread-style) ── */}
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink-primary">Recent from the community</h2>
+          <button
+            onClick={() => navigate("/snippets")}
+            className="text-xs text-gray-400 hover:text-ink-primary transition-colors"
+          >
+            See all →
+          </button>
+        </div>
+
+        {loadingFeed ? (
+          <div className="bg-white rounded-2xl shadow-soft overflow-hidden divide-y divide-gray-100">
+            {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+          </div>
+        ) : recentShares.length > 0 ? (
+          <div className="bg-white rounded-2xl shadow-soft overflow-hidden divide-y divide-gray-100">
+            {recentShares.map(snippet => (
+              <SnippetCard
+                key={snippet.id}
+                snippet={snippet}
+                currentUser={user}
+                onDeleted={(id) => setRecentShares(prev => prev.filter(s => s.id !== id))}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 text-gray-400 text-sm">
+            No shares yet — be the first! ✍️
+          </div>
+        )}
+      </div>
     </div>
   );
 }

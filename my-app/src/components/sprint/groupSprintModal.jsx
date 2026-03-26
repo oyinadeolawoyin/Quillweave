@@ -421,8 +421,8 @@ export function ReEnterShopModal({ isOpen, onClose, onEnter, groupSprint }) {
 }
 
 // ─── CHECKOUT MODAL ───────────────────────────────────────────
-// isEarly=false → navigates to /snippets?new=post-sprint after
-//   checkout so the feed auto-opens the modal with POST_SPRINT.
+// isEarly=false → navigates to /snippets/share (full page) after
+//   checkout so the user can share their post-sprint reflection.
 // isEarly=true  → just calls onSubmit and stays (no redirect).
 export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = false }) {
   const navigate = useNavigate();
@@ -463,7 +463,7 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
       onSubmit(); // notify parent (marks hasCheckedOut in workspace)
 
       if (!isEarly) {
-        navigate("/snippets?new=post-sprint");
+        navigate("/snippets/share", { state: { fromSprint: true } });
       }
     } catch {
       setError("Something went wrong. Please try again.");
