@@ -43,7 +43,7 @@ export default function Header() {
   }
 
   const navItems = [
-    { to: "/snippets", label: "Snippets" },
+    { to: "/snippets/share", label: "Snippets" },
     { to: "/blog", label: "Blog" },
     { to: "/services", label: "Services" },
   ];
