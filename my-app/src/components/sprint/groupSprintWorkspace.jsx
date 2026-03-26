@@ -604,9 +604,17 @@ export default function GroupSprintWorkspace() {
             fetch(`${API_URL}/sprint/${groupSprintId}/endGroupSprint`, {
               method: "POST", headers: { "Content-Type": "application/json" },
               credentials: "include", body: JSON.stringify({}),
-            }).then(() => { fetchGroupSprint(); setShowCheckout(true); }).catch(() => { setShowCheckout(true); });
+            }).then(async () => {
+              await fetchGroupSprint();
+              await fetchMySprint(); // ensure mySprint.id is loaded before modal opens
+              setShowCheckout(true);
+            }).catch(async () => {
+              await fetchMySprint();
+              setShowCheckout(true);
+            });
           } else {
-            setShowCheckout(true);
+            // Non-host: refresh mySprint first so sprintId is available in the modal
+            fetchMySprint().then(() => setShowCheckout(true));
           }
         }
       }
