@@ -421,22 +421,19 @@ export function ReEnterShopModal({ isOpen, onClose, onEnter, groupSprint }) {
 }
 
 // ─── CHECKOUT MODAL ───────────────────────────────────────────
-// Now styled like the check-in form.
-// - "How is your writing today?" textarea → posted as snippet context
-//   to POST /snippets (fire-and-forget, only if user filled it in)
-// - Word count → posted to checkout endpoint as before
-// - isEarly=true skips the snippet post and stays on the page
+// isEarly=false → navigates to /snippets/share (full page) after
+//   checkout so the user can share their post-sprint reflection.
+// isEarly=true  → just calls onSubmit and stays (no redirect).
 export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = false }) {
   const navigate = useNavigate();
   const [currentWords, setCurrentWords] = useState("");
-  const [reflection, setReflection] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [capturedSprintId, setCapturedSprintId] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
-      setCurrentWords(""); setReflection(""); setError(""); setSubmitting(false);
+      setCurrentWords(""); setError(""); setSubmitting(false);
       if (sprintId) setCapturedSprintId(sprintId);
     }
   }, [isOpen, sprintId]);
@@ -453,36 +450,20 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
     const val = parseInt(currentWords, 10);
     if (isNaN(val) || val < 0) { setError("Please enter a valid word count (0 or more)."); return; }
     if (!effectiveId) { setError("Still loading your session — please wait a moment and try again."); return; }
-
     setSubmitting(true); setError("");
-
     try {
-      // ── 1. Checkout ──────────────────────────────────────────
-      const checkoutRes = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
+      const res = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ currentWordCount: val }),
       });
-      if (!checkoutRes.ok) throw new Error("Checkout failed");
-
-      // ── 2. Share snippet (fire-and-forget, only if reflection filled) ──
-      if (!isEarly && reflection.trim()) {
-        fetch(`${API_URL}/snippets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            context: reflection.trim(),
-            sourceType: "GROUP_SPRINT",
-          }),
-        }).catch(() => {}); // silent — don't block checkout on snippet failure
-      }
+      if (!res.ok) throw new Error("Checkout failed");
 
       onSubmit(); // notify parent (marks hasCheckedOut in workspace)
 
       if (!isEarly) {
-        navigate("/snippet");
+        navigate("/snippets/share", { state: { fromSprint: true } });
       }
     } catch {
       setError("Something went wrong. Please try again.");
@@ -492,93 +473,35 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-
-        {/* Header — mirrors check-in style */}
-        <div className="bg-[#2d3748] px-6 py-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-[#d4af37] uppercase tracking-widest font-medium mb-0.5">
-              {isEarly ? "Leaving early?" : "Sprint complete 🏁"}
-            </p>
-            <h2 className="text-xl font-serif text-white">Your Check-out</h2>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+        <p className="text-4xl mb-3">{isEarly ? "✍️" : "🏁"}</p>
+        <h3 className="font-serif text-[#2d3748] text-xl mb-1">
+          {isEarly ? "Leaving early?" : "Sprint complete!"}
+        </h3>
+        <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+          {isEarly
+            ? "No worries — enter your current word count before you go."
+            : "Every word counts. Enter your current word count, then share a snippet of what you wrote today 🌱"}
+        </p>
+        <div className="text-left mb-4">
+          <label className="text-xs font-medium text-[#2d3748] mb-1.5 block">Current word count</label>
+          <input type="number" min="0" value={currentWords}
+            onChange={(e) => setCurrentWords(e.target.value)}
+            placeholder="e.g. 1240" autoFocus
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-[#2d3748] focus:outline-none focus:border-[#2d3748] transition-colors" />
+          {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
         </div>
-
-        <div className="p-6 space-y-5">
-
-          {/* Reflection textarea — styled like the check-in "what are you writing" field */}
-          {!isEarly && (
-            <div>
-              <label className="block text-sm font-medium text-[#2d3748] mb-2">
-                How is your writing today? <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <textarea
-                value={reflection}
-                onChange={(e) => setReflection(e.target.value)}
-                placeholder="e.g. Finally got through the hard scene I've been avoiding..."
-                rows={4}
-                maxLength={500}
-                autoFocus
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm resize-none transition-all bg-gray-50"
-              />
-              <p className="mt-1 text-xs text-gray-400 text-right">{reflection.length}/500</p>
-            </div>
+        <div className="flex gap-3">
+          {isEarly && (
+            <button onClick={onClose} className="flex-1 py-3 border border-gray-200 text-gray-500 text-sm rounded-xl hover:border-gray-300 transition-all">Stay</button>
           )}
-
-          {/* Word count */}
-          <div>
-            <label className="block text-sm font-medium text-[#2d3748] mb-1">
-              Current word count
-            </label>
-            <p className="text-xs text-gray-400 mb-2">
-              {isEarly
-                ? "Enter your current count before you go."
-                : "We'll calculate how many words you wrote this session."}
-            </p>
-            <input
-              type="number"
-              min="0"
-              value={currentWords}
-              onChange={(e) => setCurrentWords(e.target.value)}
-              placeholder="e.g. 1240"
-              autoFocus={isEarly} // only autofocus here when early (no textarea above)
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm transition-all bg-gray-50"
-            />
-            {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-1">
-            {isEarly && (
-              <button
-                onClick={onClose}
-                className="px-5 py-3 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:border-[#2d3748] transition-all"
-              >
-                Stay
-              </button>
-            )}
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || !currentWords}
-              className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-            >
-              {submitting
-                ? <><Spinner /> Saving...</>
-                : isEarly
-                  ? "Check out ✓"
-                  : "Check out & share ✨"}
-            </button>
-          </div>
-
-          {!isEarly && (
-            <p className="text-[10px] text-gray-400 text-center">
-              {reflection.trim()
-                ? "Your reflection will be shared as a snippet 🌱"
-                : "Skip the reflection to just log your word count."}
-            </p>
-          )}
+          <button onClick={handleSubmit} disabled={submitting || !currentWords}
+            className="flex-1 py-3 bg-[#2d3748] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all disabled:opacity-40">
+            {submitting ? "Saving..." : isEarly ? "Check out ✓" : "Check out & share ✨"}
+          </button>
         </div>
+        {!isEarly && <p className="text-[10px] text-gray-400 mt-3">You'll be taken to share a snippet after this.</p>}
       </div>
     </div>
   );
