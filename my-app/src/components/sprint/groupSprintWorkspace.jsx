@@ -595,6 +595,13 @@ export default function GroupSprintWorkspace() {
     function tick() {
       const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
       setSecondsLeft(remaining);
+
+      // ── 2-minute warning: prompt members to check out before sprint ends ──
+      if (remaining === 120 && !isHost && !hasCheckedOut) {
+        playRing();
+        setShowEarlyCheckout(true);
+      }
+
       if (remaining === 0 && !sprintEnded) {
         setSprintEnded(true);
         if (!hasCheckedOut && !ringFiredRef.current) {
@@ -623,7 +630,7 @@ export default function GroupSprintWorkspace() {
     tick();
     timerRef.current = setInterval(tick, 1000);
     return () => clearInterval(timerRef.current);
-  }, [groupSprint, sprintEnded, hasCheckedOut, isHost, groupSprintId, fetchGroupSprint]);
+  }, [groupSprint, sprintEnded, hasCheckedOut, isHost, groupSprintId, fetchGroupSprint, fetchMySprint]);
 
   function handleCheckedOut() {
     setShowCheckout(false);
@@ -822,6 +829,7 @@ export default function GroupSprintWorkspace() {
         onSubmit={handleCheckedOut}
         sprintId={mySprint?.id}
         isEarly={true}
+        isWarning={secondsLeft <= 120 && secondsLeft > 0}
       />
     </div>
   );
