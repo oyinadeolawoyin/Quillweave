@@ -7,6 +7,7 @@ import { StartGroupSprintModal, JoinGroupSprintModal } from "./components/sprint
 import DailyQuote from "./components/quote/dailyQuote";
 import NotificationsSetup from "./components/notification/notificationSetup";
 import WeeklySchedule from "./components/sprint/weeklyschedule";
+import ContributeSoundscape from "./components/sprint/Contributesoundscape";
 import API_URL from "./config/api";
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -172,7 +173,7 @@ export default function Homepage() {
 
   function handleStartClick() {
     if (!user) {
-      setGuestMessage("Sign up to host a group sprint and write alongside other writers.");
+      setGuestMessage("Sign up to start a sprint — solo or with others.");
       return;
     }
     setShowStartModal(true);
@@ -180,7 +181,7 @@ export default function Homepage() {
 
   function handleJoinClick() {
     if (!user) {
-      setGuestMessage("Sign up to enter the shop and write with others.");
+      setGuestMessage("Sign up to pull up a seat and write with others.");
       return;
     }
     setShowJoinModal(true);
@@ -195,88 +196,113 @@ export default function Homepage() {
       <Header />
       <NotificationsSetup user={user} />
 
-      {/* ── Hero — full bleed, outside the centered container ── */}
+      {/* ── Hero ── */}
       <HeroImage />
 
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
 
-        {/* ── Sprint CTAs ── */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* ── Sprint CTAs — full width, low pressure ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10 max-w-2xl mx-auto">
+
+          {/* Start a sprint — reframed as personal, not just for hosts */}
           <button
             onClick={handleStartClick}
-            className="flex flex-col items-center gap-2.5 p-5 sm:p-6 bg-[#2d3748] text-white rounded-2xl hover:bg-[#3d4f64] transition-all group"
+            className="flex items-center gap-4 p-5 bg-[#2d3748] text-white rounded-2xl hover:bg-[#3d4f64] transition-all group text-left"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">🖊️</span>
-            <div className="text-center">
-              <p className="font-semibold text-sm">Start a Sprint</p>
-              <p className="text-[11px] text-white/60 mt-0.5 hidden sm:block">Open the room for everyone</p>
+            <span className="text-3xl group-hover:scale-110 transition-transform flex-shrink-0">🖊️</span>
+            <div>
+              <p className="font-semibold text-sm leading-tight">Start writing</p>
+              <p className="text-[11px] text-white/60 mt-1 leading-relaxed">
+                Open a sprint room — write solo or invite others to join
+              </p>
             </div>
           </button>
 
+          {/* Join — kept friendly */}
           <button
             onClick={handleJoinClick}
-            className="flex flex-col items-center gap-2.5 p-5 sm:p-6 border-2 border-[#2d3748] text-[#2d3748] bg-white rounded-2xl hover:bg-[#2d3748] hover:text-white transition-all group"
+            className="flex items-center gap-4 p-5 border-2 border-[#2d3748] text-[#2d3748] bg-white rounded-2xl hover:bg-[#2d3748] hover:text-white transition-all group text-left"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">☕</span>
-            <div className="text-center">
-              <p className="font-semibold text-sm">Enter the Shop</p>
-              <p className="text-[11px] text-[#9a8c7a] group-hover:text-white/60 mt-0.5 hidden sm:block transition-colors">Join an active sprint</p>
+            <span className="text-3xl group-hover:scale-110 transition-transform flex-shrink-0">☕</span>
+            <div>
+              <p className="font-semibold text-sm leading-tight">Pull up a seat</p>
+              <p className="text-[11px] text-[#9a8c7a] group-hover:text-white/60 mt-1 leading-relaxed transition-colors">
+                Join someone already writing — you're welcome here
+              </p>
             </div>
           </button>
         </div>
 
-        {/* ── Daily Quote ── */}
-        <DailyQuote />
+        {/* ── Two-column desktop layout ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 lg:items-stretch">
 
-        {/* ── Weekly Schedule ── */}
-        <WeeklySchedule />
+          {/* ── Left column — main content ── */}
+          <div className="flex flex-col gap-6">
 
-        {/* ── Last Sprint Session ── */}
-        <LastSprintSession />
+            {/* Daily Quote */}
+            <DailyQuote />
 
-        {/* ── How it works — guests only ── */}
-        {!user && (
-          <div className="cozy-card">
-            <div className="text-center mb-7">
-              <h2 className="font-serif text-xl text-[#2d3748]">How it works</h2>
-              <div className="w-8 h-0.5 bg-[#d4af37] mx-auto mt-2" />
+            {/* Weekly Schedule — flex-1 so it grows to match right column */}
+            <div className="flex-1 flex flex-col [&>div]:h-full">
+              <WeeklySchedule />
             </div>
-            <div className="space-y-6">
-              {[
-                { icon: "☕", title: "Someone opens the shop", desc: "A host starts a sprint, sets the timer and picks an ambient soundscape." },
-                { icon: "✍️", title: "Writers pull up a seat", desc: "Members enter, say what they're working on, and start writing." },
-                { icon: "🌧️", title: "Write together", desc: "Ambient sounds play. You can see who else is in the room, writing beside you." },
-                { icon: "🏁", title: "Sprint ends, share the moment", desc: "Log your words and share a snippet from your session with the community." },
-              ].map((step, i) => (
-                <div key={step.title} className="flex items-start gap-4">
-                  <div className="cozy-icon-badge flex-shrink-0">{step.icon}</div>
-                  <div className="pt-0.5">
-                    <p className="font-semibold text-[#2d3748] text-sm">{step.title}</p>
-                    <p className="text-xs text-[#9a8c7a] mt-1 leading-relaxed">{step.desc}</p>
-                  </div>
+
+            {/* How it works — guests only */}
+            {!user && (
+              <div className="cozy-card">
+                <div className="text-center mb-6">
+                  <h2 className="font-serif text-xl text-[#2d3748]">How it works</h2>
+                  <div className="w-8 h-0.5 bg-[#d4af37] mx-auto mt-2" />
                 </div>
-              ))}
-            </div>
+                <div className="space-y-5">
+                  {[
+                    { icon: "🖊️", title: "Write solo or start a room", desc: "Open a sprint for yourself. No pressure to host — just set your timer and write." },
+                    { icon: "☕", title: "Or pull up a seat with others", desc: "Join an active room, say what you're working on, and write alongside friends." },
+                    { icon: "🎵", title: "Pick your soundscape", desc: "Each writer chooses their own ambient sound. Rain, café hum, birdsong — whatever helps you focus." },
+                    { icon: "🏁", title: "Log your words, share a snippet", desc: "When the timer ends, record how much you wrote and share a line with the community." },
+                  ].map((step) => (
+                    <div key={step.title} className="flex items-start gap-4">
+                      <div className="cozy-icon-badge flex-shrink-0">{step.icon}</div>
+                      <div className="pt-0.5">
+                        <p className="font-semibold text-[#2d3748] text-sm">{step.title}</p>
+                        <p className="text-xs text-[#9a8c7a] mt-1 leading-relaxed">{step.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 pt-6 border-t border-[#f0ebe3]">
-              <button
-                onClick={() => navigate("/signup")}
-                className="flex-1 py-3 bg-[#2d3748] text-white text-sm font-medium rounded-2xl hover:bg-[#3d4f64] transition-all"
-              >
-                Create a free account
-              </button>
-              <button
-                onClick={() => navigate("/login")}
-                className="flex-1 py-3 border border-[#e8e0d0] text-[#4a4a4a] text-sm font-medium rounded-2xl hover:border-[#2d3748] transition-all"
-              >
-                Sign in
-              </button>
-            </div>
+                <div className="mt-7 flex flex-col sm:flex-row gap-3 pt-6 border-t border-[#f0ebe3]">
+                  <button
+                    onClick={() => navigate("/signup")}
+                    className="flex-1 py-3 bg-[#2d3748] text-white text-sm font-medium rounded-2xl hover:bg-[#3d4f64] transition-all"
+                  >
+                    Create a free account
+                  </button>
+                  <button
+                    onClick={() => navigate("/login")}
+                    className="flex-1 py-3 border border-[#e8e0d0] text-[#4a4a4a] text-sm font-medium rounded-2xl hover:border-[#2d3748] transition-all"
+                  >
+                    Sign in
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* ── Right column — sidebar ── */}
+          <div className="space-y-6">
+
+            {/* Last session */}
+            <LastSprintSession />
+
+            {/* Contribute soundscape */}
+            <ContributeSoundscape />
+
+          </div>
+        </div>
 
         {/* ── Footer note ── */}
-        <p className="text-center text-[10px] text-[#b8a898] pb-4 tracking-wide">
+        <p className="text-center text-[10px] text-[#b8a898] pt-10 pb-4 tracking-wide">
           A quiet space for writers · Inkwell Coffee Shop
         </p>
 

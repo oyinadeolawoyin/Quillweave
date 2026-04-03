@@ -36,28 +36,34 @@ const DURATIONS = [
   { value: 60, label: "60 min", description: "Marathon" },
 ];
 
-const SOUNDSCAPES = [
-  { value: null,    label: "None",  icon: "🔇", description: "Silent" },
-  { value: "rain",  label: "Rain",  icon: "🌧️", description: "Soft rainfall" },
-  { value: "birds", label: "Birds", icon: "🐦", description: "Morning birds" },
-  { value: "cafe",  label: "Café",  icon: "☕", description: "Coffee shop hum" },
-];
-
-const SOUNDSCAPE_ICONS = { rain: "🌧️", birds: "🐦", cafe: "☕" };
+// Soundscapes are now fetched from the DB per-member — no hardcoded list here
 
 // ─── START GROUP SPRINT MODAL ─────────────────────────────────
 export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   const [step, setStep] = useState(1);
   const [duration, setDuration] = useState(25);
-  const [soundscape, setSoundscape] = useState(null);
   const [checkin, setCheckin] = useState("");
   const [startWordCount, setStartWordCount] = useState("");
+  const [soundscapeId, setSoundscapeId] = useState(null);
+  const [soundscapes, setSoundscapes] = useState([]);
+  const [loadingSoundscapes, setLoadingSoundscapes] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [groupSprint, setGroupSprint] = useState(null);
 
+  // Fetch approved soundscapes when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoadingSoundscapes(true);
+    fetch(`${API_URL}/soundscapes`)
+      .then((r) => (r.ok ? r.json() : { soundscapes: [] }))
+      .then((d) => setSoundscapes(d.soundscapes || []))
+      .catch(() => setSoundscapes([]))
+      .finally(() => setLoadingSoundscapes(false));
+  }, [isOpen]);
+
   function handleClose() {
-    setStep(1); setDuration(25); setSoundscape(null);
+    setStep(1); setDuration(25); setSoundscapeId(null);
     setCheckin(""); setStartWordCount(""); setError(null); setGroupSprint(null);
     onClose();
   }
@@ -70,7 +76,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ duration, soundscape }),
+        body: JSON.stringify({ duration }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -98,6 +104,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
           groupSprintId: groupSprint.id,
           checkin: checkin.trim() || null,
           startWords: startWordCount ? Number(startWordCount) : 0,
+          soundscapeId: soundscapeId || null,
         }),
       });
       if (res.ok) {
@@ -149,23 +156,6 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#2d3748] mb-1">Soundscape</label>
-              <p className="text-xs text-gray-400 mb-3">Everyone in the room will hear this. They can mute it.</p>
-              <div className="grid grid-cols-2 gap-2">
-                {SOUNDSCAPES.map((s) => (
-                  <button key={String(s.value)} type="button" onClick={() => setSoundscape(s.value)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${soundscape === s.value ? "border-[#d4af37] bg-amber-50" : "border-gray-200 hover:border-[#2d3748]"}`}>
-                    <span className="text-xl">{s.icon}</span>
-                    <div>
-                      <p className={`text-sm font-medium ${soundscape === s.value ? "text-[#2d3748]" : "text-gray-600"}`}>{s.label}</p>
-                      <p className="text-xs text-gray-400">{s.description}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <ErrorBanner message={error} />
             <div className="flex gap-3 pt-1">
               <button type="button" onClick={handleClose} className="flex-1 py-3 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:border-[#2d3748] transition-all">Cancel</button>
@@ -177,12 +167,10 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
         )}
 
         {step === 2 && (
-          <form onSubmit={handleHostCheckin} className="p-6 space-y-5">
+          <form onSubmit={handleHostCheckin} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             <div className="bg-gray-50 rounded-xl p-4 border-l-4 border-[#d4af37]">
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Your session</p>
-              <p className="text-sm text-[#2d3748] font-medium">
-                {groupSprint?.duration} min{groupSprint?.soundscape && ` · ${SOUNDSCAPE_ICONS[groupSprint.soundscape]} ${groupSprint.soundscape}`}
-              </p>
+              <p className="text-sm text-[#2d3748] font-medium">{groupSprint?.duration} min</p>
               <p className="text-xs text-gray-400 mt-1">Share the link so others can join</p>
             </div>
 
@@ -204,6 +192,40 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
               <input type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
                 placeholder="e.g. 3400" min={0}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm transition-all bg-gray-50" />
+            </div>
+
+            {/* ── Per-member soundscape picker ── */}
+            <div>
+              <label className="block text-sm font-medium text-[#2d3748] mb-1">
+                🎵 Your soundscape <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-3">Pick an ambient sound to write to. Only you hear it.</p>
+              {loadingSoundscapes ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400 py-2"><Spinner /> Loading sounds...</div>
+              ) : soundscapes.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">No soundscapes available yet — check back soon.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1">
+                  {/* None option */}
+                  <button type="button" onClick={() => setSoundscapeId(null)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${soundscapeId === null ? "border-[#d4af37] bg-amber-50" : "border-gray-200 hover:border-[#2d3748]"}`}>
+                    <span className="text-xl">🔇</span>
+                    <div>
+                      <p className={`text-sm font-medium ${soundscapeId === null ? "text-[#2d3748]" : "text-gray-600"}`}>None — write in silence</p>
+                    </div>
+                  </button>
+                  {soundscapes.map((s) => (
+                    <button key={s.id} type="button" onClick={() => setSoundscapeId(s.id)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${soundscapeId === s.id ? "border-[#d4af37] bg-amber-50" : "border-gray-200 hover:border-[#2d3748]"}`}>
+                      <span className="text-xl">🎵</span>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium truncate ${soundscapeId === s.id ? "text-[#2d3748]" : "text-gray-600"}`}>{s.name}</p>
+                        {s.creatorName && <p className="text-xs text-gray-400 truncate">by {s.creatorName}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <ErrorBanner message={error} />
@@ -230,6 +252,9 @@ export function JoinGroupSprintModal({ onClose }) {
   const [selectedSprint, setSelectedSprint] = useState(null);
   const [checkin, setCheckin] = useState("");
   const [startWordCount, setStartWordCount] = useState("");
+  const [soundscapeId, setSoundscapeId] = useState(null);
+  const [soundscapes, setSoundscapes] = useState([]);
+  const [loadingSoundscapes, setLoadingSoundscapes] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -248,9 +273,20 @@ export function JoinGroupSprintModal({ onClose }) {
     fetchRooms();
   }, []);
 
+  // Fetch soundscapes when moving to step 2
+  useEffect(() => {
+    if (step !== 2) return;
+    setLoadingSoundscapes(true);
+    fetch(`${API_URL}/soundscapes`)
+      .then((r) => (r.ok ? r.json() : { soundscapes: [] }))
+      .then((d) => setSoundscapes(d.soundscapes || []))
+      .catch(() => setSoundscapes([]))
+      .finally(() => setLoadingSoundscapes(false));
+  }, [step]);
+
   function handleClose() {
     setStep(1); setSelectedSprint(null);
-    setCheckin(""); setStartWordCount(""); setError(null);
+    setCheckin(""); setStartWordCount(""); setSoundscapeId(null); setError(null);
     onClose();
   }
 
@@ -265,6 +301,7 @@ export function JoinGroupSprintModal({ onClose }) {
           groupSprintId: selectedSprint.id,
           checkin: checkin.trim() || null,
           startWords: startWordCount ? Number(startWordCount) : 0,
+          soundscapeId: soundscapeId || null,
         }),
       });
       if (res.ok) {
@@ -331,7 +368,6 @@ export function JoinGroupSprintModal({ onClose }) {
                               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live
                             </span>
                             <span className="text-xs text-gray-400">· @{gs.user?.username} · {gs.duration} min</span>
-                            {gs.soundscape && <span className="text-xs">{SOUNDSCAPE_ICONS[gs.soundscape]}</span>}
                           </div>
                           <p className="text-xs text-gray-400 mt-1">{gs._count?.sprints || 0} writer{(gs._count?.sprints || 0) !== 1 ? "s" : ""} inside</p>
                         </div>
@@ -350,7 +386,7 @@ export function JoinGroupSprintModal({ onClose }) {
         )}
 
         {step === 2 && selectedSprint && (
-          <form onSubmit={handleJoin} className="p-6 space-y-5">
+          <form onSubmit={handleJoin} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             <div className="bg-gray-50 rounded-xl p-4 border-l-4 border-[#d4af37]">
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Joining</p>
               <p className="text-sm text-[#2d3748] font-medium">@{selectedSprint.user?.username}'s sprint · {selectedSprint.duration} min</p>
@@ -373,6 +409,37 @@ export function JoinGroupSprintModal({ onClose }) {
               <input type="number" value={startWordCount} onChange={(e) => setStartWordCount(e.target.value)}
                 placeholder="e.g. 3400" min={0}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#d4af37] focus:border-[#d4af37] text-[#2d3748] placeholder-gray-400 text-sm transition-all bg-gray-50" />
+            </div>
+
+            {/* ── Per-member soundscape picker ── */}
+            <div>
+              <label className="block text-sm font-medium text-[#2d3748] mb-1">
+                🎵 Your soundscape <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-3">Pick an ambient sound to write to. Only you hear it.</p>
+              {loadingSoundscapes ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400 py-2"><Spinner /> Loading sounds...</div>
+              ) : soundscapes.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">No soundscapes available yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1">
+                  <button type="button" onClick={() => setSoundscapeId(null)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${soundscapeId === null ? "border-[#d4af37] bg-amber-50" : "border-gray-200 hover:border-[#2d3748]"}`}>
+                    <span className="text-xl">🔇</span>
+                    <p className={`text-sm font-medium ${soundscapeId === null ? "text-[#2d3748]" : "text-gray-600"}`}>None — write in silence</p>
+                  </button>
+                  {soundscapes.map((s) => (
+                    <button key={s.id} type="button" onClick={() => setSoundscapeId(s.id)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${soundscapeId === s.id ? "border-[#d4af37] bg-amber-50" : "border-gray-200 hover:border-[#2d3748]"}`}>
+                      <span className="text-xl">🎵</span>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium truncate ${soundscapeId === s.id ? "text-[#2d3748]" : "text-gray-600"}`}>{s.name}</p>
+                        {s.creatorName && <p className="text-xs text-gray-400 truncate">by {s.creatorName}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <ErrorBanner message={error} />
@@ -404,11 +471,7 @@ export function ReEnterShopModal({ isOpen, onClose, onEnter, groupSprint }) {
             <p className="text-sm text-[#2d3748] leading-relaxed">
               You already checked in to this sprint — no need to fill out the form again. Just jump back in and keep writing.
             </p>
-            {groupSprint?.soundscape && (
-              <p className="text-xs text-gray-400 mt-2">
-                {SOUNDSCAPE_ICONS[groupSprint.soundscape]} {groupSprint.soundscape} · {groupSprint.duration} min session
-              </p>
-            )}
+            <p className="text-xs text-gray-400 mt-2">{groupSprint?.duration} min session</p>
           </div>
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-3 border-2 border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:border-[#2d3748] transition-all">Leave</button>

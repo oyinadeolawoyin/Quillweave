@@ -24,6 +24,7 @@ import AdminQuote from './components/quote/adminquote';
 import App from './App'
 import SnippetFeed from './components/sprint/snippetfeed';
 import AdminSchedule from './components/sprint/adminschedule';
+import AdminSoundscapes from './components/sprint/Adminsoundscapes';
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
@@ -90,6 +91,10 @@ const router = createBrowserRouter([
   { 
     path: "/admin/schedule", 
     element: <AdminSchedule /> 
+  },
+  {
+    path: "/admin/soundscapes",
+    element: <AdminSoundscapes />
   },
   {
     path: "*",

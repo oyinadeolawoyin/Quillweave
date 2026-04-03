@@ -7,18 +7,10 @@ import { CheckoutModal } from "./groupSprintModal";
 import { Room, Track } from "livekit-client";
 
 // ─── Constants ────────────────────────────────────────────────
-const SOUNDSCAPES = {
-  rain:  { label: "Rain",   icon: "🌧️", url: "/universfield-relaxing-rain-and-thunder-ambience-351014.mp3" },
-  birds: { label: "Birds",  icon: "🐦", url: "/hari0127sound-wind-forest-ambienceb-morning-sound-mks0127-378540.mp3" },
-  cafe:  { label: "Café",   icon: "☕", url: "https://cdn.pixabay.com/audio/2022/10/16/audio_3a8b67dc77.mp3" },
-};
-
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL;
 const POLL_INTERVAL = 8000;
 
 // ─── Data-channel message type ────────────────────────────────
-// We use LiveKit's publishData() to broadcast small JSON payloads.
-// { type: "sc", muted: boolean }
 const DC_SOUNDSCAPE = "sc";
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -40,31 +32,27 @@ function playRing() {
   } catch {}
 }
 
-// Encode a plain object → Uint8Array for LiveKit publishData
 function encodeMsg(obj) {
   return new TextEncoder().encode(JSON.stringify(obj));
 }
 
-// ─── Soundscape hook ──────────────────────────────────────────
-// Manages local audio playback.
-// Returns muted/started state + setters so the workspace can
-// broadcast mute changes to other participants.
-function useSoundscape(soundscape, isActive) {
+// ─── Per-member Soundscape hook ───────────────────────────────
+// Each member plays their own soundscape from their sprint.soundscape.fileUrl
+function useSoundscape(fileUrl, isActive) {
   const audioRef = useRef(null);
   const [muted, setMuted] = useState(false);
   const [started, setStarted] = useState(false);
-  const scape = SOUNDSCAPES[soundscape];
 
   useEffect(() => {
-    if (!scape || !isActive) return;
+    if (!fileUrl || !isActive) return;
     if (!audioRef.current) {
-      audioRef.current = new Audio(scape.url);
+      audioRef.current = new Audio(fileUrl);
       audioRef.current.loop = true;
       audioRef.current.volume = 0.35;
     }
     audioRef.current.play().then(() => setStarted(true)).catch(() => setStarted(false));
     return () => { audioRef.current?.pause(); };
-  }, [scape, isActive]);
+  }, [fileUrl, isActive]);
 
   useEffect(() => {
     if (!isActive && audioRef.current) audioRef.current.pause();
@@ -74,18 +62,12 @@ function useSoundscape(soundscape, isActive) {
     if (audioRef.current) audioRef.current.muted = muted;
   }, [muted]);
 
-  return { muted, setMuted, started, setStarted, scape, audioRef };
+  return { muted, setMuted, started, setStarted, audioRef };
 }
 
-// ─── Soundscape Controls (top bar) ────────────────────────────
-function SoundscapeControls({
-  soundscape, isActive,
-  muted, setMuted,
-  started, setStarted,
-  audioRef, scape,
-  onMuteToggle, // (muted: boolean) => void — broadcast to room
-}) {
-  if (!scape || !isActive) return null;
+// ─── Soundscape Controls (top bar — MY soundscape) ────────────
+function SoundscapeControls({ soundscapeName, isActive, muted, setMuted, started, setStarted, audioRef, onMuteToggle }) {
+  if (!soundscapeName || !isActive) return null;
 
   function handleToggleMute() {
     setMuted((prev) => {
@@ -97,13 +79,12 @@ function SoundscapeControls({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-base">{scape.icon}</span>
-      <span className="text-xs text-[#7a6a50] hidden sm:inline font-medium">{scape.label}</span>
+      <span className="text-base">🎵</span>
+      <span className="text-xs text-[#7a6a50] hidden sm:inline font-medium max-w-[80px] truncate">{soundscapeName}</span>
       {!started ? (
         <button
           onClick={() =>
-            audioRef.current
-              ?.play()
+            audioRef.current?.play()
               .then(() => { setStarted(true); onMuteToggle(false); })
               .catch(() => {})
           }
@@ -120,7 +101,7 @@ function SoundscapeControls({
               : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
           }`}
         >
-          {muted ? "🔇 Muted" : "🔊 On"}
+          {muted ? "🔇 Muted" : "🎵 On"}
         </button>
       )}
     </div>
@@ -274,21 +255,20 @@ function DeskCard({ sprint, groupSprint, user, screenTrack, soundscapeStates, my
   const isSprintHost = Number(sprint.userId) === Number(groupSprint.userId);
   const isCheckedOut = !sprint.isActive;
   const hasScreen = !!screenTrack;
-  const hasSoundscape = !!groupSprint.soundscape;
+  // Each member's soundscape comes from their own sprint record
+  const memberSoundscape = sprint.soundscape; // { id, name, fileUrl, creatorName } | null
 
-  // Determine soundscape display state for this card:
-  // Local user  → use live myMuted (most up-to-date, no round-trip needed)
-  // Others      → read from soundscapeStates map (populated by data channel)
+  // Mute state for this desk
   let scMuted = false;
   let scUnknown = false;
 
-  if (hasSoundscape && !isCheckedOut) {
+  if (memberSoundscape && !isCheckedOut) {
     if (isMe) {
       scMuted = myMuted;
     } else {
       const username = sprint.user?.username;
       if (soundscapeStates[username] === undefined) {
-        scUnknown = true; // haven't received a broadcast from them yet
+        scUnknown = true;
       } else {
         scMuted = soundscapeStates[username];
       }
@@ -352,6 +332,23 @@ function DeskCard({ sprint, groupSprint, user, screenTrack, soundscapeStates, my
 
         {/* Host crown */}
         {isSprintHost && <div className="absolute top-2.5 right-8 text-sm select-none opacity-80">👑</div>}
+
+        {/* Soundscape badge — bottom-left of desk square */}
+        {memberSoundscape && !isCheckedOut && (
+          <div
+            title={scUnknown ? `${memberSoundscape.name} — status unknown` : scMuted ? `${memberSoundscape.name} — muted` : `Listening to: ${memberSoundscape.name}`}
+            className={`absolute bottom-2 left-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border shadow-sm select-none transition-all duration-300 ${
+              scUnknown
+                ? "bg-white/70 border-[#e0d0b8] text-[#9a8a70] opacity-50"
+                : scMuted
+                ? "bg-white/90 border-gray-200 text-gray-400"
+                : "bg-emerald-50/95 border-emerald-200 text-emerald-700"
+            }`}
+          >
+            <span>{scMuted ? "🔇" : "🎵"}</span>
+            <span className="hidden sm:inline max-w-[60px] truncate">{memberSoundscape.name}</span>
+          </div>
+        )}
       </div>
 
       {/* Info panel below desk */}
@@ -364,7 +361,7 @@ function DeskCard({ sprint, groupSprint, user, screenTrack, soundscapeStates, my
           {isMe && <span className="text-[#9a8a70] font-normal text-xs ml-1">· you</span>}
         </Link>
 
-        {/* Working-on text + soundscape indicator on the same row */}
+        {/* Working-on text + soundscape name pill */}
         <div className="flex items-center justify-between gap-2 mt-1">
           <p className="text-xs text-[#7a6a50] leading-snug line-clamp-2 min-h-[2.5em] flex-1">
             {isCheckedOut
@@ -375,19 +372,17 @@ function DeskCard({ sprint, groupSprint, user, screenTrack, soundscapeStates, my
             }
           </p>
 
-          {/* Soundscape indicator — always visible here, even during screen share */}
-          {!isCheckedOut && hasSoundscape && (
+          {/* Soundscape mute indicator in info panel */}
+          {!isCheckedOut && memberSoundscape && (
             <div
-              title={scUnknown ? "Soundscape status unknown" : scMuted ? "Soundscape muted" : "Listening to soundscape"}
+              title={scMuted ? "Soundscape muted" : `Listening to ${memberSoundscape.name}`}
               className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs border transition-all duration-300 ${
-                scUnknown
-                  ? "bg-gray-50 border-gray-200 opacity-50"
-                  : scMuted
-                  ? "bg-white border-gray-200 opacity-70"
-                  : "bg-emerald-50 border-emerald-200"
+                scUnknown ? "bg-gray-50 border-gray-200 opacity-50"
+                : scMuted ? "bg-white border-gray-200 opacity-70"
+                : "bg-emerald-50 border-emerald-200"
               }`}
             >
-              {scUnknown ? "🎧" : scMuted ? "🔇" : "🎧"}
+              {scMuted ? "🔇" : "🎵"}
             </div>
           )}
         </div>
@@ -428,8 +423,11 @@ export default function GroupSprintWorkspace() {
   const isHost = user && groupSprint && Number(groupSprint.userId) === Number(user.id);
   const hasCheckedOut = mySprint ? !mySprint.isActive : false;
 
+  // My soundscape = what I picked when I joined (stored on my sprint record)
+  const mySoundscape = mySprint?.soundscape || null; // { id, name, fileUrl, creatorName }
+
   const soundscapeState = useSoundscape(
-    groupSprint?.soundscape,
+    mySoundscape?.fileUrl || null,
     groupSprint?.isActive ?? false
   );
 
@@ -657,7 +655,6 @@ export default function GroupSprintWorkspace() {
   }
 
   const totalSeconds = groupSprint.duration * 60;
-  const soundscape = groupSprint.soundscape;
   const activeWriters = sprints.filter((s) => s.isActive).length;
 
   return (
@@ -685,9 +682,9 @@ export default function GroupSprintWorkspace() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {soundscape && (
+            {mySoundscape && (
               <SoundscapeControls
-                soundscape={soundscape}
+                soundscapeName={mySoundscape.name}
                 isActive={groupSprint.isActive}
                 {...soundscapeState}
                 onMuteToggle={broadcastSoundscapeState}
