@@ -490,6 +490,7 @@ export function ReEnterShopModal({ isOpen, onClose, onEnter, groupSprint }) {
 export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = false }) {
   const navigate = useNavigate();
   const [currentWords, setCurrentWords] = useState("");
+  const [snippet, setSnippet] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [capturedSprintId, setCapturedSprintId] = useState(null);
@@ -515,13 +516,23 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
     if (!effectiveId) { setError("Still loading your session — please wait a moment and try again."); return; }
     setSubmitting(true); setError("");
     try {
-      const res = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ currentWordCount: val }),
-      });
+      const [res, snippetRes] = await Promise.all([
+        fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ currentWordCount: val }),
+        }),
+        fetch(`${API_URL}/snippets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ context: snippet }),
+        }),
+      ]);
+
       if (!res.ok) throw new Error("Checkout failed");
+      if (!snippetRes.ok) throw new Error("Snippet save failed");
 
       onSubmit(); // notify parent (marks hasCheckedOut in workspace)
 
@@ -547,6 +558,14 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
             ? "No worries — enter your current word count before you go."
             : "Every word counts. Enter your current word count, then share a snippet of what you wrote today 🌱"}
         </p>
+        <div className="text-left mb-4">
+          <label className="text-xs font-medium text-[#2d3748] mb-1.5 block">How's your writing today</label>
+          <textarea
+            onChange={(e) => setSnippet(e.target.value)}
+            placeholder="Any win or struggle" autoFocus rows={4}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-[#2d3748] focus:outline-none focus:border-[#2d3748] transition-colors resize-none" />
+          {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
+        </div>
         <div className="text-left mb-4">
           <label className="text-xs font-medium text-[#2d3748] mb-1.5 block">Current word count</label>
           <input type="number" min="0" value={currentWords}
