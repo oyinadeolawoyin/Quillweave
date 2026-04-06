@@ -8,7 +8,7 @@ export default function Login() {
   const { setUser } = useAuth();
   
   const [formData, setFormData] = useState({
-    email: "",
+    identifier: "",
     password: "",
   });
   
@@ -89,20 +89,20 @@ export default function Login() {
               htmlFor="email" 
               className="block text-xs sm:text-sm font-medium text-ink-primary mb-1 sm:mb-2"
             >
-              Email
+              Identifier
             </label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
+              type="text"
+              id="identifier"
+              name="identifier"
+              value={formData.identifier}
               onChange={handleChange}
               className={`w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border ${
                 errors.email 
                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                   : 'border-ink-lightgray input-focus'
               } bg-white text-ink-gray placeholder-gray-400 transition-all`}
-              placeholder="you@example.com"
+              placeholder="Email or Discord Id"
               disabled={isLoading}
               autoComplete="email"
             />
