@@ -43,7 +43,7 @@ export default function Header() {
   }
 
   const navItems = [
-    { to: "/snippets/share", label: "Snippets" },
+    { to: "/snippets/share", label: "Community" },
     { to: "/blog", label: "Blog" },
     { to: "/services", label: "Services" },
   ];
@@ -113,6 +113,10 @@ export default function Header() {
                     <span className="text-sm font-medium text-[#2d3748] hidden lg:block max-w-[120px] truncate">
                       {user?.username}
                     </span>
+                  </Link>
+
+                  <Link to="/settings" className="px-3 py-1.5 text-sm text-[#737373] hover:text-[#2d3748] transition-colors rounded-lg hover:bg-[#f7f4ee]">
+                    Settings
                   </Link>
 
                   {/* Sign out — subtle */}
@@ -214,6 +218,10 @@ export default function Header() {
                     </div>
                     <span>{user?.username}</span>
                     <span className="ml-auto text-xs text-[#737373]">Profile</span>
+                  </Link>
+
+                  <Link to="/settings" className="px-3 py-1.5 text-sm text-[#737373] hover:text-[#2d3748] transition-colors rounded-lg hover:bg-[#f7f4ee]">
+                    Settings
                   </Link>
                   <button
                     onClick={handleLogout}

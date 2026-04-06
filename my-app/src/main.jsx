@@ -25,6 +25,7 @@ import App from './App'
 import SnippetFeed from './components/sprint/snippetfeed';
 import AdminSchedule from './components/sprint/adminschedule';
 import AdminSoundscapes from './components/sprint/Adminsoundscapes';
+import Settings from './components/profile/settings';
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
@@ -43,6 +44,10 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <Login />
+  },
+  {
+    path: "/setting",
+    element: <Settings />
   },
   {
     path: "/forgot-password",
