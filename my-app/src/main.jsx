@@ -26,6 +26,9 @@ import SnippetFeed from './components/sprint/snippetfeed';
 import AdminSchedule from './components/sprint/adminschedule';
 import AdminSoundscapes from './components/sprint/Adminsoundscapes';
 import Settings from './components/profile/settings';
+import ProjectsPage from './components/projects/projectspage';
+import CreateEditProject from './components/projects/createeditproject';
+import ProjectStats from './components/projects/projectstats';
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
@@ -100,6 +103,22 @@ const router = createBrowserRouter([
   {
     path: "/admin/soundscapes",
     element: <AdminSoundscapes />
+  },
+  { 
+    path: "/projects",             
+    element: <ProjectsPage /> 
+  },
+  { 
+    path: "/projects/create",      
+    element: <CreateEditProject /> 
+  },
+  { 
+    path: "/projects/:projectId",  
+    element: <ProjectStats /> 
+  },
+  { 
+    path: "/projects/:projectId/edit", 
+    element: <CreateEditProject /> 
   },
   {
     path: "*",

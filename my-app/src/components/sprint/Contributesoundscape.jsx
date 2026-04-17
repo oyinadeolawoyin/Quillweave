@@ -38,13 +38,6 @@ export default function ContributeSoundscape() {
           Every approved track goes into the library for all writers to use during their sprints.
         </p>
 
-        <div className="flex flex-wrap gap-2 mb-5 text-xs text-[#9a8c7a]">
-          {["🌧️ Rain", "🌲 Forest", "☕ Café", "🔥 Fireplace", "🌊 Ocean", "📚 Library"].map((tag) => (
-            <span key={tag} className="bg-[#f7f4ee] border border-[#e8e0d0] px-2.5 py-1 rounded-full">{tag}</span>
-          ))}
-          <span className="bg-[#f7f4ee] border border-[#e8e0d0] px-2.5 py-1 rounded-full">+ your sound</span>
-        </div>
-
         {user ? (
           <button
             onClick={() => setIsOpen(true)}

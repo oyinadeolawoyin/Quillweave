@@ -18,7 +18,6 @@ export default function Header() {
     }
   }, [user]);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
@@ -46,6 +45,7 @@ export default function Header() {
     { to: "/snippets/share", label: "Community" },
     { to: "/blog", label: "Blog" },
     { to: "/services", label: "Services" },
+    ...(user ? [{ to: "/projects", label: "Projects" }] : []),
   ];
 
   function isActive(to) {
@@ -58,13 +58,13 @@ export default function Header() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16 sm:h-[4.5rem]">
 
-            {/* ── Logo ── */}
+            {/* Logo */}
             <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
               <span className="text-2xl">🖋️</span>
               <span className="text-xl font-serif text-[#2d3748] tracking-tight">Inkwell</span>
             </Link>
 
-            {/* ── Desktop Nav ── */}
+            {/* Desktop Nav */}
             <nav className="hidden sm:flex items-center gap-1">
               {navItems.map(({ to, label }) => (
                 <Link
@@ -81,11 +81,10 @@ export default function Header() {
               ))}
             </nav>
 
-            {/* ── Desktop Right Side ── */}
+            {/* Desktop Right Side */}
             <div className="hidden sm:flex items-center gap-2">
               {user ? (
                 <>
-                  {/* Notifications */}
                   <Link
                     to="/notifications"
                     className="relative p-2 rounded-lg text-[#737373] hover:text-[#2d3748] hover:bg-[#f7f4ee] transition-colors"
@@ -102,7 +101,6 @@ export default function Header() {
                     )}
                   </Link>
 
-                  {/* Profile link — just the avatar, goes straight to profile */}
                   <Link
                     to={`/profile/${user.id}`}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-[#f7f4ee] transition-colors"
@@ -119,7 +117,6 @@ export default function Header() {
                     Settings
                   </Link>
 
-                  {/* Sign out — subtle */}
                   <button
                     onClick={handleLogout}
                     className="px-3 py-1.5 text-sm text-[#737373] hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
@@ -145,7 +142,7 @@ export default function Header() {
               )}
             </div>
 
-            {/* ── Mobile Right Side ── */}
+            {/* Mobile Right Side */}
             <div className="flex sm:hidden items-center gap-2">
               {user && (
                 <Link
@@ -165,7 +162,6 @@ export default function Header() {
                 </Link>
               )}
 
-              {/* Hamburger */}
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="p-2 rounded-lg text-[#2d3748] hover:bg-[#f7f4ee] transition-colors"
@@ -185,12 +181,10 @@ export default function Header() {
           </div>
         </div>
 
-        {/* ── Mobile Menu ── */}
+        {/* Mobile Menu */}
         {mobileOpen && (
           <div className="sm:hidden border-t border-[#e5e5e5] bg-white">
             <div className="max-w-5xl mx-auto px-4 py-3 space-y-1">
-
-              {/* Nav links */}
               {navItems.map(({ to, label }) => (
                 <Link
                   key={to}
