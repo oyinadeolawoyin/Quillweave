@@ -8,7 +8,6 @@ import DailyQuote from "./components/quote/dailyQuote";
 import NotificationsSetup from "./components/notification/notificationSetup";
 import WeeklySchedule from "./components/sprint/weeklyschedule";
 import ContributeSoundscape from "./components/sprint/Contributesoundscape";
-import CommunityProjects from "./components/projects/communityprojects";
 import API_URL from "./config/api";
 
 function formatTimeAgo(dateStr) {
@@ -573,7 +572,7 @@ export default function Homepage() {
         </section>
 
         <section className="mb-10"><WeeklySchedule /></section>
-        <section className="mb-12"><CommunityProjects /></section> 
+        
         <section className="mb-12"><ContributeSoundscape /></section>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 lg:gap-10 lg:items-start">
