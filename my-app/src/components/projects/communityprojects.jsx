@@ -185,10 +185,18 @@ export default function CommunityProjects() {
             ))}
           </div>
 
-          {/* subtle footer note */}
-          <p className="text-center text-[10px] text-[#c4bdb4] mt-5 tracking-wide">
-            Only public projects are shown · writers choose what to share
-          </p>
+          {/* footer — clarify projects are opt-in public + nudge to share */}
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-[#e8e0d0]">
+            <p className="text-[12px] font-bold text-[#6b5c4a] leading-relaxed text-center sm:text-left">
+              Projects are private by default — writers choose what to share.
+            </p>
+            <button
+              onClick={() => navigate("/projects")}
+              className="flex-shrink-0 text-[12px] font-bold text-[#2d3748] border border-[#c8bfb0] rounded-full px-4 py-1.5 hover:border-[#2d3748] transition-all"
+            >
+              Share your project
+            </button>
+          </div>
         </>
       )}
     </section>
