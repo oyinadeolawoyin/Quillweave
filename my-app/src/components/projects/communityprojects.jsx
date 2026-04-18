@@ -59,7 +59,6 @@ function Bar({ current, target }) {
 
 // ─── Single project card ──────────────────────────────────────
 function ProjectCard({ project }) {
-  const navigate = useNavigate();
   const av = avatarColor(project.user?.username);
   const gc = genreColor(project.genre);
 
@@ -87,9 +86,8 @@ function ProjectCard({ project }) {
 
   return (
     <div
-      className="bg-white rounded-2xl border border-[#e8e0d0] p-4 flex flex-col gap-3 cursor-pointer hover:border-[#c8bfb0] transition-all"
+      className="bg-white rounded-2xl border border-[#e8e0d0] p-4 flex flex-col gap-3"
       style={{ boxShadow: "0 1px 3px rgba(45,35,20,0.04), 0 4px 12px rgba(45,35,20,0.05)" }}
-      onClick={() => navigate(`/projects/${project.id}`)}
     >
       {/* Genre + title */}
       <div className="space-y-1.5">
@@ -102,9 +100,6 @@ function ProjectCard({ project }) {
           </div>
         )}
         <p className="font-serif text-[#2d3748] text-[15px] leading-snug line-clamp-2">{project.title}</p>
-        {project.description && (
-          <p className="text-[12px] text-[#9a8c7a] leading-relaxed line-clamp-2">{project.description}</p>
-        )}
       </div>
 
       {/* Progress */}
