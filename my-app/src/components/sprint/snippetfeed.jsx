@@ -81,6 +81,22 @@ function MentionText({ content }) {
   return <>{parts.map((part, i) => /^@\w+$/.test(part) ? <span key={i} className="text-blue-500 font-semibold">{part}</span> : part)}</>;
 }
 
+// ─── Reusable like button for comments and replies ────────────
+function LikeButton({ count = 0, liked = false, onToggle, disabled }) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      className={`flex items-center gap-1 text-xs font-medium transition-colors disabled:cursor-not-allowed ${liked ? "text-red-500" : "text-gray-400 hover:text-red-400"}`}
+    >
+      <svg className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      </svg>
+      {count > 0 && <span>{count}</span>}
+    </button>
+  );
+}
+
 function CardSkeleton() {
   return (
     <div className="px-5 sm:px-7 py-6 flex gap-4 animate-pulse">
@@ -216,6 +232,20 @@ function CreateSnippetModal({ onClose, onCreated, defaultSourceType = "STANDALON
 function ReplyItem({ reply, snippetId, commentId, currentUser, onDeleted, onReplyTo }) {
   const canDelete = currentUser && (currentUser.id === reply.user?.id || currentUser.role === "ADMIN");
   const [deleting, setDeleting] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(reply._count?.likes ?? 0);
+  const [liking, setLiking] = useState(false);
+
+  async function toggleLike() {
+    if (!currentUser || liking) return;
+    setLiking(true);
+    try {
+      const res = await fetch(`${API_URL}/snippets/${snippetId}/comments/${commentId}/replies/${reply.id}/like`, { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (res.ok) { setLiked(data.liked); setLikesCount(data.likesCount); }
+    } catch (e) { console.error(e); } finally { setLiking(false); }
+  }
+
   async function handleDelete() {
     if (!confirm("Delete this reply?")) return; setDeleting(true);
     try { const res = await fetch(`${API_URL}/snippets/${snippetId}/comments/${commentId}/replies/${reply.id}`, { method: "DELETE", credentials: "include" }); if (res.ok) onDeleted(reply.id); } catch (e) { console.error(e); } finally { setDeleting(false); }
@@ -234,7 +264,10 @@ function ReplyItem({ reply, snippetId, commentId, currentUser, onDeleted, onRepl
           </div>
           <p className="text-sm text-ink-gray leading-relaxed"><MentionText content={reply.content} /></p>
         </div>
-        {currentUser && <button onClick={() => onReplyTo({ username: reply.user?.username, userId: reply.user?.id })} className="mt-1 ml-1 text-xs text-gray-400 hover:text-ink-primary font-medium transition-colors">Reply</button>}
+        <div className="flex items-center gap-3 mt-1 ml-1">
+          <LikeButton count={likesCount} liked={liked} onToggle={toggleLike} disabled={!currentUser || liking} />
+          {currentUser && <button onClick={() => onReplyTo({ username: reply.user?.username, userId: reply.user?.id })} className="text-xs text-gray-400 hover:text-ink-primary font-medium transition-colors">Reply</button>}
+        </div>
       </div>
     </div>
   );
@@ -243,6 +276,9 @@ function ReplyItem({ reply, snippetId, commentId, currentUser, onDeleted, onRepl
 function CommentItem({ comment, snippetId, currentUser, onDeleted }) {
   const canDelete = currentUser && (currentUser.id === comment.user?.id || currentUser.role === "ADMIN");
   const [deleting, setDeleting] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(comment._count?.likes ?? 0);
+  const [liking, setLiking] = useState(false);
   const [replies, setReplies] = useState([]);
   const [showReplies, setShowReplies] = useState(false);
   const [loadingReplies, setLoadingReplies] = useState(false);
@@ -252,6 +288,16 @@ function CommentItem({ comment, snippetId, currentUser, onDeleted }) {
   const [replyText, setReplyText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef(null);
+
+  async function toggleLike() {
+    if (!currentUser || liking) return;
+    setLiking(true);
+    try {
+      const res = await fetch(`${API_URL}/snippets/${snippetId}/comments/${comment.id}/like`, { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (res.ok) { setLiked(data.liked); setLikesCount(data.likesCount); }
+    } catch (e) { console.error(e); } finally { setLiking(false); }
+  }
 
   async function loadReplies() {
     setLoadingReplies(true);
@@ -293,6 +339,7 @@ function CommentItem({ comment, snippetId, currentUser, onDeleted }) {
             <p className="text-sm text-ink-gray leading-relaxed">{comment.content}</p>
           </div>
           <div className="flex items-center gap-4 mt-1.5 ml-1">
+            <LikeButton count={likesCount} liked={liked} onToggle={toggleLike} disabled={!currentUser || liking} />
             {currentUser && <button onClick={openReplyForm} className="text-xs text-gray-400 hover:text-ink-primary font-medium transition-colors">Reply</button>}
             {replyCount > 0 && (
               <button onClick={toggleReplies} className="flex items-center gap-1 text-xs text-ink-gold hover:text-amber-600 font-medium transition-colors">
@@ -391,7 +438,7 @@ function SnippetCard({ snippet, currentUser, onDeleted }) {
     try { const res = await fetch(`${API_URL}/snippets/${snippet.id}/like`, { method: "POST", credentials: "include" }); const data = await res.json(); if (res.ok) { setLiked(data.liked); setLikesCount(data.likesCount); } } finally { setLiking(false); }
   }
   async function handleShare() {
-    const url = window.location.href;
+    const url = `${window.location.origin}/snippets/${snippet.id}`;
     if (navigator.share) { try { await navigator.share({ title: "Writing snippet on Inkwell", url }); } catch {} return; }
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
   }
@@ -413,7 +460,7 @@ function SnippetCard({ snippet, currentUser, onDeleted }) {
             <div className="flex items-start justify-between gap-2 mb-1.5">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <Link to={`/profile/${snippet.user?.id}`} className="text-sm font-bold text-ink-primary hover:underline truncate">{snippet.user?.username}</Link>
-                <span className="text-xs text-gray-400 flex-shrink-0">· {timeAgo(snippet.createdAt)}</span>
+                <Link to={`/snippets/${snippet.id}`} className="text-xs text-gray-400 flex-shrink-0 hover:text-ink-primary transition-colors">· {timeAgo(snippet.createdAt)}</Link>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${snippet.sourceType === "POST_SPRINT" ? "bg-ink-primary/10 text-ink-primary" : "bg-ink-gold/10 text-[#b8962e]"}`}>
                   {snippet.sourceType === "POST_SPRINT" ? "Sprint" : "Solo"}
                 </span>
@@ -451,6 +498,12 @@ function SnippetCard({ snippet, currentUser, onDeleted }) {
                   : <svg className="w-[18px] h-[18px] group-hover/share:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>}
                 {copied && <span className="text-xs text-green-500">Copied!</span>}
               </button>
+              <Link to={`/snippets/${snippet.id}`} className="ml-auto flex items-center gap-1 text-[11px] text-gray-400 hover:text-ink-primary transition-colors font-medium">
+                Full page
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </Link>
             </div>
             {showComments && <div className="mt-4"><CommentSection snippetId={snippet.id} user={currentUser} /></div>}
           </div>

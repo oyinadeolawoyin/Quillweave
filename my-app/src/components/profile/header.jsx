@@ -42,7 +42,7 @@ export default function Header() {
   }
 
   const navItems = [
-    { to: "/snippets/share", label: "Community" },
+    { to: "/snippets", label: "Community" },
     { to: "/blog", label: "Blog" },
     { to: "/services", label: "Services" },
     ...(user ? [{ to: "/projects", label: "Projects" }] : []),

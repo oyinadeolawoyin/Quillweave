@@ -23,6 +23,7 @@ import AdminBlog from './components/blog/adminBlog';
 import AdminQuote from './components/quote/adminquote';
 import App from './App'
 import SnippetFeed from './components/sprint/snippetfeed';
+import SnippetPage from './components/sprint/snippetpage';
 import AdminSchedule from './components/sprint/adminschedule';
 import AdminSoundscapes from './components/sprint/Adminsoundscapes';
 import Settings from './components/profile/settings';
@@ -61,8 +62,12 @@ const router = createBrowserRouter([
     element: <ResetPassword />
   },
   {
-    path: "/snippets/share",
+    path: "/snippets",
     element: <SnippetFeed />
+  },
+  {
+    path: "/snippets/:snippetId",
+    element: <SnippetPage />
   },
   {
     path: "group-sprint/:groupSprintId",
