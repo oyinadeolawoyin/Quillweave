@@ -822,7 +822,7 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
       onSubmit();
 
       if (!isEarly) {
-        navigate("/snippets/share", { state: { fromSprint: true } });
+        navigate("/snippets", { state: { fromSprint: true } });
       }
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
