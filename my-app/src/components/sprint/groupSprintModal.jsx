@@ -475,13 +475,15 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
 }
 
 // ─── JOIN GROUP SPRINT MODAL ──────────────────────────────────
-export function JoinGroupSprintModal({ onClose }) {
+// preselectedSprint: if provided (e.g. user clicked a specific card on the
+// homepage), skip the room-list step and land directly on the check-in form.
+export function JoinGroupSprintModal({ onClose, preselectedSprint = null }) {
   const navigate = useNavigate();
   const { user }  = useAuth();
-  const [step, setStep]                             = useState(1);
+  const [step, setStep]                             = useState(preselectedSprint ? 2 : 1);
   const [activeSprints, setActiveSprints]           = useState([]);
-  const [loadingRooms, setLoadingRooms]             = useState(true);
-  const [selectedSprint, setSelectedSprint]         = useState(null);
+  const [loadingRooms, setLoadingRooms]             = useState(!preselectedSprint);
+  const [selectedSprint, setSelectedSprint]         = useState(preselectedSprint);
   const [checkin, setCheckin]                       = useState("");
   const [startWordCount, setStartWordCount]         = useState("");
   const [soundscapeId, setSoundscapeId]             = useState(null);
@@ -492,6 +494,8 @@ export function JoinGroupSprintModal({ onClose }) {
   const [error, setError]                           = useState(null);
 
   useEffect(() => {
+    // Skip the room list fetch if we already know which sprint to join
+    if (preselectedSprint) return;
     async function fetchRooms() {
       setLoadingRooms(true);
       try {
@@ -504,20 +508,22 @@ export function JoinGroupSprintModal({ onClose }) {
       finally { setLoadingRooms(false); }
     }
     fetchRooms();
-  }, []);
+  }, [preselectedSprint]);
 
   useEffect(() => {
-    if (step !== 2) return;
+    // When preselectedSprint is provided we start on step 2, so load immediately
+    if (step !== 2 && !preselectedSprint) return;
     setLoadingSoundscapes(true);
     fetch(`${API_URL}/soundscapes`)
       .then((r) => (r.ok ? r.json() : { soundscapes: [] }))
       .then((d) => setSoundscapes(d.soundscapes || []))
       .catch(() => setSoundscapes([]))
       .finally(() => setLoadingSoundscapes(false));
-  }, [step]);
+  }, [step, preselectedSprint]);
 
   function handleClose() {
-    setStep(1); setSelectedSprint(null);
+    setStep(preselectedSprint ? 2 : 1);
+    setSelectedSprint(preselectedSprint);
     setCheckin(""); setStartWordCount(""); setSoundscapeId(null);
     setSelectedProjectId(null); setError(null);
     onClose();
@@ -558,8 +564,8 @@ export function JoinGroupSprintModal({ onClose }) {
   return (
     <ModalShell
       onClose={handleClose}
-      step={step}
-      totalSteps={2}
+      step={preselectedSprint ? 1 : step}
+      totalSteps={preselectedSprint ? 1 : 2}
       title={step === 1 ? "Enter the Shop" : `Joining @${selectedSprint?.user?.username}'s sprint`}
       subtitle={step === 1 ? "Active sessions" : "Your check-in"}
     >
@@ -689,9 +695,11 @@ export function JoinGroupSprintModal({ onClose }) {
           <ErrorBanner message={error} />
 
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={() => { setStep(1); setError(null); }}
+            <button
+              type="button"
+              onClick={() => { if (preselectedSprint) { handleClose(); } else { setStep(1); setError(null); } }}
               className="px-5 py-3 border border-[#e8e0d0] text-[#6b5c4a] rounded-xl text-sm font-medium hover:border-[#b8a898] transition-all bg-[#faf7f2]">
-              Back
+              {preselectedSprint ? "Cancel" : "Back"}
             </button>
             <button type="submit" disabled={isLoading}
               className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-semibold hover:bg-[#3d4f64] transition-all disabled:opacity-50 flex items-center justify-center gap-2">

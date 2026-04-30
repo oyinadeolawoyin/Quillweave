@@ -43,8 +43,9 @@ export default function Header() {
 
   const navItems = [
     { to: "/snippets", label: "Community" },
+    { to: "/discovery", label: "Discovery" },
+    { to: "/feedback", label: "Feedback Hub" },
     { to: "/blog", label: "Blog" },
-    { to: "/services", label: "Services" },
     ...(user ? [{ to: "/projects", label: "Projects" }] : []),
   ];
 
@@ -74,9 +75,12 @@ export default function Header() {
                     isActive(to)
                       ? "text-[#2d3748] bg-[#f7f4ee]"
                       : "text-[#737373] hover:text-[#2d3748] hover:bg-[#fafaf9]"
-                  }`}
+                  } ${to === "/feedback-hub" ? "relative" : ""}`}
                 >
                   {label}
+                  {to === "/feedback-hub" && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-[#d4af37] rounded-full" />
+                  )}
                 </Link>
               ))}
             </nav>
@@ -145,11 +149,7 @@ export default function Header() {
             {/* Mobile Right Side */}
             <div className="flex sm:hidden items-center gap-2">
               {user && (
-                <Link
-                  to="/notifications"
-                  className="relative p-2 text-[#737373]"
-                  aria-label="Notifications"
-                >
+                <Link to="/notifications" className="relative p-2 text-[#737373]" aria-label="Notifications">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -161,7 +161,6 @@ export default function Header() {
                   )}
                 </Link>
               )}
-
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="p-2 rounded-lg text-[#2d3748] hover:bg-[#f7f4ee] transition-colors"
@@ -189,13 +188,18 @@ export default function Header() {
                 <Link
                   key={to}
                   to={to}
-                  className={`block px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                     isActive(to)
                       ? "text-[#2d3748] bg-[#f7f4ee]"
                       : "text-[#4a4a4a] hover:bg-[#fafaf9]"
                   }`}
                 >
                   {label}
+                  {to === "/feedback-hub" && (
+                    <span className="text-[10px] bg-[#fdf3d8] text-[#b8962e] border border-[#f0d98a] px-2 py-0.5 rounded-full font-semibold">
+                      New
+                    </span>
+                  )}
                 </Link>
               ))}
 
@@ -213,8 +217,7 @@ export default function Header() {
                     <span>{user?.username}</span>
                     <span className="ml-auto text-xs text-[#737373]">Profile</span>
                   </Link>
-
-                  <Link to="/settings" className="px-3 py-1.5 text-sm text-[#737373] hover:text-[#2d3748] transition-colors rounded-lg hover:bg-[#f7f4ee]">
+                  <Link to="/settings" className="block px-4 py-2.5 rounded-xl text-sm font-medium text-[#4a4a4a] hover:bg-[#fafaf9]">
                     Settings
                   </Link>
                   <button
@@ -226,16 +229,10 @@ export default function Header() {
                 </>
               ) : (
                 <>
-                  <Link
-                    to="/login"
-                    className="block px-4 py-2.5 rounded-xl text-sm font-medium text-[#4a4a4a] hover:bg-[#fafaf9]"
-                  >
+                  <Link to="/login" className="block px-4 py-2.5 rounded-xl text-sm font-medium text-[#4a4a4a] hover:bg-[#fafaf9]">
                     Sign In
                   </Link>
-                  <Link
-                    to="/signup"
-                    className="block px-4 py-2.5 rounded-xl text-sm font-medium text-center bg-[#2d3748] text-white hover:opacity-90"
-                  >
+                  <Link to="/signup" className="block px-4 py-2.5 rounded-xl text-sm font-medium text-center bg-[#2d3748] text-white hover:opacity-90">
                     Get Started
                   </Link>
                 </>

@@ -9,9 +9,27 @@ const STATUS_LABEL = {
   ON_HOLD:     { label: "On hold",     color: "#6b7280", bg: "#f3f4f6", border: "#e5e7eb" },
 };
 
+const PHASE_LABEL = {
+  BRAINSTORMING: { label: "Brainstorming", color: "#0369a1", bg: "#f0f9ff" },
+  OUTLINING:     { label: "Outlining",     color: "#6d28d9", bg: "#f5f3ff" },
+  DRAFTING:      { label: "Drafting",      color: "#2d6e5a", bg: "#f0fdf4" },
+  EDITING:       { label: "Editing",       color: "#b8962e", bg: "#fffbeb" },
+  PLANNING:      { label: "Planning",      color: "#6b5c4a", bg: "#faf7f2" },
+};
+
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   return Math.max(0, Math.ceil((new Date(dateStr) - Date.now()) / (1000 * 60 * 60 * 24)));
+}
+
+// Determine which tracking mode a project uses
+function trackingMode(project) {
+  if (project.consecutiveDaysTarget > 0) return "days";
+  if (project.sessionGoalCount > 0)      return "sessions";
+  if (project.targetScenes > 0)          return "scenes";
+  if (project.targetChapters > 0)        return "chapters";
+  if (project.targetWordCount > 0)       return "words";
+  return "none";
 }
 
 // ─── Mini Arc Ring ────────────────────────────────────────────
@@ -45,11 +63,231 @@ function ThinBar({ percent, color }) {
   );
 }
 
-// ─── Project Card ─────────────────────────────────────────────
+// ─── Streak flame bar ─────────────────────────────────────────
+function StreakBar({ current, target }) {
+  const pct = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0;
+  return (
+    <div className="w-full h-1.5 bg-[#fce7f3] rounded-full overflow-hidden">
+      <div
+        className="h-full rounded-full transition-all duration-700"
+        style={{ width: `${pct}%`, background: "linear-gradient(90deg, #f472b6 0%, #9d174d 100%)" }}
+      />
+    </div>
+  );
+}
+
+// ─── Phase badge ──────────────────────────────────────────────
+function PhaseBadge({ phase }) {
+  const p = PHASE_LABEL[phase];
+  if (!p) return null;
+  return (
+    <span
+      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+      style={{ color: p.color, background: p.bg }}
+    >
+      {p.label}
+    </span>
+  );
+}
+
+// ─── Session project card (pink accent) ──────────────────────
+function SessionCard({ project }) {
+  const navigate = useNavigate();
+  const status = STATUS_LABEL[project.status] || STATUS_LABEL.IN_PROGRESS;
+  const daysLeft = daysUntil(project.deadline);
+  const deadlineUrgent = daysLeft !== null && daysLeft <= 7;
+  const deadlineColor  = daysLeft === 0 ? "#ef4444" : deadlineUrgent ? "#c47d1e" : "#6b5c4a";
+
+  const goalCount = project.sessionGoalCount || 0;
+  const current   = project.currentSessionCount || 0;
+  const pct = goalCount > 0 ? Math.min(Math.round((current / goalCount) * 100), 100) : 0;
+  const periodLabel = project.sessionGoalType
+    ? { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly" }[project.sessionGoalType] || ""
+    : "";
+
+  return (
+    <div
+      onClick={() => navigate(`/projects/${project.id}`)}
+      className="group cursor-pointer rounded-3xl border bg-white overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
+      style={{
+        borderColor: "#fbcfe8",
+        boxShadow: "0 2px 4px rgba(190,24,93,0.04), 0 6px 20px rgba(190,24,93,0.06)",
+      }}
+    >
+      {/* Pink top accent */}
+      <div className="h-[3px] w-full" style={{ background: "linear-gradient(90deg, #f472b6 0%, #9d174d 100%)" }} />
+
+      <div className="p-5">
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+            style={{ color: status.color, background: status.bg, borderColor: status.border }}>
+            {status.label}
+          </span>
+          {project.phase && <PhaseBadge phase={project.phase} />}
+          {project.genre && (
+            <span className="text-[10px] text-[#9a8c7a] bg-[#faf7f2] border border-[#e8e0d0] px-2 py-0.5 rounded-full">
+              {project.genre}
+            </span>
+          )}
+          {project.visibility === "PUBLIC" && (
+            <span className="text-[10px] text-[#be185d] bg-[#fdf2f8] border border-[#fbcfe8] px-2 py-0.5 rounded-full">
+              Public
+            </span>
+          )}
+        </div>
+
+        <h3 className="font-serif text-lg text-[#2d3748] leading-snug mb-1 group-hover:text-[#1a2535] transition-colors">
+          {project.title}
+        </h3>
+        {project.description && (
+          <p className="text-xs text-[#9a8c7a] leading-relaxed line-clamp-2 mb-4">{project.description}</p>
+        )}
+
+        {goalCount > 0 && (
+          <div className="mb-4 space-y-2">
+            <div className="flex items-end justify-between">
+              <div>
+                <span className="font-serif text-2xl font-bold text-[#9d174d]">{current}</span>
+                <span className="text-xs text-[#be185d] ml-1">/ {goalCount} sessions</span>
+              </div>
+              <span className="text-[10px] font-semibold text-[#be185d] bg-[#fdf2f8] px-2 py-0.5 rounded-full border border-[#fbcfe8]">
+                {pct}% {periodLabel}
+              </span>
+            </div>
+            <ThinBar percent={pct} color="#be185d" />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-3 border-t border-[#fce7f3]">
+          <div className="flex items-center gap-3">
+            {daysLeft !== null && (
+              <span className="text-xs font-semibold tabular-nums" style={{ color: deadlineColor }}>
+                {daysLeft === 0 ? "Past due" : `${daysLeft}d left`}
+              </span>
+            )}
+            {project.daysPerWeek && (
+              <span className="text-[10px] text-[#b8a898]">{project.daysPerWeek}x/week</span>
+            )}
+          </div>
+          <span className="text-[#f9a8d4] group-hover:text-[#be185d] transition-colors text-sm font-semibold">
+            View →
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Streak / Days project card (pink accent) ─────────────────
+function StreakCard({ project }) {
+  const navigate = useNavigate();
+  const status = STATUS_LABEL[project.status] || STATUS_LABEL.IN_PROGRESS;
+  const daysLeft = daysUntil(project.deadline);
+  const deadlineUrgent = daysLeft !== null && daysLeft <= 7;
+  const deadlineColor  = daysLeft === 0 ? "#ef4444" : deadlineUrgent ? "#c47d1e" : "#6b5c4a";
+
+  const streak = project.currentStreak || 0;
+  const target = project.consecutiveDaysTarget || 0;
+  const pct    = target > 0 ? Math.min(Math.round((streak / target) * 100), 100) : 0;
+
+  // Build a tiny dot grid showing the last 14 "slots" (placeholder visual)
+  const dots = Array.from({ length: Math.min(target || 30, 30) }, (_, i) => i < streak);
+
+  return (
+    <div
+      onClick={() => navigate(`/projects/${project.id}`)}
+      className="group cursor-pointer rounded-3xl border bg-white overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
+      style={{
+        borderColor: "#fbcfe8",
+        boxShadow: "0 2px 4px rgba(157,23,77,0.04), 0 6px 20px rgba(157,23,77,0.06)",
+      }}
+    >
+      {/* Deep pink top accent */}
+      <div className="h-[3px] w-full" style={{ background: "linear-gradient(90deg, #9d174d 0%, #f472b6 100%)" }} />
+
+      <div className="p-5">
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+            style={{ color: status.color, background: status.bg, borderColor: status.border }}>
+            {status.label}
+          </span>
+          {project.phase && <PhaseBadge phase={project.phase} />}
+          {project.genre && (
+            <span className="text-[10px] text-[#9a8c7a] bg-[#faf7f2] border border-[#e8e0d0] px-2 py-0.5 rounded-full">
+              {project.genre}
+            </span>
+          )}
+          {project.visibility === "PUBLIC" && (
+            <span className="text-[10px] text-[#9d174d] bg-[#fff0f8] border border-[#f9a8d4] px-2 py-0.5 rounded-full">
+              Public
+            </span>
+          )}
+        </div>
+
+        <h3 className="font-serif text-lg text-[#2d3748] leading-snug mb-1 group-hover:text-[#1a2535] transition-colors">
+          {project.title}
+        </h3>
+        {project.description && (
+          <p className="text-xs text-[#9a8c7a] leading-relaxed line-clamp-2 mb-4">{project.description}</p>
+        )}
+
+        {/* Streak display */}
+        <div className="mb-4 space-y-2.5">
+          <div className="flex items-end justify-between">
+            <div>
+              <span className="font-serif text-3xl font-bold text-[#9d174d] leading-none">{streak}</span>
+              <span className="text-xs text-[#be185d] ml-1.5">
+                day{streak !== 1 ? "s" : ""} streak
+                {target > 0 && ` / ${target} goal`}
+              </span>
+            </div>
+            {target > 0 && (
+              <span className="text-[10px] font-semibold text-[#9d174d] bg-[#fff0f8] px-2 py-0.5 rounded-full border border-[#f9a8d4]">
+                {pct}%
+              </span>
+            )}
+          </div>
+
+          {target > 0 && <StreakBar current={streak} target={target} />}
+
+          {/* Dot grid */}
+          {dots.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {dots.map((filled, i) => (
+                <div
+                  key={i}
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: filled ? "#be185d" : "#fce7f3" }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-[#fce7f3]">
+          <div className="flex items-center gap-3">
+            {daysLeft !== null && (
+              <span className="text-xs font-semibold tabular-nums" style={{ color: deadlineColor }}>
+                {daysLeft === 0 ? "Past due" : `${daysLeft}d left`}
+              </span>
+            )}
+          </div>
+          <span className="text-[#f9a8d4] group-hover:text-[#9d174d] transition-colors text-sm font-semibold">
+            View →
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Standard progress project card ───────────────────────────
 function ProjectCard({ project }) {
   const navigate = useNavigate();
   const status = STATUS_LABEL[project.status] || STATUS_LABEL.IN_PROGRESS;
   const daysLeft = daysUntil(project.deadline);
+  const deadlineUrgent = daysLeft !== null && daysLeft <= 7;
+  const deadlineColor  = daysLeft === 0 ? "#ef4444" : deadlineUrgent ? "#c47d1e" : "#6b5c4a";
 
   const wordPct = project.targetWordCount
     ? Math.min(Math.round((project.currentWordCount / project.targetWordCount) * 100), 100) : 0;
@@ -63,26 +301,21 @@ function ProjectCard({ project }) {
   const hasScenes   = project.targetScenes > 0;
   const hasAnyGoal  = hasWords || hasChapters || hasScenes;
 
-  // Deadline urgency
-  const deadlineUrgent = daysLeft !== null && daysLeft <= 7;
-  const deadlineColor  = daysLeft === 0 ? "#ef4444" : deadlineUrgent ? "#c47d1e" : "#6b5c4a";
-
   return (
     <div
       onClick={() => navigate(`/projects/${project.id}`)}
       className="group cursor-pointer rounded-3xl border border-[#e8e0d0] bg-white overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
       style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.03), 0 6px 20px rgba(45,35,20,0.06)" }}
     >
-      {/* Gold top accent bar */}
       <div className="h-[3px] w-full" style={{ background: "linear-gradient(90deg, #d4af37 0%, #2d3748 100%)" }} />
 
       <div className="p-5">
-        {/* Status + genre chips */}
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
             style={{ color: status.color, background: status.bg, borderColor: status.border }}>
             {status.label}
           </span>
+          {project.phase && <PhaseBadge phase={project.phase} />}
           {project.genre && (
             <span className="text-[10px] text-[#9a8c7a] bg-[#faf7f2] border border-[#e8e0d0] px-2 py-0.5 rounded-full">
               {project.genre}
@@ -95,7 +328,6 @@ function ProjectCard({ project }) {
           )}
         </div>
 
-        {/* Title */}
         <h3 className="font-serif text-lg text-[#2d3748] leading-snug mb-1 group-hover:text-[#1a2535] transition-colors">
           {project.title}
         </h3>
@@ -103,7 +335,6 @@ function ProjectCard({ project }) {
           <p className="text-xs text-[#9a8c7a] leading-relaxed line-clamp-2 mb-4">{project.description}</p>
         )}
 
-        {/* Progress rings — only for goals that exist */}
         {hasAnyGoal && (
           <div className="flex items-center gap-4 mb-4">
             {hasWords && (
@@ -124,7 +355,6 @@ function ProjectCard({ project }) {
                 <p className="text-[10px] text-[#9a8c7a]">scenes</p>
               </div>
             )}
-            {/* Primary word count on the right */}
             {hasWords && (
               <div className="ml-auto text-right">
                 <p className="font-serif text-xl font-bold text-[#2d3748] leading-none">
@@ -137,7 +367,6 @@ function ProjectCard({ project }) {
           </div>
         )}
 
-        {/* Footer row */}
         <div className="flex items-center justify-between pt-3 border-t border-[#f0ebe3]">
           <div className="flex items-center gap-3">
             {daysLeft !== null && (
@@ -146,7 +375,7 @@ function ProjectCard({ project }) {
               </span>
             )}
             {project.daysPerWeek && (
-              <span className="text-[10px] text-[#b8a898]">{project.daysPerWeek}×/week</span>
+              <span className="text-[10px] text-[#b8a898]">{project.daysPerWeek}x/week</span>
             )}
           </div>
           <span className="text-[#c4bdb4] group-hover:text-[#d4af37] transition-colors text-sm font-semibold">
@@ -154,6 +383,19 @@ function ProjectCard({ project }) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Section divider ──────────────────────────────────────────
+function SectionDivider({ label, color = "#9a8c7a", lineColor = "#e8e0d0" }) {
+  return (
+    <div className="flex items-center gap-3 mb-4 mt-8">
+      <div className="h-px flex-1" style={{ background: lineColor }} />
+      <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color }}>
+        {label}
+      </p>
+      <div className="h-px flex-1" style={{ background: lineColor }} />
     </div>
   );
 }
@@ -174,6 +416,12 @@ export default function ProjectsPage() {
   }, []);
 
   const filtered = filter === "ALL" ? projects : projects.filter(p => p.status === filter);
+
+  // Separate into rhythm projects (days/sessions) and progress projects
+  const rhythmProjects   = filtered.filter(p => ["days", "sessions"].includes(trackingMode(p)));
+  const progressProjects = filtered.filter(p => !["days", "sessions"].includes(trackingMode(p)));
+  const hasRhythm        = rhythmProjects.length > 0;
+  const hasProgress      = progressProjects.length > 0;
 
   return (
     <div className="min-h-screen bg-[#faf7f2]">
@@ -201,9 +449,7 @@ export default function ProjectsPage() {
             {["ALL", "IN_PROGRESS", "COMPLETED", "ON_HOLD"].map(s => (
               <button key={s} onClick={() => setFilter(s)}
                 className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  filter === s
-                    ? "bg-[#2d3748] text-white"
-                    : "text-[#6b5c4a] hover:text-[#2d3748]"
+                  filter === s ? "bg-[#2d3748] text-white" : "text-[#6b5c4a] hover:text-[#2d3748]"
                 }`}>
                 {s === "ALL" ? "All" : STATUS_LABEL[s]?.label || s}
                 {s !== "ALL" && (
@@ -250,9 +496,41 @@ export default function ProjectsPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filtered.map(p => <ProjectCard key={p.id} project={p} />)}
-          </div>
+          <>
+            {/* Habit / rhythm projects — days & sessions */}
+            {hasRhythm && (
+              <>
+                <SectionDivider
+                  label="Habit tracking"
+                  color="#be185d"
+                  lineColor="#fbcfe8"
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {rhythmProjects.map(p =>
+                    trackingMode(p) === "days"
+                      ? <StreakCard key={p.id} project={p} />
+                      : <SessionCard key={p.id} project={p} />
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Progress projects — words, chapters, scenes, none */}
+            {hasProgress && (
+              <>
+                {hasRhythm && (
+                  <SectionDivider
+                    label="Progress tracking"
+                    color="#6b5c4a"
+                    lineColor="#e8e0d0"
+                  />
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {progressProjects.map(p => <ProjectCard key={p.id} project={p} />)}
+                </div>
+              </>
+            )}
+          </>
         )}
       </main>
     </div>

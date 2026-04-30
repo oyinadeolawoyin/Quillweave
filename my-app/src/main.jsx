@@ -13,7 +13,7 @@ import ResetPassword from './components/auth/resetPassword';
 import GroupSprintWorkspace from './components/sprint/groupSprintWorkspace';
 
 import Notification from './components/notification/notification';
-// import EditProfile from './components/profile/editProfile';
+import UserFeedbackSubmissions from './components/profile/profile';
 import NotFound from './components/NotFound';
 import About from './components/about/about';
 import Services from './components/services/services';
@@ -30,6 +30,14 @@ import Settings from './components/profile/settings';
 import ProjectsPage from './components/projects/projectspage';
 import CreateEditProject from './components/projects/createeditproject';
 import ProjectStats from './components/projects/projectstats';
+import FeedbackHub from './components/feedbackHub/feedbackhub';
+import SubmitFeedback from './components/feedbackHub/submitFeedback';
+import FeedbackPage from './components/feedbackHub/feedbackPage';
+import OutdatedPage from './components/feedbackHub/outdatedpage';
+import DiscoveryFeed from './components/discovery/discoveryfeed';
+import DiscoveryStoryPage from './components/discovery/discoverystorypage';
+import SubmitDiscoveryStory from './components/discovery/submitdiscoverystory';
+import AdminDiscovery from './components/discovery/admindiscovery';
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
@@ -124,6 +132,42 @@ const router = createBrowserRouter([
   { 
     path: "/projects/:projectId/edit", 
     element: <CreateEditProject /> 
+  },
+  { 
+    path: "/feedback", 
+    element: <FeedbackHub /> 
+  },
+  { 
+    path: "/feedback/submit", 
+    element: <SubmitFeedback /> 
+  },
+  { 
+    path: "/feedback/:id",     
+    element: <FeedbackPage /> 
+  },
+  {
+    path: "/feedback/outdated",
+    element: <OutdatedPage />
+  },
+  { 
+    path: "/profile/:userId",     
+    element: <UserFeedbackSubmissions /> 
+  },
+  { 
+    path: "/discovery", 
+    element: <DiscoveryFeed /> 
+  },
+  { 
+    path: "/discovery/submit", 
+    element: <SubmitDiscoveryStory /> 
+  },
+  { 
+    path: "/discovery/:storyId", 
+    element: <DiscoveryStoryPage /> 
+  },
+  { 
+    path: "/admin/discovery", 
+    element: <AdminDiscovery /> 
   },
   {
     path: "*",

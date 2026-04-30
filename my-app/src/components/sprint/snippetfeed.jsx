@@ -15,6 +15,22 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+const sourceTypeConfig = {
+  POST_SPRINT: {
+    label: "Sprint",
+    className: "bg-ink-primary/10 text-ink-primary",
+  },
+  STANDALONE: {
+    label: "Solo",
+    className: "bg-ink-gold/10 text-[#b8962e]",
+  },
+  DAYS_CHALLENGE: {
+    label: "Day Challenge",
+    className: "bg-pink-100 text-pink-600",
+  },
+};
+
+
 function Avatar({ username, avatar, size = "md" }) {
   const sizes = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
   if (avatar) return <img src={avatar} alt={username} className={`${sizes[size]} rounded-full object-cover flex-shrink-0`} />;
@@ -430,6 +446,7 @@ function SnippetCard({ snippet, currentUser, onDeleted }) {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const tagList = snippet.tags ? snippet.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
   const commentCount = snippet._count?.comments || 0;
+  const sourceConfig = sourceTypeConfig[snippet.sourceType] || sourceTypeConfig.STANDALONE;
   const canDelete = currentUser && (currentUser.id === snippet.user?.id || currentUser.role === "ADMIN");
   const isImage = snippet.mediaUrl && !snippet.mediaUrl.match(/\.(mp4|webm|ogg|mov)$/i);
 
@@ -461,8 +478,10 @@ function SnippetCard({ snippet, currentUser, onDeleted }) {
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <Link to={`/profile/${snippet.user?.id}`} className="text-sm font-bold text-ink-primary hover:underline truncate">{snippet.user?.username}</Link>
                 <Link to={`/snippets/${snippet.id}`} className="text-xs text-gray-400 flex-shrink-0 hover:text-ink-primary transition-colors">· {timeAgo(snippet.createdAt)}</Link>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${snippet.sourceType === "POST_SPRINT" ? "bg-ink-primary/10 text-ink-primary" : "bg-ink-gold/10 text-[#b8962e]"}`}>
-                  {snippet.sourceType === "POST_SPRINT" ? "Sprint" : "Solo"}
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${sourceConfig.className}`}
+                >
+                  {sourceConfig.label}
                 </span>
               </div>
               {canDelete && <ThreeDotMenu onDelete={handleDelete} deleting={deleting} />}
