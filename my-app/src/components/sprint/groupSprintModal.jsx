@@ -891,7 +891,7 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
           />
         </Field>
 
-        {/* Media upload */}
+        {/* Media  */}
         <div>
           {mediaPreview ? (
             <div className="relative rounded-xl overflow-hidden border border-[#e8e0d0]">
