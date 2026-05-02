@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+import Header from "./header";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -10,6 +11,7 @@ const TIER_LABELS = {
   TIER_2000: "2,000 words",
   TIER_3000: "3,000 words",
   TIER_4000: "4,000 words",
+  TIER_5000: "5,000 words",
 };
 
 const DRAFT_LABELS = {
@@ -96,25 +98,21 @@ function WalletCard({ wallet, isOwner }) {
       className="rounded-2xl border p-5 flex flex-col gap-4"
       style={{ background: style.bg, borderColor: style.border }}
     >
-      {/* Tier badge */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span
-            className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold"
-            style={{ background: style.border, color: style.color }}
-          >
-            {tier?.gem}
-          </span>
-          <div>
-            <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: style.color }}>
-              {tier?.name} Tier
-            </p>
-            <p className="text-[11px] text-[#9a8c7a] mt-0.5">Feedback reputation</p>
-          </div>
+      <div className="flex items-center gap-2.5">
+        <span
+          className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold"
+          style={{ background: style.border, color: style.color }}
+        >
+          {tier?.gem}
+        </span>
+        <div>
+          <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: style.color }}>
+            {tier?.name} Tier
+          </p>
+          <p className="text-[11px] text-[#9a8c7a] mt-0.5">Feedback reputation</p>
         </div>
       </div>
 
-      {/* Stats row */}
       <div className={`grid gap-3 ${isOwner ? "grid-cols-2" : "grid-cols-1"}`}>
         <div className="bg-white/70 rounded-xl px-4 py-3 border border-white/80">
           <p className="text-[11px] uppercase tracking-widest text-[#9a8c7a] font-semibold mb-0.5">Reputation</p>
@@ -143,7 +141,7 @@ function SubmissionRow({ sub, isOwner, onDelete, onClose }) {
   const comments = sub._count?.paragraphComments ?? 0;
 
   return (
-    <div className="group bg-white border border-[#e8e0d0] rounded-2xl p-5 transition-all hover:border-[#c4b8a8] hover:shadow-sm">
+    <div className="group bg-white border border-[#e8e0d0] rounded-2xl p-4 sm:p-5 transition-all hover:border-[#c4b8a8] hover:shadow-sm">
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <span className="text-[11px] font-semibold text-[#2d3748] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
           {sub.genre}
@@ -180,7 +178,7 @@ function SubmissionRow({ sub, isOwner, onDelete, onClose }) {
       <p className="text-xs text-[#9a8c7a] leading-relaxed mb-4 line-clamp-2">{sub.summary}</p>
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#f0ebe3]">
-        <div className="flex items-center gap-3 text-xs text-[#b0a090]">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[#b0a090]">
           <span>{responses} {responses === 1 ? "critique" : "critiques"}</span>
           <span className="w-1 h-1 rounded-full bg-[#e0d8cc] inline-block" />
           <span>{comments} comments</span>
@@ -188,13 +186,21 @@ function SubmissionRow({ sub, isOwner, onDelete, onClose }) {
           <span>{timeAgo(sub.createdAt)}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             to={`/feedback/${sub.id}`}
             className="px-3 py-1.5 rounded-lg border border-[#e8e0d0] text-xs text-[#6b5c4a] hover:border-[#2d3748] hover:text-[#2d3748] transition-all font-medium"
           >
             View
           </Link>
+          {isOwner && (
+            <Link
+              to={`/feedback/${sub.id}/edit`}
+              className="px-3 py-1.5 rounded-lg border border-[#c4bef0] text-xs text-[#5248a8] bg-[#f2f0fc] hover:bg-[#eae7fa] transition-all font-medium"
+            >
+              Edit
+            </Link>
+          )}
           {isOwner && sub.isOpen && (
             <button
               onClick={() => onClose(sub)}
@@ -219,14 +225,13 @@ function SubmissionRow({ sub, isOwner, onDelete, onClose }) {
 
 // ─── DISCOVERY CARD ───────────────────────────────────────────────────────────
 
-function DiscoveryCard({ story, isOwner }) {
+function DiscoveryCard({ story, isOwner, onDeleteStory }) {
   const isPending = !story.isApproved;
 
   return (
     <div className={`group bg-white border rounded-2xl overflow-hidden transition-all hover:shadow-sm ${
       isPending ? "border-[#f0d98a] bg-[#fdfbea]" : "border-[#e8e0d0] hover:border-[#c4b8a8]"
     }`}>
-      {/* Cover image */}
       {story.coverUrl && (
         <div className="h-36 overflow-hidden">
           <img
@@ -238,7 +243,6 @@ function DiscoveryCard({ story, isOwner }) {
       )}
 
       <div className="p-4">
-        {/* Badges */}
         <div className="flex flex-wrap gap-2 mb-2.5">
           <span className="text-[11px] font-semibold text-[#2d3748] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
             {story.genre}
@@ -269,11 +273,30 @@ function DiscoveryCard({ story, isOwner }) {
           {story.synopsis}
         </p>
 
-        <div className="flex items-center justify-between pt-2.5 border-t border-[#f0ebe3]">
-          <span className="text-[11px] text-[#b0a090]">{formatDate(story.createdAt)}</span>
-          <span className="text-[11px] text-[#9a8c7a]">
-            {story._count?.likes ?? 0} {story._count?.likes === 1 ? "like" : "likes"}
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#f0ebe3]">
+          <div className="flex items-center gap-3 text-[11px] text-[#b0a090]">
+            <span>{formatDate(story.createdAt)}</span>
+            <span>{story._count?.likes ?? 0} {story._count?.likes === 1 ? "like" : "likes"}</span>
+          </div>
+
+          {isOwner && (
+            <div className="flex items-center gap-1.5">
+              <Link
+                to={`/discovery/${story.id}/edit`}
+                className="px-2.5 py-1 rounded-lg border border-[#c4bef0] text-[11px] text-[#5248a8] bg-[#f2f0fc] hover:bg-[#eae7fa] transition-all font-medium"
+              >
+                Edit
+              </Link>
+              {onDeleteStory && (
+                <button
+                  onClick={() => onDeleteStory(story)}
+                  className="px-2.5 py-1 rounded-lg border border-[#f5c6c3] text-[11px] text-[#c0392b] bg-[#fdf1f0] hover:bg-[#fbe8e6] transition-all font-medium"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -282,14 +305,29 @@ function DiscoveryCard({ story, isOwner }) {
 
 // ─── SECTION WRAPPER ──────────────────────────────────────────────────────────
 
-function Section({ title, action, children }) {
+function Section({ title, action, badge, description, children }) {
   return (
-    <div className="mt-10">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="font-serif text-xl text-[#1e2a38]">{title}</h2>
+    <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden">
+      {/* Section header */}
+      <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#f0ebe3] bg-[#faf8f5]">
+        <div className="flex items-center gap-3">
+          <h2 className="font-serif text-lg text-[#1e2a38]">{title}</h2>
+          {badge != null && (
+            <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full tabular-nums">
+              {badge}
+            </span>
+          )}
+        </div>
         {action}
       </div>
-      {children}
+      {description && (
+        <p className="text-sm text-[#9a8c7a] leading-relaxed px-5 sm:px-6 pt-4 pb-0">
+          {description}
+        </p>
+      )}
+      <div className="p-4 sm:p-5">
+        {children}
+      </div>
     </div>
   );
 }
@@ -298,9 +336,9 @@ function Section({ title, action, children }) {
 
 function EmptyState({ message, cta, ctaTo }) {
   return (
-    <div className="bg-white border border-[#e8e0d0] rounded-2xl px-6 py-12 text-center">
+    <div className="py-10 text-center">
       <div className="w-10 h-10 rounded-xl bg-[#f4f1ec] border border-[#e8e0d0] flex items-center justify-center mx-auto mb-4">
-        <svg className="w-4.5 h-4.5 text-[#b8a898]" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
+        <svg className="text-[#b8a898]" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
@@ -343,6 +381,17 @@ function Pagination({ page, totalPages, onChange }) {
   );
 }
 
+// ─── STAT PILL ────────────────────────────────────────────────────────────────
+
+function StatPill({ label, value }) {
+  return (
+    <div className="flex flex-col items-center px-5 py-3 bg-white/10 rounded-xl border border-white/20 min-w-[80px]">
+      <span className="text-xl font-serif font-bold text-white tabular-nums">{value}</span>
+      <span className="text-[11px] text-white/70 mt-0.5 uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
@@ -353,29 +402,30 @@ export default function ProfilePage() {
   const isOwner = currentUser && currentUser.id === profileUserId;
 
   // ── State ──
-  const [profileUser, setProfileUser]   = useState(null);
-  const [wallet, setWallet]             = useState(null);
-  const [userLoading, setUserLoading]   = useState(true);
+  const [profileUser, setProfileUser]     = useState(null);
+  const [wallet, setWallet]               = useState(null);
+  const [userLoading, setUserLoading]     = useState(true);
   const [walletLoading, setWalletLoading] = useState(true);
 
   // Submissions
-  const [submissions, setSubmissions]   = useState([]);
-  const [subLoading, setSubLoading]     = useState(true);
-  const [subPage, setSubPage]           = useState(1);
-  const [subTotalPages, setSubTotalPages] = useState(1);
+  const [submissions, setSubmissions]         = useState([]);
+  const [subLoading, setSubLoading]           = useState(true);
+  const [subPage, setSubPage]                 = useState(1);
+  const [subTotalPages, setSubTotalPages]     = useState(1);
 
   // Discovery stories
-  const [stories, setStories]           = useState([]);
-  const [storyLoading, setStoryLoading] = useState(true);
-  const [storyPage, setStoryPage]       = useState(1);
-  const [storyTotalPages, setStoryTotalPages] = useState(1);
-  const [pendingStories, setPendingStories]   = useState([]);
+  const [approvedStories, setApprovedStories]   = useState([]);
+  const [pendingStories, setPendingStories]     = useState([]);
+  const [storyLoading, setStoryLoading]         = useState(true);
+  const [storyPage, setStoryPage]               = useState(1);
+  const [storyTotalPages, setStoryTotalPages]   = useState(1);
 
   // Modal / feedback
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [closeTarget, setCloseTarget]   = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [toast, setToast]               = useState(null);
+  const [deleteTarget, setDeleteTarget]     = useState(null);
+  const [closeTarget, setCloseTarget]       = useState(null);
+  const [deleteStoryTarget, setDeleteStoryTarget] = useState(null);
+  const [actionLoading, setActionLoading]   = useState(false);
+  const [toast, setToast]                   = useState(null);
 
   // ── Fetch user ──
   useEffect(() => {
@@ -430,22 +480,24 @@ export default function ProfilePage() {
   }, [profileUserId, isOwner, subPage]);
 
   // ── Fetch discovery stories ──
+  // NOTE: The backend /discovery endpoint needs a userId query param added.
+  // See discoveryservice.js update below. Client-side filter is a safety net.
   useEffect(() => {
     async function fetchStories() {
       setStoryLoading(true);
       try {
-        // Approved stories — public endpoint filtered by userId (add userId param if your API supports it)
         const res = await fetch(
           `${API_URL}/discovery?userId=${profileUserId}&page=${storyPage}&limit=9`,
           { credentials: "include" }
         );
         if (res.ok) {
           const data = await res.json();
-          setStories(data.stories ?? []);
+          // Safety-net filter: only show this user's stories in case backend ignores userId param
+          const userStories = (data.stories ?? []).filter(s => s.userId === profileUserId || s.user?.id === profileUserId);
+          setApprovedStories(userStories);
           setStoryTotalPages(data.totalPages ?? 1);
         }
 
-        // Pending stories — only fetch for the owner
         if (isOwner) {
           const pendingRes = await fetch(
             `${API_URL}/discovery/pending?limit=50`,
@@ -453,10 +505,7 @@ export default function ProfilePage() {
           );
           if (pendingRes.ok) {
             const pendingData = await pendingRes.json();
-            // Filter to only this user's own pending stories
-            const myPending = (pendingData.stories ?? []).filter(
-              (s) => s.userId === profileUserId
-            );
+            const myPending = (pendingData.stories ?? []).filter(s => s.userId === profileUserId);
             setPendingStories(myPending);
           }
         }
@@ -477,7 +526,7 @@ export default function ProfilePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete.");
-      setSubmissions((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setSubmissions(prev => prev.filter(s => s.id !== deleteTarget.id));
       setToast({
         type: "success",
         message: data.refunded
@@ -502,8 +551,8 @@ export default function ProfilePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to close.");
-      setSubmissions((prev) =>
-        prev.map((s) => (s.id === closeTarget.id ? { ...s, isOpen: false } : s))
+      setSubmissions(prev =>
+        prev.map(s => s.id === closeTarget.id ? { ...s, isOpen: false } : s)
       );
       setToast({ type: "success", message: "Submission closed." });
     } catch (e) {
@@ -513,82 +562,113 @@ export default function ProfilePage() {
     setActionLoading(false);
   }
 
+  // ── Delete discovery story ──
+  async function confirmDeleteStory() {
+    if (!deleteStoryTarget) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/discovery/${deleteStoryTarget.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to delete story.");
+      setApprovedStories(prev => prev.filter(s => s.id !== deleteStoryTarget.id));
+      setPendingStories(prev => prev.filter(s => s.id !== deleteStoryTarget.id));
+      setToast({ type: "success", message: "Story deleted successfully." });
+    } catch (e) {
+      setToast({ type: "error", message: e.message });
+    }
+    setDeleteStoryTarget(null);
+    setActionLoading(false);
+  }
+
   // ── Derived ──
-  const approvedStories = stories.filter((s) => s.isApproved);
   const joinedDate = profileUser?.createdAt ? formatDate(profileUser.createdAt) : null;
+  const tierStyle = wallet?.tier ? (TIER_STYLES[wallet.tier.name] ?? TIER_STYLES.Bronze) : null;
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-[#f9f6f1]">
-      {/* ── Top background strip ─────────────────────────────────── */}
-      <div className="h-40 bg-gradient-to-br from-[#2d3748] via-[#3d4f6a] to-[#4a5568] relative overflow-hidden">
+      <Header />
+      {/* ── PROFILE HEADER ──────────────────────────────────────────────────── */}
+      <div className="relative w-full overflow-hidden" style={{ minHeight: 200 }}>
+        {/* Blurred avatar background — same technique as story page */}
+        {profileUser?.avatar && !userLoading ? (
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${profileUser.avatar})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center top",
+              filter: "blur(24px) brightness(0.45) saturate(1.2)",
+              transform: "scale(1.1)",
+            }}
+          />
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(135deg, #1e2235 0%, #2d3748 60%, #3b4a6b 100%)" }}
+          />
+        )}
+        {/* Gradient overlay for readability */}
         <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,.06) 40px, rgba(255,255,255,.06) 80px)",
-          }}
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.60) 100%)" }}
         />
-      </div>
 
-      {/* ── Main layout ──────────────────────────────────────────── */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-20">
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+          <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start sm:items-end">
 
-        {/* ── Profile header card ───────────────────────────────── */}
-        <div className="bg-white border border-[#e8e0d0] rounded-2xl shadow-sm -mt-16 mb-8 p-6 sm:p-8 relative">
-          <div className="flex flex-col sm:flex-row gap-5 items-start">
             {/* Avatar */}
-            {userLoading ? (
-              <Skeleton className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex-shrink-0" />
-            ) : (
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-[#e8e0d0] bg-[#f4f1ec] flex-shrink-0">
-                {profileUser?.avatar ? (
-                  <img
-                    src={profileUser.avatar}
-                    alt={profileUser.username}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="font-serif text-3xl text-[#c4b8a8]">
-                      {profileUser?.username?.[0]?.toUpperCase() ?? "?"}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="flex-shrink-0">
+              {userLoading ? (
+                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white/10 animate-pulse" />
+              ) : (
+                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-white/40 bg-white/10 shadow-2xl">
+                  {profileUser?.avatar ? (
+                    <img src={profileUser.avatar} alt={profileUser.username} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="font-serif text-4xl text-white/70">
+                        {profileUser?.username?.[0]?.toUpperCase() ?? "?"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
               {userLoading ? (
-                <div className="space-y-2 mt-1">
-                  <Skeleton className="h-7 w-40" />
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-4 w-full max-w-xs mt-3" />
+                <div className="space-y-2">
+                  <div className="h-8 w-40 bg-white/10 rounded-lg animate-pulse" />
+                  <div className="h-4 w-28 bg-white/10 rounded-lg animate-pulse" />
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-wrap items-center gap-3 mb-1">
-                    <h1 className="font-serif text-2xl sm:text-3xl text-[#1e2a38] leading-tight">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h1 className="font-serif text-2xl sm:text-3xl text-white leading-tight drop-shadow-lg">
                       {profileUser?.username}
                     </h1>
                     {profileUser?.role === "FOUNDING_WRITER" && (
-                      <span className="text-[11px] font-semibold text-[#5248a8] bg-[#f2f0fc] border border-[#c4bef0] px-2.5 py-0.5 rounded-full">
+                      <span className="text-[11px] font-semibold text-white bg-white/20 border border-white/30 px-2.5 py-0.5 rounded-full backdrop-blur-sm">
                         Founding Writer
                       </span>
                     )}
                     {profileUser?.role === "ADMIN" && (
-                      <span className="text-[11px] font-semibold text-[#1e2a38] bg-[#f4f1ec] border border-[#ddd5c8] px-2.5 py-0.5 rounded-full">
+                      <span className="text-[11px] font-semibold text-white bg-white/20 border border-white/30 px-2.5 py-0.5 rounded-full backdrop-blur-sm">
                         Admin
                       </span>
                     )}
                   </div>
                   {joinedDate && (
-                    <p className="text-xs text-[#b0a090] mb-3">Member since {joinedDate}</p>
+                    <p className="text-sm text-white/60 mb-2">Member since {joinedDate}</p>
                   )}
                   {profileUser?.bio && (
-                    <p className="text-sm text-[#6b5c4a] leading-relaxed max-w-2xl">
+                    <p className="text-sm text-white/80 leading-relaxed max-w-xl">
                       {profileUser.bio}
                     </p>
                   )}
@@ -596,196 +676,187 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Edit button (owner) */}
+            {/* Edit profile button */}
             {isOwner && !userLoading && (
               <Link
                 to="/settings"
-                className="flex-shrink-0 self-start px-4 py-2 rounded-xl border border-[#ddd5c8] text-sm text-[#6b5c4a] hover:border-[#2d3748] hover:text-[#2d3748] transition-all font-medium"
+                className="flex-shrink-0 self-start sm:self-auto px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white hover:bg-white/20 transition-all font-medium backdrop-blur-sm"
               >
                 Edit profile
               </Link>
             )}
           </div>
-        </div>
 
-        {/* ── Two-column layout ─────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-
-          {/* ── Left sidebar ─────────────────────────────────────── */}
-          <aside className="lg:col-span-1 space-y-6">
-
-            {/* Wallet */}
-            <div>
-              <h2 className="font-serif text-lg text-[#1e2a38] mb-3">Feedback Standing</h2>
-              {walletLoading ? (
-                <Skeleton className="h-36 w-full rounded-2xl" />
-              ) : wallet ? (
-                <WalletCard wallet={wallet} isOwner={isOwner} />
-              ) : (
-                <div className="bg-white border border-[#e8e0d0] rounded-2xl p-5 text-center">
-                  <p className="text-sm text-[#9a8c7a]">No activity yet</p>
-                </div>
+          {/* Stats row
+          {!walletLoading && (
+            <div className="flex flex-wrap gap-3 mt-6">
+              <StatPill label="Submissions" value={submissions.length} />
+              <StatPill label="Stories" value={approvedStories.length + pendingStories.length} />
+              {wallet && (
+                <>
+                  <StatPill label="Reputation" value={wallet.reputation ?? 0} />
+                  {isOwner && <StatPill label="Points" value={wallet.postingBalance ?? 0} />}
+                </>
               )}
             </div>
-
-            {/* Quick stats */}
-            {!userLoading && (
-              <div className="bg-white border border-[#e8e0d0] rounded-2xl p-5 space-y-3">
-                <h3 className="text-xs uppercase tracking-widest font-semibold text-[#b0a090]">Activity</h3>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-[#7a6e62]">Submissions</span>
-                  <span className="font-semibold text-[#1e2a38] tabular-nums">{submissions.length}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm border-t border-[#f0ebe3] pt-3">
-                  <span className="text-[#7a6e62]">Stories shared</span>
-                  <span className="font-semibold text-[#1e2a38] tabular-nums">
-                    {approvedStories.length + (isOwner ? pendingStories.length : 0)}
-                  </span>
-                </div>
-                {isOwner && pendingStories.length > 0 && (
-                  <div className="flex items-center justify-between text-sm border-t border-[#f0ebe3] pt-3">
-                    <span className="text-[#8a6c00]">Awaiting approval</span>
-                    <span className="font-semibold text-[#8a6c00] tabular-nums">
-                      {pendingStories.length}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </aside>
-
-          {/* ── Right main content ───────────────────────────────── */}
-          <main className="lg:col-span-2 space-y-0">
-
-            {/* Toast */}
-            {toast && (
-              <div
-                className={`mb-6 px-4 py-3 rounded-xl text-sm border flex items-center justify-between ${
-                  toast.type === "success"
-                    ? "bg-[#f0fdf4] border-[#bbf7d0] text-[#166534]"
-                    : "bg-[#fdf1f0] border-[#f5c6c3] text-[#c0392b]"
-                }`}
-              >
-                <span>{toast.message}</span>
-                <button onClick={() => setToast(null)} className="ml-4 opacity-60 hover:opacity-100 transition-opacity">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            )}
-
-            {/* ── FEEDBACK SUBMISSIONS ─────────────────────────── */}
-            <Section
-              title={isOwner ? "My Submissions" : "Feedback Submissions"}
-              action={
-                <Link
-                  to="/feedback"
-                  className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors"
-                >
-                  Feedback hub
-                </Link>
-              }
-            >
-              {subLoading ? (
-                <div className="space-y-3">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="bg-white border border-[#e8e0d0] rounded-2xl p-5">
-                      <div className="flex gap-2 mb-3">
-                        <Skeleton className="h-5 w-16 rounded-full" />
-                        <Skeleton className="h-5 w-24 rounded-full" />
-                      </div>
-                      <Skeleton className="h-5 w-2/3 mb-2" />
-                      <Skeleton className="h-3 w-full mb-1" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  ))}
-                </div>
-              ) : submissions.length === 0 ? (
-                <EmptyState
-                  message="No submissions yet"
-                  cta={isOwner ? "Submit a chapter" : undefined}
-                  ctaTo={isOwner ? "/feedback/submit" : undefined}
-                />
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {submissions.map((sub) => (
-                      <SubmissionRow
-                        key={sub.id}
-                        sub={sub}
-                        isOwner={isOwner}
-                        onDelete={setDeleteTarget}
-                        onClose={setCloseTarget}
-                      />
-                    ))}
-                  </div>
-                  <Pagination page={subPage} totalPages={subTotalPages} onChange={setSubPage} />
-                </>
-              )}
-            </Section>
-
-            {/* ── DISCOVERY STORIES — APPROVED ─────────────────── */}
-            <Section
-              title="Discovery Stories"
-              action={
-                <Link
-                  to="/discovery"
-                  className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors"
-                >
-                  Discovery page
-                </Link>
-              }
-            >
-              {storyLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden">
-                      <Skeleton className="h-36 w-full rounded-none" />
-                      <div className="p-4 space-y-2">
-                        <Skeleton className="h-4 w-2/3" />
-                        <Skeleton className="h-3 w-1/3" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : approvedStories.length === 0 ? (
-                <EmptyState
-                  message="No approved stories yet"
-                  cta={isOwner ? "Share a story" : undefined}
-                  ctaTo={isOwner ? "/discovery/submit" : undefined}
-                />
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {approvedStories.map((s) => (
-                      <DiscoveryCard key={s.id} story={s} isOwner={isOwner} />
-                    ))}
-                  </div>
-                  <Pagination page={storyPage} totalPages={storyTotalPages} onChange={setStoryPage} />
-                </>
-              )}
-            </Section>
-
-            {/* ── PENDING STORIES — owner only ─────────────────── */}
-            {isOwner && !storyLoading && pendingStories.length > 0 && (
-              <Section title="Awaiting Approval">
-                <p className="text-sm text-[#9a8c7a] mb-4 leading-relaxed">
-                  These stories are under review and not yet visible to others. You will be notified once they go live.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {pendingStories.map((s) => (
-                    <DiscoveryCard key={s.id} story={s} isOwner={true} />
-                  ))}
-                </div>
-              </Section>
-            )}
-
-          </main>
+          )} */}
         </div>
       </div>
 
-      {/* ── Modals ─────────────────────────────────────────────── */}
+      {/* ── MAIN CONTENT ────────────────────────────────────────────────────── */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-20">
+
+        {/* Toast */}
+        {toast && (
+          <div
+            className={`mb-6 px-4 py-3 rounded-xl text-sm border flex items-center justify-between ${
+              toast.type === "success"
+                ? "bg-[#f0fdf4] border-[#bbf7d0] text-[#166534]"
+                : "bg-[#fdf1f0] border-[#f5c6c3] text-[#c0392b]"
+            }`}
+          >
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} className="ml-4 opacity-60 hover:opacity-100 transition-opacity">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-6">
+
+          {/* ── FEEDBACK STANDING ────────────────────────────────────── */}
+          {(walletLoading || wallet) && (
+            <Section
+              title="Feedback Standing"
+              badge={wallet?.tier?.name}
+            >
+              {walletLoading ? (
+                <Skeleton className="h-28 w-full rounded-2xl" />
+              ) : (
+                <WalletCard wallet={wallet} isOwner={isOwner} />
+              )}
+            </Section>
+          )}
+
+          {/* ── FEEDBACK SUBMISSIONS ─────────────────────────────────── */}
+          <Section
+            title={isOwner ? "My Submissions" : "Feedback Submissions"}
+            badge={!subLoading ? submissions.length : undefined}
+            action={
+              <Link to="/feedback" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
+                Feedback Hub →
+              </Link>
+            }
+          >
+            {subLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="border border-[#e8e0d0] rounded-2xl p-5">
+                    <div className="flex gap-2 mb-3">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                    </div>
+                    <Skeleton className="h-5 w-2/3 mb-2" />
+                    <Skeleton className="h-3 w-full mb-1" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : submissions.length === 0 ? (
+              <EmptyState
+                message="No submissions yet"
+                cta={isOwner ? "Submit a chapter" : undefined}
+                ctaTo={isOwner ? "/feedback/submit" : undefined}
+              />
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {submissions.map(sub => (
+                    <SubmissionRow
+                      key={sub.id}
+                      sub={sub}
+                      isOwner={isOwner}
+                      onDelete={setDeleteTarget}
+                      onClose={setCloseTarget}
+                    />
+                  ))}
+                </div>
+                <Pagination page={subPage} totalPages={subTotalPages} onChange={setSubPage} />
+              </>
+            )}
+          </Section>
+
+          {/* ── DISCOVERY STORIES — APPROVED ─────────────────────────── */}
+          <Section
+            title="Discovery Stories"
+            badge={!storyLoading ? approvedStories.length : undefined}
+            action={
+              <Link to="/discovery" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
+                Discovery page →
+              </Link>
+            }
+          >
+            {storyLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="border border-[#e8e0d0] rounded-2xl overflow-hidden">
+                    <Skeleton className="h-36 w-full rounded-none" />
+                    <div className="p-4 space-y-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : approvedStories.length === 0 ? (
+              <EmptyState
+                message="No approved stories yet"
+                cta={isOwner ? "Share a story" : undefined}
+                ctaTo={isOwner ? "/discovery/submit" : undefined}
+              />
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {approvedStories.map(s => (
+                    <DiscoveryCard
+                      key={s.id}
+                      story={s}
+                      isOwner={isOwner}
+                      onDeleteStory={isOwner ? setDeleteStoryTarget : null}
+                    />
+                  ))}
+                </div>
+                <Pagination page={storyPage} totalPages={storyTotalPages} onChange={setStoryPage} />
+              </>
+            )}
+          </Section>
+
+          {/* ── PENDING STORIES — owner only ─────────────────────────── */}
+          {isOwner && !storyLoading && pendingStories.length > 0 && (
+            <Section
+              title="Awaiting Approval"
+              badge={pendingStories.length}
+              description="These stories are under review and not yet visible to others. You will be notified once they go live."
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pendingStories.map(s => (
+                  <DiscoveryCard
+                    key={s.id}
+                    story={s}
+                    isOwner={true}
+                    onDeleteStory={setDeleteStoryTarget}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+        </div>
+      </div>
+
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {isOwner && deleteTarget && (
         <ConfirmModal
           title="Delete submission?"
@@ -811,6 +882,17 @@ export default function ProfilePage() {
           danger={false}
           onConfirm={confirmClose}
           onCancel={() => setCloseTarget(null)}
+        />
+      )}
+
+      {isOwner && deleteStoryTarget && (
+        <ConfirmModal
+          title="Delete story?"
+          body={`This will permanently delete "${deleteStoryTarget.title}" from the Discovery page.`}
+          confirmLabel={actionLoading ? "Deleting..." : "Delete story"}
+          danger
+          onConfirm={confirmDeleteStory}
+          onCancel={() => setDeleteStoryTarget(null)}
         />
       )}
     </div>

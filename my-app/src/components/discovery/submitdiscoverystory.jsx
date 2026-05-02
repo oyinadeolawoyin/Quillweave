@@ -1,6 +1,6 @@
 // src/components/discovery/SubmitDiscoveryStory.jsx
 import { useState, useRef, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import Header from "../profile/header";
@@ -14,8 +14,13 @@ const PLATFORMS = [
   "Webnovel", "Scribble Hub", "AO3", "Other",
 ];
 
+const CONTENT_WARNINGS = [
+  "Violence", "Strong language", "Sexual content", "Graphic gore",
+  "Abuse", "Self-harm", "Suicide", "Substance use",
+  "Trauma", "Dark themes", "Death", "Disturbing imagery",
+];
+
 // ─── RICH TEXTAREA ────────────────────────────────────────────────────────────
-// Uncontrolled textarea to avoid scroll/focus reset on every keystroke.
 
 function RichTextarea({ value, onChange, rows, placeholder, className }) {
   const ref = useRef(null);
@@ -134,10 +139,15 @@ const inputClass = "w-full border border-[#e8e0d0] rounded-xl px-4 py-3 text-sm 
 export default function SubmitDiscoveryStory() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  // storyId present → edit mode
+  const { storyId } = useParams();
+  const isEditMode = Boolean(storyId);
 
+  const [loading, setLoading]       = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
-  const [coverPreview, setCoverPreview] = useState(null);
+  const [coverPreview, setCoverPreview]   = useState(null);
+  const [keepExistingCover, setKeepExistingCover] = useState(false);
   const [customGenre, setCustomGenre]     = useState("");
   const [customPlatform, setCustomPlatform] = useState("");
 
@@ -151,18 +161,58 @@ export default function SubmitDiscoveryStory() {
     recommendedBy:     "",
     platform:          "",
     platformLink:      "",
-    contentWarnings:   [],   // array of warning tags
+    contentWarnings:   [],
   });
 
   const formRef = useRef(form);
   useEffect(() => { formRef.current = form; }, [form]);
 
-  // ─── Content warnings ──────────────────────────────────────────────────────
-  const CONTENT_WARNINGS = [
-    "Violence", "Strong language", "Sexual content", "Graphic gore",
-    "Abuse", "Self-harm", "Suicide", "Substance use",
-    "Trauma", "Dark themes", "Death", "Disturbing imagery",
-  ];
+  const coverRef  = useRef(null);
+  const [coverFile, setCoverFile] = useState(null);
+
+  // ── Load existing story in edit mode ──────────────────────────────────────
+  useEffect(() => {
+    if (!isEditMode) return;
+    async function loadStory() {
+      try {
+        const res = await fetch(`${API_URL}/discovery/${storyId}`, { credentials: "include" });
+        if (!res.ok) throw new Error("Story not found.");
+        const data = await res.json();
+        const s = data.story ?? data;
+
+        // Determine if genre is a known value or custom
+        const knownGenre = GENRES.includes(s.genre) ? s.genre : "Other";
+        if (knownGenre === "Other") setCustomGenre(s.genre);
+
+        const knownPlatform = PLATFORMS.includes(s.platform) ? s.platform : "Other";
+        if (knownPlatform === "Other") setCustomPlatform(s.platform);
+
+        setForm({
+          title:             s.title ?? "",
+          genre:             knownGenre,
+          synopsis:          s.synopsis ?? "",
+          firstChapterTitle: s.firstChapterTitle ?? "",
+          firstChapter:      s.firstChapter ?? "",
+          authorName:        s.authorName ?? "",
+          recommendedBy:     s.recommendedBy ?? "",
+          platform:          knownPlatform,
+          platformLink:      s.platformLink ?? "",
+          contentWarnings:   s.contentWarnings ?? [],
+        });
+
+        if (s.coverUrl) {
+          setCoverPreview(s.coverUrl);
+          setKeepExistingCover(true);
+        }
+      } catch (e) {
+        setError(e.message);
+      }
+      setLoading(false);
+    }
+    loadStory();
+  }, [storyId, isEditMode]);
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   function toggleWarning(tag) {
     setForm(prev => ({
@@ -173,9 +223,6 @@ export default function SubmitDiscoveryStory() {
     }));
     setError("");
   }
-
-  const coverRef = useRef(null);
-  const [coverFile, setCoverFile] = useState(null);
 
   function set(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -191,6 +238,13 @@ export default function SubmitDiscoveryStory() {
     if (!file) return;
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
+    setKeepExistingCover(false);
+  }
+
+  function removeCover() {
+    setCoverPreview(null);
+    setCoverFile(null);
+    setKeepExistingCover(false);
   }
 
   function validate() {
@@ -222,29 +276,56 @@ export default function SubmitDiscoveryStory() {
       const f = formRef.current;
       const effectiveGenre    = f.genre === "Other" ? customGenre.trim()    : f.genre;
       const effectivePlatform = f.platform === "Other" ? customPlatform.trim() : f.platform;
+
       Object.entries(f).forEach(([k, v]) => {
         if (k === "genre")           fd.append(k, effectiveGenre);
         else if (k === "platform")   fd.append(k, effectivePlatform);
         else if (k === "contentWarnings") {
-          // Send each warning as a separate field so the backend can parse as array
           v.forEach(w => fd.append("contentWarnings", w));
         }
         else fd.append(k, v);
       });
-      if (coverFile) fd.append("cover", coverFile);
 
-      const res = await fetch(`${API_URL}/discovery`, {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
+      if (coverFile) {
+        fd.append("cover", coverFile);
+      }
+      // In edit mode, if no new file and no existing cover, signal removal
+      // (backend treats missing cover as unchanged if omitted)
+
+      const url    = isEditMode ? `${API_URL}/discovery/${storyId}` : `${API_URL}/discovery`;
+      const method = isEditMode ? "PUT" : "POST";
+
+      const res = await fetch(url, { method, credentials: "include", body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Submission failed.");
-      navigate("/discovery", { state: { submitted: true } });
+      if (!res.ok) throw new Error(data.message || (isEditMode ? "Update failed." : "Submission failed."));
+
+      if (isEditMode) {
+        navigate(`/discovery/${storyId}`, { state: { updated: true } });
+      } else {
+        navigate("/discovery", { state: { submitted: true } });
+      }
     } catch (e) {
       setError(e.message);
     }
     setSubmitting(false);
+  }
+
+  // ─── Loading state ─────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#faf7f2]">
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-3">
+            <svg className="w-8 h-8 animate-spin text-[#9a8c7a] mx-auto" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-sm text-[#9a8c7a]">Loading story…</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -257,20 +338,24 @@ export default function SubmitDiscoveryStory() {
         <div className="absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12 relative">
           <Link
-            to="/discovery"
+            to={isEditMode ? `/discovery/${storyId}` : "/discovery"}
             className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white/90 transition-colors mb-6"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Discovery
+            {isEditMode ? "Back to story" : "Discovery"}
           </Link>
-          <p className="text-xs text-[#d4af37] font-bold uppercase tracking-widest mb-2">Submit a story</p>
+          <p className="text-xs text-[#d4af37] font-bold uppercase tracking-widest mb-2">
+            {isEditMode ? "Edit story" : "Submit a story"}
+          </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-white leading-tight">
-            Recommend a story
+            {isEditMode ? "Update your story" : "Recommend a story"}
           </h1>
           <p className="mt-3 text-white/60 text-sm max-w-md">
-            Found a hidden gem? Share its first chapter with the community and help other readers discover it.
+            {isEditMode
+              ? "Make changes to your submission. It will remain live while you edit."
+              : "Found a hidden gem? Share its first chapter with the community and help other readers discover it."}
           </p>
         </div>
       </div>
@@ -440,7 +525,6 @@ export default function SubmitDiscoveryStory() {
                 </p>
               </div>
 
-              {/* Chapter title — the key new field */}
               <Field label="Chapter title" hint="What is this chapter called?">
                 <input
                   type="text"
@@ -451,7 +535,6 @@ export default function SubmitDiscoveryStory() {
                 />
               </Field>
 
-              {/* Chapter content */}
               <Field label="Chapter content">
                 <RichTextarea
                   value={form.firstChapter}
@@ -471,7 +554,9 @@ export default function SubmitDiscoveryStory() {
             {/* ── Cover image ───────────────────────────────────────────── */}
             <div className="space-y-4">
               <div>
-                <h2 className="text-xs font-bold uppercase tracking-widest text-[#b8a898] mb-1">Cover image <span className="normal-case font-normal text-[#9a8c7a]">(optional)</span></h2>
+                <h2 className="text-xs font-bold uppercase tracking-widest text-[#b8a898] mb-1">
+                  Cover image <span className="normal-case font-normal text-[#9a8c7a]">(optional)</span>
+                </h2>
                 <p className="text-xs text-[#9a8c7a]">Upload the story's cover art if available.</p>
               </div>
 
@@ -502,10 +587,10 @@ export default function SubmitDiscoveryStory() {
               {coverPreview && (
                 <button
                   type="button"
-                  onClick={() => { setCoverPreview(null); setCoverFile(null); }}
+                  onClick={removeCover}
                   className="text-xs text-[#9a8c7a] hover:text-[#c0392b] transition-colors"
                 >
-                  Remove cover
+                  {keepExistingCover ? "Remove existing cover" : "Remove cover"}
                 </button>
               )}
             </div>
@@ -521,23 +606,33 @@ export default function SubmitDiscoveryStory() {
           {/* Footer */}
           <div className="px-6 sm:px-10 py-5 bg-[#faf7f2] border-t border-[#f0ebe3] flex items-center justify-between gap-4">
             <p className="text-xs text-[#b8a898]">
-              Stories are reviewed before going live.
+              {isEditMode ? "Changes save immediately." : "Stories are reviewed before going live."}
             </p>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-7 py-3 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {submitting ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Submitting…
-                </>
-              ) : "Submit story"}
-            </button>
+            <div className="flex items-center gap-3">
+              {isEditMode && (
+                <Link
+                  to={`/discovery/${storyId}`}
+                  className="px-5 py-3 rounded-xl border border-[#e8e0d0] text-sm text-[#6b5c4a] hover:border-[#2d3748] transition-all font-medium"
+                >
+                  Cancel
+                </Link>
+              )}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-7 py-3 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    {isEditMode ? "Saving…" : "Submitting…"}
+                  </>
+                ) : isEditMode ? "Save changes" : "Submit story"}
+              </button>
+            </div>
           </div>
         </form>
       </main>

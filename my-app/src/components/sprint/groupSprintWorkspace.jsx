@@ -302,7 +302,7 @@ function DeskCard({ sprint, groupSprint, user, screenTrack, soundscapeStates, my
         {/* Avatar */}
         {!hasScreen && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Link to={`/profile/${sprint.user?.username}`} className="group/avatar">
+            <Link to={`/profile/${sprint.user?.id}`} className="group/avatar">
               {sprint.user?.avatar ? (
                 <img src={sprint.user.avatar} alt={sprint.user?.username}
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-white shadow-lg group-hover/avatar:scale-105 transition-transform" />
@@ -354,7 +354,7 @@ function DeskCard({ sprint, groupSprint, user, screenTrack, soundscapeStates, my
       {/* Info panel below desk */}
       <div className="bg-white rounded-b-2xl border border-t-0 border-[#e8dcc8] px-3 pt-2.5 pb-3 shadow-sm">
         {/* Name row */}
-        <Link to={`/profile/${sprint.user?.username}`}
+        <Link to={`/profile/${sprint.user?.id}`}
           className="text-sm font-bold text-[#2d3748] hover:underline truncate block leading-tight">
           @{sprint.user?.username}
           {isSprintHost && <span className="text-[#b8962e] font-normal text-xs ml-1">· host</span>}
@@ -724,7 +724,9 @@ export default function GroupSprintWorkspace() {
                             ? <img src={s.user.avatar} alt={s.user?.username} className="w-5 h-5 rounded-full object-cover" />
                             : <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${Number(s.userId) === Number(groupSprint.userId) ? "bg-[#d4af37] text-[#2d3748]" : "bg-[#2d3748] text-white"}`}>{getInitials(s.user?.username)}</div>
                           }
-                          <span className="text-xs text-[#5a4a30] font-medium">@{s.user?.username}</span>
+                          <Link to={`/profile/${s.user?.id}`} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                            <span className="text-xs text-[#5a4a30] font-medium">@{s.user?.username}</span>
+                          </Link>
                           {Number(s.userId) === Number(groupSprint.userId) && <span className="text-[10px] text-[#b8962e]">host</span>}
                           <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
                         </div>

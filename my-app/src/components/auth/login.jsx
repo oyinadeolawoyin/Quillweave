@@ -8,7 +8,7 @@ export default function Login() {
   const { setUser } = useAuth();
   
   const [formData, setFormData] = useState({
-    identifier: "",
+    email: "",
     password: "",
   });
   
@@ -38,7 +38,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ identifier: formData.email, password: formData.password }),
       });
       
       const data = await res.json();
@@ -89,20 +89,20 @@ export default function Login() {
               htmlFor="email" 
               className="block text-xs sm:text-sm font-medium text-ink-primary mb-1 sm:mb-2"
             >
-              Identifier
+              Email
             </label>
             <input
-              type="text"
-              id="identifier"
-              name="identifier"
-              value={formData.identifier}
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
               onChange={handleChange}
               className={`w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border ${
                 errors.email 
                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                   : 'border-ink-lightgray input-focus'
               } bg-white text-ink-gray placeholder-gray-400 transition-all`}
-              placeholder="Email or Discord Id"
+              placeholder="you@example.com"
               disabled={isLoading}
               autoComplete="email"
             />

@@ -1,19 +1,23 @@
 // src/components/feedback/SubmitFeedback.jsx
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import Header from "../profile/header";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-const GENRES = ["Fantasy", "Sci-fi", "Romance", "Thriller", "Literary", "Horror", "Other"];
+const GENRES = [
+  "Fantasy", "Sci-fi", "Romance", "Thriller", "Literary",
+  "Horror", "Mystery", "Historical fiction", "Other",
+];
 
 const TIERS = [
   { value: "TIER_1000", label: "Up to 1,000 words", cost: 10 },
   { value: "TIER_2000", label: "Up to 2,000 words", cost: 20 },
   { value: "TIER_3000", label: "Up to 3,000 words", cost: 30 },
   { value: "TIER_4000", label: "Up to 4,000 words", cost: 40 },
+  { value: "TIER_5000", label: "Up to 5,000 words", cost: 50 },
 ];
 
 const STAGES = [
@@ -130,11 +134,7 @@ function TagInput({ tags, onChange, placeholder }) {
   );
 }
 
-
 // ─── RICH TEXTAREA ────────────────────────────────────────────────────────────
-// A textarea with a minimal formatting toolbar.
-// Formatting is stored as plain-text markdown syntax (**bold**, *italic*, —).
-// The toolbar wraps selected text or inserts at the cursor if nothing is selected.
 
 function RichTextarea({ value, onChange, rows, placeholder, className }) {
   const ref = useRef(null);
@@ -142,24 +142,20 @@ function RichTextarea({ value, onChange, rows, placeholder, className }) {
   function applyFormat(syntax) {
     const el = ref.current;
     if (!el) return;
-
     const start = el.selectionStart;
     const end   = el.selectionEnd;
     const selected = value.slice(start, end);
     let newValue, newStart, newEnd;
 
     if (syntax === "em-dash") {
-      // Insert — at cursor (replace selection if any)
       newValue = value.slice(0, start) + "\u2014" + value.slice(end);
       newStart = newEnd = start + 1;
     } else {
-      // syntax is e.g. "**" or "*"
       const wrapped = `${syntax}${selected || "text"}${syntax}`;
       newValue = value.slice(0, start) + wrapped + value.slice(end);
-      // Select the inner text so user can immediately type over "text"
       if (!selected) {
         newStart = start + syntax.length;
-        newEnd   = newStart + 4; // length of "text"
+        newEnd   = newStart + 4;
       } else {
         newStart = start;
         newEnd   = start + wrapped.length;
@@ -167,27 +163,23 @@ function RichTextarea({ value, onChange, rows, placeholder, className }) {
     }
 
     onChange(newValue);
-
-    // Restore selection after React re-render
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(newStart, newEnd);
     });
   }
 
-  // Auto-convert -- to em dash while typing
   function handleKeyDown(e) {
     if (e.key === "-") {
       const el = ref.current;
       const pos = el.selectionStart;
-      // Check if the character just before cursor is also "-"
       if (pos > 0 && value[pos - 1] === "-") {
         e.preventDefault();
         const newValue = value.slice(0, pos - 1) + "\u2014" + value.slice(el.selectionEnd);
         onChange(newValue);
         requestAnimationFrame(() => {
           el.focus();
-          el.setSelectionRange(pos, pos); // pos-1+1 = pos
+          el.setSelectionRange(pos, pos);
         });
       }
     }
@@ -198,13 +190,12 @@ function RichTextarea({ value, onChange, rows, placeholder, className }) {
 
   return (
     <div className="flex flex-col border border-[#e8e0d0] rounded-xl overflow-hidden focus-within:border-[#2d3748] focus-within:ring-2 focus-within:ring-[#2d3748]/10 transition-all bg-[#faf7f2]">
-      {/* Toolbar */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-[#e8e0d0] bg-white">
         <button
           type="button"
           onMouseDown={(e) => { e.preventDefault(); applyFormat("**"); }}
           className={toolbarBtnClass}
-          title="Bold (wrap in **)"
+          title="Bold"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
@@ -212,34 +203,28 @@ function RichTextarea({ value, onChange, rows, placeholder, className }) {
           </svg>
           <span>B</span>
         </button>
-
         <button
           type="button"
           onMouseDown={(e) => { e.preventDefault(); applyFormat("*"); }}
           className={toolbarBtnClass}
-          title="Italic (wrap in *)"
+          title="Italic"
         >
           <span className="italic font-serif text-sm leading-none">I</span>
         </button>
-
         <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
-
         <button
           type="button"
           onMouseDown={(e) => { e.preventDefault(); applyFormat("em-dash"); }}
           className={toolbarBtnClass}
-          title="Em dash (—) · Also auto-inserts when you type --"
+          title="Em dash"
         >
           <span className="text-sm leading-none">—</span>
           <span className="text-[10px] text-[#9a8c7a] font-normal">em dash</span>
         </button>
-
         <div className="ml-auto text-[10px] text-[#c4b9ab] pr-1 hidden sm:block">
           tip: -- auto-converts to —
         </div>
       </div>
-
-      {/* Textarea */}
       <textarea
         ref={ref}
         value={value}
@@ -258,22 +243,56 @@ function RichTextarea({ value, onChange, rows, placeholder, className }) {
 export default function SubmitFeedback() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { id: submissionId } = useParams();
+  const isEditMode = Boolean(submissionId);
 
-  const [step, setStep]         = useState(0);
-  const [wallet, setWallet]     = useState(null);
+  const [step, setStep]             = useState(0);
+  const [wallet, setWallet]         = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]       = useState("");
+  const [error, setError]           = useState("");
+  const [loading, setLoading]       = useState(isEditMode);
+  const [customGenre, setCustomGenre] = useState("");
 
   const [form, setForm] = useState({
-    title:          "",
-    genre:          "",
-    summary:        "",
-    content:        "",
-    wordCountTier:  "",
-    draftStage:     "",
+    title:           "",
+    genre:           "",
+    summary:         "",
+    content:         "",
+    wordCountTier:   "",
+    draftStage:      "",
     contentWarnings: [],
-    feedbackWanted: [],
+    feedbackWanted:  [],
   });
+
+  // ── Load existing submission in edit mode ─────────────────────────────────
+  useEffect(() => {
+    if (!isEditMode) return;
+    async function loadSubmission() {
+      try {
+        const res = await fetch(`${API_URL}/feedback/submissions/${submissionId}`, { credentials: "include" });
+        if (!res.ok) throw new Error("Submission not found.");
+        const data = await res.json();
+        const s = data.submission ?? data;
+        const genreValue = s.genre ?? "";
+        const isKnownGenre = GENRES.includes(genreValue);
+        setForm({
+          title:           s.title          ?? "",
+          genre:           isKnownGenre ? genreValue : "Other",
+          summary:         s.summary        ?? "",
+          content:         s.content        ?? "",
+          wordCountTier:   s.wordCountTier  ?? "",
+          draftStage:      s.draftStage     ?? "",
+          contentWarnings: s.contentWarnings ?? [],
+          feedbackWanted:  s.feedbackWanted  ?? [],
+        });
+        if (!isKnownGenre) setCustomGenre(genreValue);
+      } catch (e) {
+        setError(e.message);
+      }
+      setLoading(false);
+    }
+    loadSubmission();
+  }, [submissionId, isEditMode]);
 
   useEffect(() => {
     if (user) fetchWallet();
@@ -300,13 +319,14 @@ export default function SubmitFeedback() {
     );
   }
 
+  // The "effective" genre — either the selected preset or the custom input
+  const effectiveGenre = form.genre === "Other" ? customGenre.trim() : form.genre;
+
   const wordCount    = countWords(form.content);
   const summaryWords = countWords(form.summary);
   const selectedTier = TIERS.find((t) => t.value === form.wordCountTier);
   const balance      = wallet?.postingBalance ?? 0;
   const canAfford    = selectedTier ? balance >= selectedTier.cost : false;
-  // freePostAvailable is computed by the server: true only when BOTH
-  // this user hasn't used their slot AND the global bootstrap pool (3 slots) isn't exhausted.
   const isFreeEligible = !!(wallet?.freePostAvailable);
 
   // ── Validation per step ────────────────────────────────────────────────────
@@ -314,7 +334,7 @@ export default function SubmitFeedback() {
   function validateStep(s) {
     if (s === 0) {
       if (!form.title.trim()) return "Please give your chapter a title.";
-      if (!form.genre) return "Please select a genre.";
+      if (!effectiveGenre)    return "Please select or enter a genre.";
       if (summaryWords < 25 || summaryWords > 60)
         return `Summary must be 25–60 words (currently ${summaryWords}).`;
       return "";
@@ -328,11 +348,12 @@ export default function SubmitFeedback() {
     }
     if (s === 2) {
       if (!form.content.trim()) return "Please paste your chapter content.";
-      const max = TIERS.find((t) => t.value === form.wordCountTier);
-      if (max && wordCount > { TIER_1000: 1000, TIER_2000: 2000, TIER_3000: 3000, TIER_4000: 4000 }[form.wordCountTier]) {
-        return `Your chapter is ${wordCount} words. Selected tier allows up to ${max.label}.`;
+      const tierMaxWords = { TIER_1000: 1000, TIER_2000: 2000, TIER_3000: 3000, TIER_4000: 4000, TIER_5000: 5000 };
+      const max = tierMaxWords[form.wordCountTier];
+      if (max && wordCount > max) {
+        return `Your chapter is ${wordCount} words. Selected tier allows up to ${selectedTier?.label}.`;
       }
-      if (!canAfford && !isFreeEligible) {
+      if (!isEditMode && !canAfford && !isFreeEligible) {
         return `Not enough points. You need ${selectedTier?.cost ?? 0} pts but have ${balance}.`;
       }
       return "";
@@ -354,29 +375,66 @@ export default function SubmitFeedback() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/feedback/submissions`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Submission failed.");
-      navigate(`/feedback/${data.id}`);
+      const payload = { ...form, genre: effectiveGenre };
+
+      if (isEditMode) {
+        const res = await fetch(`${API_URL}/feedback/submissions/${submissionId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title:           payload.title,
+            genre:           payload.genre,
+            summary:         payload.summary,
+            content:         payload.content,
+            draftStage:      payload.draftStage,
+            contentWarnings: payload.contentWarnings,
+            feedbackWanted:  payload.feedbackWanted,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Update failed.");
+        navigate(`/feedback/${submissionId}`, { state: { updated: true } });
+      } else {
+        const res = await fetch(`${API_URL}/feedback/submissions`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Submission failed.");
+        navigate(`/feedback/${data.id}`);
+      }
     } catch (e) {
       setError(e.message);
     }
     setSubmitting(false);
   }
 
-  // ── UI Sections ────────────────────────────────────────────────────────────
-
   const steps = ["About", "Details", "Content"];
 
-  const tierMaxWords = { TIER_1000: 1000, TIER_2000: 2000, TIER_3000: 3000, TIER_4000: 4000 };
-  const maxWords     = tierMaxWords[form.wordCountTier] ?? 4000;
+  const tierMaxWords = { TIER_1000: 1000, TIER_2000: 2000, TIER_3000: 3000, TIER_4000: 4000, TIER_5000: 5000 };
+  const maxWords     = tierMaxWords[form.wordCountTier] ?? 5000;
   const wordProgress = Math.min((wordCount / maxWords) * 100, 100);
   const wordOver     = form.wordCountTier && wordCount > maxWords;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#faf7f2]">
+        <Header />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-3">
+            <svg className="w-8 h-8 animate-spin text-[#9a8c7a] mx-auto" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-sm text-[#9a8c7a]">Loading submission…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#faf7f2]">
@@ -384,27 +442,28 @@ export default function SubmitFeedback() {
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
 
-        {/* Back link */}
         <Link
-          to="/feedback"
+          to={isEditMode ? `/feedback/${submissionId}` : "/feedback"}
           className="inline-flex items-center gap-1.5 text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors mb-8"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
           </svg>
-          Back to hub
+          {isEditMode ? "Back to submission" : "Back to hub"}
         </Link>
 
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="font-serif text-3xl text-[#2d3748] mb-2">Submit a chapter</h1>
+          <h1 className="font-serif text-3xl text-[#2d3748] mb-2">
+            {isEditMode ? "Edit submission" : "Submit a chapter"}
+          </h1>
           <p className="text-[#6b5c4a] text-sm">
-            Share your writing and receive structured, thoughtful feedback from the community.
+            {isEditMode
+              ? "Update your chapter details. Your existing critiques and comments will not be affected."
+              : "Share your writing and receive structured, thoughtful feedback from the community."}
           </p>
         </div>
 
-        {/* Wallet note */}
-        {wallet && (
+        {!isEditMode && wallet && (
           <div className="flex items-center justify-between bg-white border border-[#e8e0d0] rounded-xl px-4 py-3 mb-8 text-sm">
             <span className="text-[#6b5c4a]">
               Your posting balance: <strong className="text-[#2d3748]">{balance} pts</strong>
@@ -417,10 +476,19 @@ export default function SubmitFeedback() {
           </div>
         )}
 
-        {/* Step bar */}
+        {isEditMode && (
+          <div className="flex items-start gap-3 bg-[#fdfbea] border border-[#e8d87a] rounded-xl px-4 py-3 mb-8 text-sm">
+            <svg className="w-4 h-4 text-[#8a6c00] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-[#8a6c00]">
+              Editing will not change your word count tier or cost. Existing feedback remains visible.
+            </p>
+          </div>
+        )}
+
         <StepBar current={step} steps={steps} />
 
-        {/* Card */}
         <div className="bg-white border border-[#e8e0d0] rounded-2xl p-6 sm:p-8 shadow-[0_2px_12px_rgba(45,35,20,0.05)]">
 
           {/* ── STEP 0 — About ─────────────────────────────────────────────── */}
@@ -439,6 +507,7 @@ export default function SubmitFeedback() {
                 />
               </div>
 
+              {/* ── Genre — buttons + "Other" custom input ────────────────── */}
               <div>
                 <label className="block text-sm font-semibold text-[#2d3748] mb-1.5">Genre</label>
                 <div className="flex flex-wrap gap-2">
@@ -446,7 +515,10 @@ export default function SubmitFeedback() {
                     <button
                       key={g}
                       type="button"
-                      onClick={() => set("genre", g)}
+                      onClick={() => {
+                        set("genre", g);
+                        if (g !== "Other") setCustomGenre("");
+                      }}
                       className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
                         form.genre === g
                           ? "bg-[#2d3748] text-white border-[#2d3748]"
@@ -457,13 +529,21 @@ export default function SubmitFeedback() {
                     </button>
                   ))}
                 </div>
+                {form.genre === "Other" && (
+                  <input
+                    type="text"
+                    value={customGenre}
+                    onChange={(e) => setCustomGenre(e.target.value)}
+                    placeholder="Enter the genre (e.g. Dark academia, Cozy mystery…)"
+                    className="w-full mt-3 border border-[#e8e0d0] rounded-xl px-4 py-3 text-sm text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] focus:ring-2 focus:ring-[#2d3748]/10 transition-all"
+                    autoFocus
+                  />
+                )}
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-semibold text-[#2d3748]">
-                    Summary
-                  </label>
+                  <label className="text-sm font-semibold text-[#2d3748]">Summary</label>
                   <span className={`text-xs font-medium ${
                     summaryWords < 25 || summaryWords > 60 ? "text-[#c0392b]" : "text-[#6b8c6b]"
                   }`}>
@@ -489,30 +569,35 @@ export default function SubmitFeedback() {
                   Word count tier
                 </label>
                 <p className="text-xs text-[#9a8c7a] mb-3">
-                  Match this to your chapter length. The cost is deducted from your posting balance.
+                  {isEditMode
+                    ? "Word count tier cannot be changed after submission."
+                    : "Match this to your chapter length. The cost is deducted from your posting balance."}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {TIERS.map((t) => {
                     const affordable = balance >= t.cost || isFreeEligible;
+                    const isSelected = form.wordCountTier === t.value;
                     return (
                       <button
                         key={t.value}
                         type="button"
-                        onClick={() => set("wordCountTier", t.value)}
+                        onClick={() => !isEditMode && set("wordCountTier", t.value)}
+                        disabled={isEditMode || (!affordable && !isFreeEligible)}
                         className={`px-4 py-3 rounded-xl border text-left transition-all ${
-                          form.wordCountTier === t.value
+                          isSelected
                             ? "bg-[#2d3748] text-white border-[#2d3748]"
+                            : isEditMode
+                            ? "bg-[#faf7f2] text-[#b8a898] border-[#f0ebe3] cursor-not-allowed"
                             : affordable
                             ? "bg-white text-[#6b5c4a] border-[#e8e0d0] hover:border-[#2d3748]"
                             : "bg-[#faf7f2] text-[#b8a898] border-[#f0ebe3] cursor-not-allowed"
                         }`}
-                        disabled={!affordable && !isFreeEligible}
                       >
                         <span className="block text-sm font-semibold">{t.label}</span>
                         <span className={`text-xs mt-0.5 block ${
-                          form.wordCountTier === t.value ? "text-[#a8b4c4]" : "text-[#9a8c7a]"
+                          isSelected ? "text-[#a8b4c4]" : "text-[#9a8c7a]"
                         }`}>
-                          {isFreeEligible ? "Free (first post)" : `Costs ${t.cost} pts`}
+                          {isEditMode ? (isSelected ? "Current tier" : "—") : isFreeEligible ? "Free (first post)" : `Costs ${t.cost} pts`}
                         </span>
                       </button>
                     );
@@ -603,7 +688,6 @@ export default function SubmitFeedback() {
                   </span>
                 </div>
 
-                {/* Word count bar */}
                 {form.wordCountTier && (
                   <div className="h-1 bg-[#f0ebe3] rounded-full mb-3 overflow-hidden">
                     <div
@@ -619,7 +703,7 @@ export default function SubmitFeedback() {
                   value={form.content}
                   onChange={(v) => { set("content", v); }}
                   rows={18}
-                  placeholder="Paste your chapter here. Separate paragraphs with a blank line — this is how paragraph comments are mapped to your text."
+                  placeholder="Paste your chapter here. Separate paragraphs with a blank line."
                   className="w-full px-4 py-3 text-sm text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none resize-none leading-[1.9] font-[Georgia,serif]"
                 />
                 <p className="text-xs text-[#b8a898] mt-2">
@@ -627,7 +711,6 @@ export default function SubmitFeedback() {
                 </p>
               </div>
 
-              {/* Submission summary */}
               <div className="bg-[#faf7f2] border border-[#e8e0d0] rounded-xl p-4 text-sm space-y-2">
                 <p className="font-semibold text-[#2d3748] mb-2">Submission summary</p>
                 <div className="flex justify-between text-[#6b5c4a]">
@@ -636,7 +719,7 @@ export default function SubmitFeedback() {
                 </div>
                 <div className="flex justify-between text-[#6b5c4a]">
                   <span>Genre</span>
-                  <span className="font-medium text-[#2d3748]">{form.genre || "—"}</span>
+                  <span className="font-medium text-[#2d3748]">{effectiveGenre || "—"}</span>
                 </div>
                 <div className="flex justify-between text-[#6b5c4a]">
                   <span>Tier</span>
@@ -644,30 +727,32 @@ export default function SubmitFeedback() {
                     {TIERS.find((t) => t.value === form.wordCountTier)?.label ?? "—"}
                   </span>
                 </div>
-                <div className="flex justify-between text-[#6b5c4a]">
-                  <span>Cost</span>
-                  <span className={`font-semibold ${isFreeEligible ? "text-[#b8860b]" : "text-[#2d3748]"}`}>
-                    {isFreeEligible ? "Free (first post)" : `${selectedTier?.cost ?? 0} pts`}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#6b5c4a]">
-                  <span>Balance after</span>
-                  <span className="font-medium text-[#2d3748]">
-                    {isFreeEligible ? `${balance} pts` : `${balance - (selectedTier?.cost ?? 0)} pts`}
-                  </span>
-                </div>
+                {!isEditMode && (
+                  <>
+                    <div className="flex justify-between text-[#6b5c4a]">
+                      <span>Cost</span>
+                      <span className={`font-semibold ${isFreeEligible ? "text-[#b8860b]" : "text-[#2d3748]"}`}>
+                        {isFreeEligible ? "Free (first post)" : `${selectedTier?.cost ?? 0} pts`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[#6b5c4a]">
+                      <span>Balance after</span>
+                      <span className="font-medium text-[#2d3748]">
+                        {isFreeEligible ? `${balance} pts` : `${balance - (selectedTier?.cost ?? 0)} pts`}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
 
-          {/* Error */}
           {error && (
             <div className="mt-5 bg-[#fdf1f0] border border-[#f5c6c3] rounded-xl px-4 py-3 text-sm text-[#c0392b]">
               {error}
             </div>
           )}
 
-          {/* Navigation */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#f0ebe3]">
             {step > 0 ? (
               <button
@@ -702,10 +787,10 @@ export default function SubmitFeedback() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                     </svg>
-                    Submitting...
+                    {isEditMode ? "Saving..." : "Submitting..."}
                   </>
                 ) : (
-                  "Post chapter"
+                  isEditMode ? "Save changes" : "Post chapter"
                 )}
               </button>
             )}

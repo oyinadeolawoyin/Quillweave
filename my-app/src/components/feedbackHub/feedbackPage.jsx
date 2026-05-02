@@ -12,6 +12,7 @@ const TIER_LABELS = {
   TIER_2000: "≤ 2,000 words",
   TIER_3000: "≤ 3,000 words",
   TIER_4000: "≤ 4,000 words",
+  TIER_5000: "≤ 5,000 words",
 };
 
 const DRAFT_LABELS = {
@@ -27,6 +28,20 @@ const TIER_META = {
   Platinum: { color: "#6558d4", bg: "#f2f0fd" },
   Diamond:  { color: "#c0392b", bg: "#fdf1f0" },
 };
+
+const CRITIQUE_PLACEHOLDER = `A strong critique does three things well:
+
+1. Identifies what is working — point to specific lines, scenes, or choices that land. Writers need to know what to keep, not just what to fix.
+
+2. Names areas for improvement specifically — instead of "the pacing feels slow", try "the transition between paragraphs 3 and 4 loses momentum because...". Vague notes are hard to act on.
+
+3. Keeps a constructive, supportive tone — frame weaknesses as opportunities. "This scene could hit harder if..." lands better than "this scene doesn't work." The goal is to help the writer improve, not to judge them.
+
+Align your star ratings with what you actually write. If your feedback praises the clarity, the Clarity score should reflect that.
+
+Write at least 100 words. Short critiques rarely give writers enough to work with.`;
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function getTier(rep) {
   if (rep >= 1500) return { name: "Diamond", gem: "D", color: "#c0392b" };
@@ -51,8 +66,7 @@ function timeAgo(dateStr) {
   if (d < 30) return `${d}d ago`;
   return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
-// ─── INLINE MARKDOWN RENDERER ────────────────────────────────────────────────
-// Renders **bold** and *italic* stored as plain-text markdown syntax.
+
 function renderMarkdown(text) {
   if (!text) return null;
   const parts = text.split(/(\*\*[\s\S]*?\*\*|\*[\s\S]*?\*)/g);
@@ -64,8 +78,6 @@ function renderMarkdown(text) {
     return <span key={i}>{part}</span>;
   });
 }
-
-
 
 // ─── STAR RATING ─────────────────────────────────────────────────────────────
 
@@ -136,21 +148,47 @@ function AuthorChip({ user, size = "md" }) {
   );
 }
 
-// ─── UPVOTE BUTTON ────────────────────────────────────────────────────────────
+// ─── THUMB UPVOTE BUTTON ──────────────────────────────────────────────────────
 
-function UpvoteButton({ count, upvoted, onToggle, disabled }) {
+function ThumbUpButton({ count, upvoted, onToggle, disabled }) {
   return (
     <button
       onClick={onToggle}
       disabled={disabled}
+      title={disabled ? "You cannot upvote your own critique" : upvoted ? "Remove upvote" : "Upvote this critique"}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
         upvoted
           ? "bg-[#2d3748] text-white border-[#2d3748]"
           : "bg-white text-[#6b5c4a] border-[#e8e0d0] hover:border-[#2d3748] hover:text-[#2d3748]"
       } disabled:opacity-40 disabled:cursor-not-allowed`}
     >
+      {/* Thumbs up icon */}
       <svg className="w-3.5 h-3.5" fill={upvoted ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" />
+      </svg>
+      {count}
+    </button>
+  );
+}
+
+// ─── SMALL UPVOTE BUTTON (for paragraph comments) ────────────────────────────
+
+function CommentUpvoteButton({ count, upvoted, onToggle, disabled }) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      title={disabled ? "You cannot upvote your own comment" : upvoted ? "Remove upvote" : "Upvote"}
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border transition-all ${
+        upvoted
+          ? "bg-[#2d3748] text-white border-[#2d3748]"
+          : "bg-white text-[#9a8c7a] border-[#e8e0d0] hover:border-[#2d3748] hover:text-[#2d3748]"
+      } disabled:opacity-40 disabled:cursor-not-allowed`}
+    >
+      <svg className="w-3 h-3" fill={upvoted ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" />
       </svg>
       {count}
     </button>
@@ -167,14 +205,20 @@ function CommentSidebar({
   onClose,
   onNewComment,
   onUpvoteComment,
+  onEditComment,
+  onDeleteComment,
   isAuthor,
   user,
 }) {
-  const [replyOpen, setReplyOpen] = useState(null);
-  const [replyText, setReplyText] = useState("");
-  const [commentText, setCommentText] = useState("");
-  const [posting, setPosting]    = useState(false);
+  const [replyOpen, setReplyOpen]       = useState(null);
+  const [replyText, setReplyText]       = useState("");
+  const [commentText, setCommentText]   = useState("");
+  const [posting, setPosting]           = useState(false);
   const [replyPosting, setReplyPosting] = useState(false);
+  const [editingId, setEditingId]       = useState(null);
+  const [editText, setEditText]         = useState("");
+  const [editSaving, setEditSaving]     = useState(false);
+  const [deletingId, setDeletingId]     = useState(null);
 
   async function submitComment() {
     if (!commentText.trim()) return;
@@ -215,6 +259,46 @@ function CommentSidebar({
     setReplyPosting(false);
   }
 
+  function startEdit(c) {
+    setEditingId(c.id);
+    setEditText(c.content);
+  }
+
+  async function saveEdit(commentId) {
+    if (!editText.trim()) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/feedback/comments/${commentId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editText.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onEditComment(commentId, data.content ?? editText.trim());
+        setEditingId(null);
+        setEditText("");
+      }
+    } catch (e) {}
+    setEditSaving(false);
+  }
+
+  async function deleteComment(commentId) {
+    if (!window.confirm("Delete this comment?")) return;
+    setDeletingId(commentId);
+    try {
+      const res = await fetch(`${API_URL}/feedback/comments/${commentId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        onDeleteComment(commentId);
+      }
+    } catch (e) {}
+    setDeletingId(null);
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Sidebar header */}
@@ -238,9 +322,9 @@ function CommentSidebar({
       </div>
 
       {/* Comments list */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
         {comments.length === 0 && (
-          <p className="text-sm text-[#b8a898] text-center py-6">
+          <p className="text-sm text-[#b8a898] text-center py-8">
             No comments on this paragraph yet.
           </p>
         )}
@@ -249,35 +333,87 @@ function CommentSidebar({
           const upvoted   = (c.upvotes?.length ?? 0) > 0;
           const upvCount  = c._count?.upvotes ?? 0;
           const isOwn     = user?.id === c.author?.id;
+          const isEditing = editingId === c.id;
 
           return (
             <div key={c.id} className="group">
               <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-[9px] font-semibold flex-shrink-0 mt-0.5">
+                <div className="w-7 h-7 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 mt-0.5">
                   {c.author?.username?.charAt(0).toUpperCase() ?? "?"}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-xs font-semibold text-[#2d3748]">{c.author?.username}</span>
-                    <span className="text-[10px] text-[#b8a898]">{timeAgo(c.createdAt)}</span>
-                  </div>
-                  <p className="text-sm text-[#4a4a4a] leading-relaxed">{renderMarkdown(c.content)}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <UpvoteButton
-                      count={upvCount}
-                      upvoted={upvoted}
-                      onToggle={() => onUpvoteComment(c.id)}
-                      disabled={!user || isOwn}
-                    />
-                    {user && (
-                      <button
-                        onClick={() => setReplyOpen(replyOpen === c.id ? null : c.id)}
-                        className="text-[11px] text-[#9a8c7a] hover:text-[#2d3748] transition-colors font-medium"
-                      >
-                        {replyOpen === c.id ? "Cancel" : "Reply"}
-                      </button>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-[#2d3748]">{c.author?.username}</span>
+                      <span className="text-[10px] text-[#b8a898]">{timeAgo(c.createdAt)}</span>
+                    </div>
+                    {/* Edit / Delete — only for the comment author */}
+                    {isOwn && !isEditing && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => startEdit(c)}
+                          className="text-[10px] text-[#9a8c7a] hover:text-[#2d3748] px-1.5 py-0.5 rounded transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteComment(c.id)}
+                          disabled={deletingId === c.id}
+                          className="text-[10px] text-[#c0392b] hover:text-[#9b1c1c] px-1.5 py-0.5 rounded transition-colors disabled:opacity-40"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     )}
                   </div>
+
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        rows={3}
+                        autoFocus
+                        className="w-full border border-[#2d3748] rounded-lg px-3 py-2 text-xs text-[#2d3748] bg-white focus:outline-none resize-none leading-relaxed"
+                      />
+                      <div className="flex items-center gap-2 justify-end">
+                        <button
+                          onClick={() => { setEditingId(null); setEditText(""); }}
+                          className="text-[11px] text-[#9a8c7a] hover:text-[#2d3748] px-2 py-1 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => saveEdit(c.id)}
+                          disabled={editSaving || !editText.trim()}
+                          className="px-3 py-1 bg-[#2d3748] text-white text-[11px] font-semibold rounded-lg disabled:opacity-40 hover:opacity-90 transition-all"
+                        >
+                          {editSaving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[#4a4a4a] leading-relaxed">{renderMarkdown(c.content)}</p>
+                  )}
+
+                  {!isEditing && (
+                    <div className="flex items-center gap-2 mt-2.5">
+                      <CommentUpvoteButton
+                        count={upvCount}
+                        upvoted={upvoted}
+                        onToggle={() => onUpvoteComment(c.id)}
+                        disabled={!user || isOwn}
+                      />
+                      {user && (
+                        <button
+                          onClick={() => setReplyOpen(replyOpen === c.id ? null : c.id)}
+                          className="text-[11px] text-[#9a8c7a] hover:text-[#2d3748] transition-colors font-medium"
+                        >
+                          {replyOpen === c.id ? "Cancel" : "Reply"}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Replies */}
                   {c.replies?.length > 0 && (
@@ -302,7 +438,7 @@ function CommentSidebar({
                         onChange={(e) => setReplyText(e.target.value)}
                         rows={2}
                         placeholder="Write a reply..."
-                        className="w-full border border-[#e8e0d0] rounded-xl sm:rounded-none px-3 py-2 text-xs text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] resize-none transition-all"
+                        className="w-full border border-[#e8e0d0] rounded-xl px-3 py-2 text-xs text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] resize-none transition-all"
                       />
                       <div className="flex justify-end mt-1.5">
                         <button
@@ -324,13 +460,13 @@ function CommentSidebar({
 
       {/* New comment input */}
       {user && (
-        <div className="px-5 py-4 border-t border-[#f0ebe3] flex-shrink-0">
+        <div className="px-5 py-4 border-t border-[#f0ebe3] flex-shrink-0 bg-white">
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             rows={3}
             placeholder="Add a comment on this paragraph..."
-            className="w-full border border-[#e8e0d0] rounded-xl sm:rounded-none px-3 py-2.5 text-sm text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] focus:ring-2 focus:ring-[#2d3748]/10 resize-none transition-all"
+            className="w-full border border-[#e8e0d0] rounded-xl px-3 py-2.5 text-sm text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] focus:ring-2 focus:ring-[#2d3748]/10 resize-none transition-all"
           />
           <div className="flex justify-end mt-2">
             <button
@@ -353,7 +489,7 @@ function CritiqueForm({ submissionId, onSuccess }) {
   const [ratings, setRatings] = useState({
     overallRating: 0, clarityRating: 0, pacingRating: 0, believabilityRating: 0,
   });
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback]     = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
 
@@ -392,140 +528,352 @@ function CritiqueForm({ submissionId, onSuccess }) {
   }
 
   return (
-    <div className="bg-white border border-[#e8e0d0] rounded-2xl p-6 shadow-[0_2px_12px_rgba(45,35,20,0.04)]">
-      <h3 className="font-serif text-xl text-[#2d3748] mb-1">Leave a critique</h3>
-      <p className="text-sm text-[#9a8c7a] mb-6">
-        Rate each dimension, then write your general feedback (minimum 100 words).
-        You'll earn points for a complete critique.
-      </p>
+    <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden shadow-[0_2px_12px_rgba(45,35,20,0.04)]">
 
-      {/* Ratings */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 mb-6 pb-6 border-b border-[#f0ebe3]">
-        {ratingLabels.map((r) => (
-          <div key={r.key} className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium text-[#6b5c4a] w-24 flex-shrink-0">{r.label}</span>
-            <StarRating
-              value={ratings[r.key]}
-              onChange={(v) => setRatings((prev) => ({ ...prev, [r.key]: v }))}
+      {/* AI / bad critique warning banner */}
+      <div className="bg-[#fdf9ed] border-b border-[#f0d98a] px-6 py-4">
+        <div className="flex items-start gap-3">
+          <div className="w-5 h-5 rounded-full bg-[#b8860b]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg className="w-3 h-3 text-[#b8860b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-[#92680a] mb-1">AI critiques and low-effort feedback are not permitted</p>
+            <p className="text-xs text-[#7a5c1e] leading-relaxed">
+              Submitting AI-generated critique that does not engage with the actual work is a violation of community standards.
+              Poor critiques can be reported to the Inkwell admin — find them on the{" "}
+              <a
+                href="https://discord.gg/KsZjEjjsh"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline underline-offset-2 hover:text-[#92680a] transition-colors"
+              >
+                Discord server
+              </a>.
+            </p>
+            <ul className="mt-2 space-y-0.5 text-xs text-[#7a5c1e]">
+              <li className="flex items-start gap-1.5">
+                <span className="text-[#b8860b] mt-0.5 flex-shrink-0">—</span>
+                Identifies strengths clearly and specifically
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-[#b8860b] mt-0.5 flex-shrink-0">—</span>
+                Points out areas for improvement with concrete examples
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-[#b8860b] mt-0.5 flex-shrink-0">—</span>
+                Aligns ratings with the actual comments written
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <h3 className="font-serif text-xl text-[#2d3748] mb-1">Leave a critique</h3>
+        <p className="text-sm text-[#9a8c7a] mb-7">
+          Rate each dimension, then write your general feedback (minimum 100 words).
+          You will earn points for a complete critique.
+        </p>
+
+        {/* Ratings */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 mb-7 pb-7 border-b border-[#f0ebe3]">
+          {ratingLabels.map((r) => (
+            <div key={r.key} className="flex items-center justify-between gap-4">
+              <span className="text-sm font-medium text-[#6b5c4a] w-28 flex-shrink-0">{r.label}</span>
+              <StarRating
+                value={ratings[r.key]}
+                onChange={(v) => setRatings((prev) => ({ ...prev, [r.key]: v }))}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* General feedback */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-semibold text-[#2d3748]">General feedback</label>
+            <span className={`text-xs font-semibold transition-colors ${
+              wordCount >= 100 ? "text-[#6b8c6b]" : wordCount > 0 ? "text-[#b8860b]" : "text-[#b8a898]"
+            }`}>
+              {wordCount} / 100 words min
+            </span>
+          </div>
+          <div className="h-1 bg-[#f0ebe3] rounded-full mb-3 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                wordCount >= 100 ? "bg-[#6b8c6b]" : "bg-[#d4af37]"
+              }`}
+              style={{ width: `${Math.min((wordCount / 100) * 100, 100)}%` }}
             />
           </div>
-        ))}
-      </div>
-
-      {/* General feedback */}
-      <div className="mb-5">
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-sm font-semibold text-[#2d3748]">General feedback</label>
-          <span className={`text-xs font-semibold transition-colors ${
-            wordCount >= 100 ? "text-[#6b8c6b]" : wordCount > 0 ? "text-[#b8860b]" : "text-[#b8a898]"
-          }`}>
-            {wordCount} / 100 words min
-          </span>
-        </div>
-        {/* Progress bar to 100 words */}
-        <div className="h-1 bg-[#f0ebe3] rounded-full mb-3 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${
-              wordCount >= 100 ? "bg-[#6b8c6b]" : "bg-[#d4af37]"
-            }`}
-            style={{ width: `${Math.min((wordCount / 100) * 100, 100)}%` }}
+          <textarea
+            value={feedback}
+            onChange={(e) => { setFeedback(e.target.value); setError(""); }}
+            rows={12}
+            placeholder={CRITIQUE_PLACEHOLDER}
+            className="w-full border border-[#e8e0d0] rounded-xl px-4 py-3.5 text-sm text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] focus:ring-2 focus:ring-[#2d3748]/10 transition-all resize-none leading-relaxed"
           />
         </div>
-        <textarea
-          value={feedback}
-          onChange={(e) => { setFeedback(e.target.value); setError(""); }}
-          rows={10}
-          placeholder="Share your overall impression — what's working well, what isn't, and the one thing you think the writer should focus on next. Be specific and constructive."
-          className="w-full border border-[#e8e0d0] rounded-xl px-4 py-3 text-sm text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] focus:ring-2 focus:ring-[#2d3748]/10 transition-all resize-none leading-relaxed"
-        />
+
+        {error && (
+          <div className="bg-[#fdf1f0] border border-[#f5c6c3] rounded-xl px-4 py-3 text-sm text-[#c0392b] mb-5">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="w-full py-3 bg-[#2d3748] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {submitting ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Submitting...
+            </>
+          ) : "Submit critique"}
+        </button>
       </div>
-
-      {error && (
-        <div className="bg-[#fdf1f0] border border-[#f5c6c3] rounded-xl px-4 py-3 text-sm text-[#c0392b] mb-4">
-          {error}
-        </div>
-      )}
-
-      <button
-        onClick={handleSubmit}
-        disabled={submitting}
-        className="w-full py-3 bg-[#2d3748] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-      >
-        {submitting ? (
-          <>
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-            </svg>
-            Submitting...
-          </>
-        ) : "Submit critique"}
-      </button>
     </div>
   );
 }
 
 // ─── CRITIQUE CARD ────────────────────────────────────────────────────────────
+// - The critique AUTHOR can edit and delete their own critique
+// - Any other logged-in user (including the submission author) can upvote
+// - The critique author cannot upvote their own critique
 
-function CritiqueCard({ response, submissionAuthorId, user, onUpvote }) {
-  const isAuthor   = user?.id === submissionAuthorId;
-  const upvoted    = (response.upvotes?.length ?? 0) > 0;
-  const upvCount   = response._count?.upvotes ?? 0;
+function CritiqueCard({ response, submissionAuthorId, user, onUpvote, onEdit, onDelete }) {
+  const isCritiqueAuthor = user?.id === response.criticId;
+  const isSubmissionAuthor = user?.id === submissionAuthorId;
+  const canUpvote    = user && !isCritiqueAuthor;
+  const upvoted      = (response.upvotes?.length ?? 0) > 0;
+  const upvCount     = response._count?.upvotes ?? 0;
 
-  const ratingItems = [
-    { label: "Overall",        value: response.overallRating },
-    { label: "Clarity",        value: response.clarityRating },
-    { label: "Pacing",         value: response.pacingRating },
-    { label: "Believability",  value: response.believabilityRating },
+  const [editing, setEditing]       = useState(false);
+  const [editRatings, setEditRatings] = useState({
+    overallRating:       response.overallRating,
+    clarityRating:       response.clarityRating,
+    pacingRating:        response.pacingRating,
+    believabilityRating: response.believabilityRating,
+  });
+  const [editFeedback, setEditFeedback] = useState(response.generalFeedback ?? "");
+  const [editSaving, setEditSaving]   = useState(false);
+  const [editError, setEditError]     = useState("");
+  const [deleting, setDeleting]       = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const editWordCount = countWords(editFeedback);
+
+  const ratingLabels = [
+    { key: "overallRating",       label: "Overall" },
+    { key: "clarityRating",       label: "Clarity" },
+    { key: "pacingRating",        label: "Pacing" },
+    { key: "believabilityRating", label: "Believability" },
   ];
 
+  async function saveEdit() {
+    for (const r of ratingLabels) {
+      if (!editRatings[r.key]) { setEditError(`Please rate ${r.label}.`); return; }
+    }
+    if (editWordCount < 100) {
+      setEditError(`Feedback must be at least 100 words (currently ${editWordCount}).`);
+      return;
+    }
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const res = await fetch(`${API_URL}/feedback/responses/${response.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editRatings, generalFeedback: editFeedback }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to update critique.");
+      onEdit(response.id, { ...editRatings, generalFeedback: editFeedback });
+      setEditing(false);
+    } catch (e) {
+      setEditError(e.message);
+    }
+    setEditSaving(false);
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`${API_URL}/feedback/responses/${response.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        onDelete(response.id);
+      }
+    } catch (e) {}
+    setDeleting(false);
+    setConfirmDelete(false);
+  }
+
   return (
-    <div className="bg-white border border-[#e8e0d0] rounded-2xl p-5 shadow-[0_1px_4px_rgba(45,35,20,0.04)]">
+    <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden shadow-[0_1px_6px_rgba(45,35,20,0.04)]">
+
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-[#f0ebe3]">
+      <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-[#f0ebe3]">
         <AuthorChip user={response.critic} />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <span className="text-xs text-[#b8a898]">{timeAgo(response.createdAt)}</span>
-          {isAuthor && (
-            <UpvoteButton
+
+          {/* Upvote — visible to everyone except the critique author */}
+          {canUpvote && (
+            <ThumbUpButton
               count={upvCount}
               upvoted={upvoted}
               onToggle={() => onUpvote(response.id)}
               disabled={!user}
             />
           )}
-          {!isAuthor && upvCount > 0 && (
-            <span className="text-xs text-[#b8a898]">
-              {upvCount} upvote{upvCount !== 1 ? "s" : ""}
+
+          {/* Upvote count display when current user is the critique author and can't upvote */}
+          {isCritiqueAuthor && upvCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-[#9a8c7a] border border-[#e8e0d0] bg-[#faf7f2] px-2.5 py-1 rounded-lg">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" />
+              </svg>
+              {upvCount}
             </span>
+          )}
+
+          {/* Edit / Delete — only for the critique author */}
+          {isCritiqueAuthor && !editing && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setEditing(true)}
+                className="text-xs text-[#9a8c7a] hover:text-[#2d3748] border border-[#e8e0d0] px-2.5 py-1 rounded-lg hover:border-[#2d3748] transition-all"
+              >
+                Edit
+              </button>
+              {!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="text-xs text-[#c0392b] hover:text-[#9b1c1c] border border-[#f5c6c3] px-2.5 py-1 rounded-lg hover:border-[#c0392b] transition-all"
+                >
+                  Delete
+                </button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="text-xs text-white bg-[#c0392b] px-2.5 py-1 rounded-lg hover:bg-[#9b1c1c] transition-all disabled:opacity-50"
+                  >
+                    {deleting ? "..." : "Confirm"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="text-xs text-[#9a8c7a] px-2 py-1 rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isCritiqueAuthor && editing && (
+            <button
+              onClick={() => { setEditing(false); setEditError(""); }}
+              className="text-xs text-[#9a8c7a] border border-[#e8e0d0] px-2.5 py-1 rounded-lg transition-all"
+            >
+              Cancel
+            </button>
           )}
         </div>
       </div>
 
-      {/* Ratings row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-        {ratingItems.map((r) => (
-          <div key={r.label} className="text-center">
-            <p className="text-[10px] font-medium text-[#9a8c7a] mb-1">{r.label}</p>
-            <p className="text-sm font-semibold text-[#2d3748]">
-              {r.value}<span className="text-[#d6cfc4] font-normal">/5</span>
-            </p>
+      <div className="px-6 py-5 space-y-5">
+        {/* Ratings row */}
+        {editing ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 pb-5 border-b border-[#f0ebe3]">
+            {ratingLabels.map((r) => (
+              <div key={r.key} className="flex items-center justify-between gap-4">
+                <span className="text-sm font-medium text-[#6b5c4a] w-28 flex-shrink-0">{r.label}</span>
+                <StarRating
+                  value={editRatings[r.key]}
+                  onChange={(v) => setEditRatings((prev) => ({ ...prev, [r.key]: v }))}
+                />
+              </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pb-5 border-b border-[#f0ebe3]">
+            {ratingLabels.map((r) => (
+              <div key={r.label} className="bg-[#faf7f2] rounded-xl px-3 py-3 text-center">
+                <p className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wide mb-1">{r.label}</p>
+                <p className="text-base font-bold text-[#2d3748]">
+                  {response[r.key]}<span className="text-xs text-[#d6cfc4] font-normal">/5</span>
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* General feedback */}
+        {editing ? (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-semibold text-[#2d3748]">General feedback</label>
+              <span className={`text-xs font-semibold ${editWordCount >= 100 ? "text-[#6b8c6b]" : "text-[#b8860b]"}`}>
+                {editWordCount} / 100 min
+              </span>
+            </div>
+            <div className="h-1 bg-[#f0ebe3] rounded-full mb-3 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${editWordCount >= 100 ? "bg-[#6b8c6b]" : "bg-[#d4af37]"}`}
+                style={{ width: `${Math.min((editWordCount / 100) * 100, 100)}%` }}
+              />
+            </div>
+            <textarea
+              value={editFeedback}
+              onChange={(e) => { setEditFeedback(e.target.value); setEditError(""); }}
+              rows={10}
+              className="w-full border border-[#2d3748] rounded-xl px-4 py-3 text-sm text-[#2d3748] bg-[#faf7f2] focus:outline-none resize-none leading-relaxed"
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-[#4a4a4a] leading-[1.85] whitespace-pre-wrap">
+            {renderMarkdown(response.generalFeedback)}
+          </p>
+        )}
+
+        {editError && (
+          <div className="bg-[#fdf1f0] border border-[#f5c6c3] rounded-xl px-4 py-3 text-sm text-[#c0392b]">
+            {editError}
+          </div>
+        )}
+
+        {editing && (
+          <button
+            onClick={saveEdit}
+            disabled={editSaving}
+            className="w-full py-2.5 bg-[#2d3748] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-50"
+          >
+            {editSaving ? "Saving..." : "Save changes"}
+          </button>
+        )}
+
+        {/* Points earned note */}
+        {!editing && response.pointsEarned > 0 && (
+          <p className="text-xs text-[#9a8c7a] pt-3 border-t border-[#f0ebe3]">
+            Earned {response.pointsEarned} pts for this critique
+            {upvCount > 0 && ` · +${upvCount * 2} pts from upvotes`}
+          </p>
+        )}
       </div>
-
-      {/* General feedback */}
-      <p className="text-sm text-[#4a4a4a] leading-[1.8] whitespace-pre-wrap">
-        {renderMarkdown(response.generalFeedback)}
-      </p>
-
-      {/* Points earned note */}
-      {response.pointsEarned > 0 && (
-        <p className="text-xs text-[#9a8c7a] mt-4 pt-3 border-t border-[#f0ebe3]">
-          Earned {response.pointsEarned} pts for this critique
-          {upvCount > 0 && ` · +${upvCount * 3} pts from upvotes`}
-        </p>
-      )}
     </div>
   );
 }
@@ -538,11 +886,11 @@ export default function FeedbackPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [submission, setSubmission]   = useState(null);
-  const [comments, setComments]       = useState([]); // all paragraph comments
-  const [loading, setLoading]         = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activePara, setActivePara]   = useState(null); // { index, preview }
+  const [submission, setSubmission]     = useState(null);
+  const [comments, setComments]         = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [sidebarOpen, setSidebarOpen]   = useState(false);
+  const [activePara, setActivePara]     = useState(null);
   const [hasResponded, setHasResponded] = useState(false);
 
   const paragraphRefs = useRef([]);
@@ -550,16 +898,14 @@ export default function FeedbackPage() {
 
   useEffect(() => { fetchSubmission(); }, [id]);
 
-  // Scroll to paragraph or critique referenced in URL hash (from notification links)
   useEffect(() => {
     if (!submission || !location.hash) return;
-    const hash = location.hash; // e.g. #paragraph-5  or  #critique-12  or  #comment-34
-
-    const paraMatch = hash.match(/^#paragraph-(\d+)$/);
+    const hash = location.hash;
+    const paraMatch    = hash.match(/^#paragraph-(\d+)$/);
     const critiqueMatch = hash.match(/^#critique-(\d+)$/);
 
     if (paraMatch) {
-      const idx = Number(paraMatch[1]) - 1; // convert 1-based to 0-based
+      const idx = Number(paraMatch[1]) - 1;
       const el = paragraphRefs.current[idx];
       if (el) {
         setTimeout(() => {
@@ -588,7 +934,6 @@ export default function FeedbackPage() {
       const data = await res.json();
       setSubmission(data);
       setComments(data.paragraphComments ?? []);
-
       if (user) {
         const already = (data.responses ?? []).some((r) => r.criticId === user.id);
         setHasResponded(already);
@@ -624,6 +969,16 @@ export default function FeedbackPage() {
     } else {
       setComments((prev) => [...prev, data]);
     }
+  }
+
+  function handleEditComment(commentId, newContent) {
+    setComments((prev) =>
+      prev.map((c) => c.id === commentId ? { ...c, content: newContent } : c)
+    );
+  }
+
+  function handleDeleteComment(commentId) {
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
   }
 
   async function handleUpvoteComment(commentId) {
@@ -673,6 +1028,26 @@ export default function FeedbackPage() {
     } catch (e) {}
   }
 
+  function handleCritiqueEdit(responseId, updatedFields) {
+    setSubmission((prev) => ({
+      ...prev,
+      responses: prev.responses.map((r) =>
+        r.id === responseId ? { ...r, ...updatedFields } : r
+      ),
+    }));
+  }
+
+  function handleCritiqueDelete(responseId) {
+    setSubmission((prev) => ({
+      ...prev,
+      responses: (prev.responses ?? []).filter((r) => r.id !== responseId),
+    }));
+    // If the deleted critique was the current user's, allow them to submit again
+    if (submission?.responses?.find((r) => r.id === responseId)?.criticId === user?.id) {
+      setHasResponded(false);
+    }
+  }
+
   function handleCritiqueSuccess(response) {
     setSubmission((prev) => ({
       ...prev,
@@ -683,8 +1058,6 @@ export default function FeedbackPage() {
 
   const isAuthor    = user?.id === submission?.userId;
   const canCritique = user && !isAuthor && !hasResponded && submission?.isOpen;
-
-  // ─── Loading ────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -720,15 +1093,15 @@ export default function FeedbackPage() {
           Back to hub
         </Link>
 
-        {/* Two-column layout: chapter + sidebar */}
-        <div className={`flex gap-6 transition-all duration-300 ${sidebarOpen ? "" : ""}`}>
+        {/* Two-column layout */}
+        <div className="flex gap-7 transition-all duration-300">
 
-          {/* ── Left: Chapter + critiques ────────────────────────────────────── */}
-          <div className={`flex-1 min-w-0 transition-all duration-300 ${sidebarOpen ? "sm:pr-0" : ""}`}>
+          {/* ── Left: Chapter + critiques ─────────────────────────────────── */}
+          <div className="flex-1 min-w-0">
 
             {/* Submission meta card */}
             <div className="bg-white border border-[#e8e0d0] rounded-2xl p-6 mb-6 shadow-[0_2px_8px_rgba(45,35,20,0.04)]">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
                 <span className="text-[11px] font-semibold text-[#2d3748] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
                   {submission.genre}
                 </span>
@@ -745,28 +1118,25 @@ export default function FeedbackPage() {
                 )}
               </div>
 
-              <h1 className="font-serif text-2xl text-[#2d3748] mb-3 leading-snug">
+              <h1 className="font-serif text-2xl text-[#2d3748] mb-4 leading-snug">
                 {submission.title}
               </h1>
 
               <AuthorChip user={submission.user} />
 
-              <p className="text-sm text-[#6b5c4a] mt-4 leading-relaxed border-t border-[#f0ebe3] pt-4">
+              <p className="text-sm text-[#6b5c4a] mt-5 leading-relaxed border-t border-[#f0ebe3] pt-5">
                 {submission.summary}
               </p>
 
               {/* Feedback wanted */}
               {submission.feedbackWanted?.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-[#f0ebe3]">
+                <div className="mt-5 pt-5 border-t border-[#f0ebe3]">
                   <p className="text-xs font-semibold text-[#9a8c7a] uppercase tracking-wide mb-2">
                     Feedback requested
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {submission.feedbackWanted.map((tag, i) => (
-                      <span
-                        key={i}
-                        className="text-xs text-[#6558d4] bg-[#f2f0fd] px-3 py-1 rounded-full"
-                      >
+                      <span key={i} className="text-xs text-[#6558d4] bg-[#f2f0fd] px-3 py-1 rounded-full">
                         {tag}
                       </span>
                     ))}
@@ -776,7 +1146,7 @@ export default function FeedbackPage() {
 
               {/* Content warnings */}
               {submission.contentWarnings?.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <div className="mt-4 flex flex-wrap gap-1.5">
                   {submission.contentWarnings.map((w, i) => (
                     <span key={i} className="text-[10px] text-[#c0392b] bg-[#fdf1f0] px-2.5 py-0.5 rounded-full border border-[#f5c6c3]">
                       {w}
@@ -787,7 +1157,7 @@ export default function FeedbackPage() {
             </div>
 
             {/* Reading instruction */}
-            <div className="flex items-center gap-2 bg-[#fdf9ed] border border-[#f0d98a] rounded-xl px-4 py-2.5 mb-5 text-sm text-[#6b5c4a]">
+            <div className="flex items-center gap-2 bg-[#fdf9ed] border border-[#f0d98a] rounded-xl px-4 py-3 mb-6 text-sm text-[#6b5c4a]">
               <svg className="w-4 h-4 text-[#b8860b] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -796,7 +1166,7 @@ export default function FeedbackPage() {
             </div>
 
             {/* Chapter text */}
-            <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden mb-8 shadow-[0_2px_8px_rgba(45,35,20,0.04)]">
+            <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden mb-10 shadow-[0_2px_8px_rgba(45,35,20,0.04)]">
               <div className="px-6 sm:px-10 py-8 sm:py-10">
                 {paragraphs.map((para, i) => {
                   const paraComments = getParaComments(i);
@@ -806,38 +1176,26 @@ export default function FeedbackPage() {
                     <div
                       key={i}
                       ref={(el) => (paragraphRefs.current[i] = el)}
-                      className={`group relative cursor-pointer transition-all duration-150 rounded-lg -mx-2 px-2 py-1 mb-5 last:mb-0 ${
-                        isActive
-                          ? "bg-[#fdf9ed]"
-                          : "hover:bg-[#fafaf7]"
+                      className={`group relative cursor-pointer transition-all duration-150 rounded-lg -mx-2 px-2 py-1 mb-6 last:mb-0 ${
+                        isActive ? "bg-[#fdf9ed]" : "hover:bg-[#fafaf7]"
                       }`}
                       onClick={() => openSidebar(i)}
                     >
-                      {/* Paragraph marker */}
-                      <div className="absolute -left-5 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                        <div
-                          className={`w-1 h-full min-h-[1rem] rounded-full transition-all ${
-                            isActive ? "bg-[#d4af37]" : "bg-[#e8e0d0]"
-                          }`}
-                        />
-                      </div>
                       <div
                         className={`absolute -left-1 top-0 w-0.5 rounded-full transition-all h-full ${
                           isActive ? "bg-[#d4af37] opacity-100" : "opacity-0 group-hover:opacity-100 bg-[#d6cfc4]"
                         }`}
                       />
-
-                      {/* Paragraph number — visible on hover or when active */}
-                      <span className={`block text-[10px] font-semibold tracking-widest uppercase mb-1 select-none transition-opacity ${ isActive ? "text-[#d4af37] opacity-100" : "text-[#c4b9ab] opacity-0 group-hover:opacity-100" }`}>
-                        ¶ {i + 1}
+                      <span className={`block text-[10px] font-semibold tracking-widest uppercase mb-1 select-none transition-opacity ${
+                        isActive ? "text-[#d4af37] opacity-100" : "text-[#c4b9ab] opacity-0 group-hover:opacity-100"
+                      }`}>
+                        P {i + 1}
                       </span>
                       <p className="font-[Georgia,serif] text-[#2d3748] text-[15.5px] leading-[1.95] tracking-[0.01em]">
                         {renderMarkdown(para)}
                       </p>
-
-                      {/* Comment count badge */}
                       {paraComments.length > 0 && (
-                        <span className="absolute -right-1 top-1 bg-[#2d3748] text-white text-[9px] font-bold w-4.5 h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center">
+                        <span className="absolute -right-1 top-1 bg-[#2d3748] text-white text-[9px] font-bold min-w-[18px] px-1 h-[18px] rounded-full flex items-center justify-center">
                           {paraComments.length}
                         </span>
                       )}
@@ -847,19 +1205,16 @@ export default function FeedbackPage() {
               </div>
             </div>
 
-            {/* Critiques section */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="font-serif text-xl text-[#2d3748]">
-                  Critiques
-                  <span className="text-[#b8a898] font-sans text-sm font-normal ml-2">
-                    {submission.responses?.length ?? 0}
-                  </span>
-                </h2>
+            {/* ── Critiques section ──────────────────────────────────────────── */}
+            <div className="mb-10">
+              <div className="flex items-center gap-4 mb-6">
+                <h2 className="font-serif text-xl text-[#2d3748]">Critiques</h2>
+                <span className="text-sm text-[#b8a898]">{submission.responses?.length ?? 0}</span>
+                <div className="flex-1 h-px bg-[#e8e0d0]" />
               </div>
 
               {(submission.responses?.length ?? 0) === 0 ? (
-                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-6 py-10 text-center mb-6">
+                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-6 py-12 text-center mb-8">
                   <p className="font-serif text-[#2d3748] mb-1">No critiques yet</p>
                   <p className="text-sm text-[#9a8c7a]">
                     {canCritique
@@ -868,7 +1223,7 @@ export default function FeedbackPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4 mb-6">
+                <div className="space-y-5 mb-8">
                   {submission.responses.map((r, rIdx) => (
                     <div key={r.id} ref={(el) => (responseRefs.current[rIdx] = el)}>
                       <CritiqueCard
@@ -876,6 +1231,8 @@ export default function FeedbackPage() {
                         submissionAuthorId={submission.userId}
                         user={user}
                         onUpvote={handleUpvoteResponse}
+                        onEdit={handleCritiqueEdit}
+                        onDelete={handleCritiqueDelete}
                       />
                     </div>
                   ))}
@@ -899,9 +1256,9 @@ export default function FeedbackPage() {
 
               {/* Not logged in */}
               {!user && (
-                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-6 py-6 text-center">
+                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-6 py-8 text-center">
                   <p className="font-serif text-[#2d3748] mb-1">Want to leave a critique?</p>
-                  <p className="text-sm text-[#9a8c7a] mb-4">Sign in to give feedback and earn posting points.</p>
+                  <p className="text-sm text-[#9a8c7a] mb-5">Sign in to give feedback and earn posting points.</p>
                   <Link
                     to="/login"
                     className="inline-block px-5 py-2.5 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all"
@@ -931,6 +1288,8 @@ export default function FeedbackPage() {
                 onClose={() => setSidebarOpen(false)}
                 onNewComment={handleNewComment}
                 onUpvoteComment={handleUpvoteComment}
+                onEditComment={handleEditComment}
+                onDeleteComment={handleDeleteComment}
                 isAuthor={isAuthor}
                 user={user}
               />
@@ -950,6 +1309,8 @@ export default function FeedbackPage() {
                 onClose={() => setSidebarOpen(false)}
                 onNewComment={handleNewComment}
                 onUpvoteComment={handleUpvoteComment}
+                onEditComment={handleEditComment}
+                onDeleteComment={handleDeleteComment}
                 isAuthor={isAuthor}
                 user={user}
               />

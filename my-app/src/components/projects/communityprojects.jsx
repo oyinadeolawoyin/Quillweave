@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import API_URL from "../../config/api";
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -153,13 +153,16 @@ function ProjectCard({ project }) {
       )}
 
       <div className="flex items-center gap-2 pt-1 border-t border-[#f0ebe3]">
-        <div
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0"
-          style={{ background: av.bg, color: av.text }}
-        >
-          {initials(project.user?.username)}
-        </div>
-        <span className="text-[11px] text-[#9a8c7a] truncate">@{project.user?.username}</span>
+        <Link to={`/profile/${project.user?.id}`} className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity">
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden"
+            style={{ background: av.bg, color: av.text }}>
+            {project.user?.avatar
+              ? <img src={project.user.avatar} alt={project.user.username} className="w-full h-full object-cover" />
+              : initials(project.user?.username)
+            }
+          </div>
+          <span className="text-[11px] text-[#9a8c7a] truncate">@{project.user?.username}</span>
+        </Link>
         {project.status === "COMPLETED" && (
           <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider text-[#16a34a] bg-[#f0fdf4] px-1.5 py-0.5 rounded-full flex-shrink-0">
             Complete
@@ -213,13 +216,16 @@ function StreakCard({ project }) {
       </div>
 
       <div className="flex items-center gap-2 pt-1 border-t border-[#fce7f3]">
-        <div
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0"
-          style={{ background: av.bg, color: av.text }}
-        >
-          {initials(project.user?.username)}
-        </div>
-        <span className="text-[11px] text-[#9a8c7a] truncate">@{project.user?.username}</span>
+        <Link to={`/profile/${project.user?.id}`} className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity">
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden"
+            style={{ background: av.bg, color: av.text }}>
+            {project.user?.avatar
+              ? <img src={project.user.avatar} alt={project.user.username} className="w-full h-full object-cover" />
+              : initials(project.user?.username)
+            }
+          </div>
+          <span className="text-[11px] text-[#9a8c7a] truncate">@{project.user?.username}</span>
+        </Link>
         {project.status === "COMPLETED" && (
           <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider text-[#16a34a] bg-[#f0fdf4] px-1.5 py-0.5 rounded-full flex-shrink-0">
             Complete
@@ -279,13 +285,16 @@ function SessionCard({ project }) {
       )}
 
       <div className="flex items-center gap-2 pt-1 border-t border-[#fce7f3]">
-        <div
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0"
-          style={{ background: av.bg, color: av.text }}
-        >
-          {initials(project.user?.username)}
-        </div>
-        <span className="text-[11px] text-[#9a8c7a] truncate">@{project.user?.username}</span>
+        <Link to={`/profile/${project.user?.id}`} className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity">
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden"
+            style={{ background: av.bg, color: av.text }}>
+            {project.user?.avatar
+              ? <img src={project.user.avatar} alt={project.user.username} className="w-full h-full object-cover" />
+              : initials(project.user?.username)
+            }
+          </div>
+          <span className="text-[11px] text-[#9a8c7a] truncate">@{project.user?.username}</span>
+        </Link>
         {project.status === "COMPLETED" && (
           <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider text-[#16a34a] bg-[#f0fdf4] px-1.5 py-0.5 rounded-full flex-shrink-0">
             Complete

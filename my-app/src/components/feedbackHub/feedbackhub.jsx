@@ -172,26 +172,39 @@ function SubmissionCard({ sub }) {
         <CritiqueProgress count={responses} max={3} />
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-[#f0ebe3]">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-ink-primary flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-            {author?.username?.charAt(0).toUpperCase() ?? "?"}
+      <div className="pt-3 border-t border-[#f0ebe3]">
+        {/* Author row */}
+        <Link to={`/profile/${author?.id}`} className="flex items-center gap-2 mb-3 hover:opacity-80 transition-opacity">
+          <div className="w-7 h-7 rounded-full bg-ink-primary flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 overflow-hidden">
+            {author?.avatar
+              ? <img src={author.avatar} alt={author.username} className="w-full h-full object-cover" />
+              : <span>{author?.username?.charAt(0).toUpperCase() ?? "?"}</span>
+            }
           </div>
           <span className="text-sm text-ink-primary font-medium">{author?.username}</span>
           {author?.feedbackPoints?.reputation != null && (
             <span className="text-xs text-[#9a8c7a]">Rep {author.feedbackPoints.reputation}</span>
           )}
-        </div>
-        <div className="flex items-center gap-3 text-xs text-[#9a8c7a]">
-          <span className="flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        </Link>
+        {/* Stats row */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 text-[#9a8c7a]">
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z" />
             </svg>
-            {responses} {responses === 1 ? "critique" : "critiques"}
-          </span>
-          <span className="w-1 h-1 rounded-full bg-[#e8e0d0] inline-block" />
-          <span>{comments} comments</span>
+            <span className="text-xs font-semibold text-ink-primary">{responses}</span>
+            <span className="text-xs">{responses === 1 ? "critique" : "critiques"}</span>
+          </div>
+          <span className="w-1 h-1 rounded-full bg-[#e8e0d0] flex-shrink-0" />
+          <div className="flex items-center gap-1.5 text-[#9a8c7a]">
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+            </svg>
+            <span className="text-xs font-semibold text-ink-primary">{comments}</span>
+            <span className="text-xs">comments</span>
+          </div>
         </div>
       </div>
     </Link>

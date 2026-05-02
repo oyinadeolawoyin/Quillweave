@@ -142,6 +142,10 @@ const router = createBrowserRouter([
     element: <SubmitFeedback /> 
   },
   { 
+    path: "/feedback/:id/edit",     
+    element: <SubmitFeedback /> 
+  },
+  { 
     path: "/feedback/:id",     
     element: <FeedbackPage /> 
   },
@@ -159,6 +163,10 @@ const router = createBrowserRouter([
   },
   { 
     path: "/discovery/submit", 
+    element: <SubmitDiscoveryStory /> 
+  },
+  { 
+    path: "/discovery/:storyId/edit", 
     element: <SubmitDiscoveryStory /> 
   },
   { 
