@@ -29,17 +29,21 @@ const TIER_META = {
   Diamond:  { color: "#c0392b", bg: "#fdf1f0" },
 };
 
-const CRITIQUE_PLACEHOLDER = `A strong critique does three things well:
+const CRITIQUE_PLACEHOLDER = `
+[THE HOOK & PACING] 
+Did the opening grab you? Mention if any parts felt too slow or "dragged" (e.g., the 400-word breakfast rule!).
 
-1. Identifies what is working — point to specific lines, scenes, or choices that land. Writers need to know what to keep, not just what to fix.
+[CLARITY & IMAGERY] 
+Was the action easy to follow? Note if any imagery felt confusing or if the "theme" of the scene shifted too much.
 
-2. Names areas for improvement specifically — instead of "the pacing feels slow", try "the transition between paragraphs 3 and 4 loses momentum because...". Vague notes are hard to act on.
+[STORY THEORY (The Heart)] 
+Does the protagonist's internal struggle come through? Is there a clear "point" to this scene?
 
-3. Keeps a constructive, supportive tone — frame weaknesses as opportunities. "This scene could hit harder if..." lands better than "this scene doesn't work." The goal is to help the writer improve, not to judge them.
+[WHAT TO KEEP] 
+What was the most vivid or strongest part of the writing? (Be specific!)
 
-Align your star ratings with what you actually write. If your feedback praises the clarity, the Clarity score should reflect that.
-
-Write at least 100 words. Short critiques rarely give writers enough to work with.`;
+[ONE SUGGESTION] 
+If you could change one thing to make the next chapter hit harder, what would it be?`;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
