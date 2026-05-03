@@ -31,7 +31,7 @@ const TIER_META = {
 
 const CRITIQUE_PLACEHOLDER = `
 [THE HOOK & PACING] 
-Did the opening grab you? Mention if any parts felt too slow or "dragged" (e.g., the 400-word breakfast rule!).
+Did the opening grab you? Mention if any parts felt too slow or fast (e.g., the 400-word breakfast rule!).
 
 [CLARITY & IMAGERY] 
 Was the action easy to follow? Note if any imagery felt confusing or if the "theme" of the scene shifted too much.
