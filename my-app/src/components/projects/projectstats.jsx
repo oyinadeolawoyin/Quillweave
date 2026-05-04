@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../profile/header";
-import API_URL from "../../config/api";
+import API_URL from "@/config/api";
 
 function daysUntil(dateStr) {
   if (!dateStr) return null;
