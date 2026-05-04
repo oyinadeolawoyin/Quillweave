@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import API_URL from "@/config/api";
 
 export default function Header() {
@@ -9,6 +9,10 @@ export default function Header() {
   const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [activeEvents, setActiveEvents] = useState([]);
+  const [eventsDropdownOpen, setEventsDropdownOpen] = useState(false);
+  const [eventsMobileOpen, setEventsMobileOpen] = useState(false);
+  const eventsDropdownRef = useRef(null);
 
   useEffect(() => {
     if (user) {
@@ -19,8 +23,24 @@ export default function Header() {
   }, [user]);
 
   useEffect(() => {
+    fetchActiveEvents();
+  }, []);
+
+  useEffect(() => {
     setMobileOpen(false);
+    setEventsDropdownOpen(false);
   }, [pathname]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (eventsDropdownRef.current && !eventsDropdownRef.current.contains(e.target)) {
+        setEventsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   async function fetchNotificationCount() {
     try {
@@ -35,6 +55,18 @@ export default function Header() {
     }
   }
 
+  async function fetchActiveEvents() {
+    try {
+      const res = await fetch(`${API_URL}/events/active`);
+      if (res.ok) {
+        const data = await res.json();
+        setActiveEvents(data.events || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch active events:", error);
+    }
+  }
+
   async function handleLogout() {
     await logout();
     navigate("/login");
@@ -44,13 +76,28 @@ export default function Header() {
   const navItems = [
     { to: "/snippets", label: "Community" },
     { to: "/discovery", label: "Discovery" },
-    { to: "/feedback", label: "Feedback Hub" },
+    { to: "/feedback", label: "Feedback" },
     { to: "/blog", label: "Blog" },
     ...(user ? [{ to: "/projects", label: "Projects" }] : []),
   ];
 
   function isActive(to) {
     return pathname === to || pathname.startsWith(to + "/");
+  }
+
+  const isEventsActive = pathname.startsWith("/events");
+
+  function getEventTypeLabel(type) {
+    if (type === "DAYS_CHALLENGE") return "Challenge";
+    if (type === "WORKSHOP") return "Workshop";
+    if (type === "ANNOUNCEMENT") return "Announcement";
+    return "Event";
+  }
+
+  function daysLeft(endDate) {
+    if (!endDate) return null;
+    const d = Math.max(0, Math.ceil((new Date(endDate) - Date.now()) / (1000 * 60 * 60 * 24)));
+    return d === 0 ? "Last day" : `${d}d left`;
   }
 
   return (
@@ -75,14 +122,92 @@ export default function Header() {
                     isActive(to)
                       ? "text-[#2d3748] bg-[#f7f4ee]"
                       : "text-[#737373] hover:text-[#2d3748] hover:bg-[#fafaf9]"
-                  } ${to === "/feedback-hub" ? "relative" : ""}`}
+                  }`}
                 >
                   {label}
-                  {to === "/feedback-hub" && (
-                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-[#d4af37] rounded-full" />
-                  )}
                 </Link>
               ))}
+
+              {/* Events dropdown */}
+              <div className="relative" ref={eventsDropdownRef}>
+                <button
+                  onClick={() => setEventsDropdownOpen(o => !o)}
+                  className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isEventsActive || eventsDropdownOpen
+                      ? "text-[#2d3748] bg-[#f7f4ee]"
+                      : "text-[#737373] hover:text-[#2d3748] hover:bg-[#fafaf9]"
+                  }`}
+                >
+                  Events
+                  {activeEvents.length > 0 && (
+                    <span className="w-1.5 h-1.5 bg-[#d4af37] rounded-full" />
+                  )}
+                  <svg
+                    className={`w-3 h-3 transition-transform ${eventsDropdownOpen ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {eventsDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-[#e5e5e5] rounded-2xl shadow-xl overflow-hidden z-50"
+                    style={{ boxShadow: "0 8px 32px rgba(45,55,72,0.12)" }}>
+                    {activeEvents.length > 0 ? (
+                      <>
+                        <div className="px-4 pt-3 pb-2">
+                          <p className="text-[10px] uppercase tracking-widest font-bold text-[#9a8c7a]">Active Events</p>
+                        </div>
+                        <div className="pb-2">
+                          {activeEvents.map(ev => (
+                            <Link
+                              key={ev.id}
+                              to={`/events/${ev.id}`}
+                              onClick={() => setEventsDropdownOpen(false)}
+                              className="flex items-start gap-3 px-4 py-3 hover:bg-[#faf7f2] transition-colors"
+                            >
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#2d3748] to-[#4a5568] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-sm">{ev.type === "DAYS_CHALLENGE" ? "🔥" : ev.type === "WORKSHOP" ? "🎓" : "📣"}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-[#2d3748] truncate">{ev.title}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] font-semibold text-[#d4af37] bg-[#fdf8e7] px-1.5 py-0.5 rounded-full border border-[#f0d98a]">
+                                    {getEventTypeLabel(ev.type)}
+                                  </span>
+                                  {ev.endDate && (
+                                    <span className="text-[10px] text-[#9a8c7a]">{daysLeft(ev.endDate)}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                        <div className="border-t border-[#f0ebe3] px-4 py-2.5">
+                          <Link
+                            to="/events"
+                            onClick={() => setEventsDropdownOpen(false)}
+                            className="text-xs font-semibold text-[#2d3748] hover:text-[#d4af37] transition-colors"
+                          >
+                            View all events →
+                          </Link>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="px-4 py-5 text-center">
+                        <p className="text-sm text-[#9a8c7a]">No active events right now</p>
+                        <Link
+                          to="/events"
+                          onClick={() => setEventsDropdownOpen(false)}
+                          className="text-xs font-semibold text-[#2d3748] hover:underline mt-1 block"
+                        >
+                          Browse past events
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* Desktop Right Side */}
@@ -198,13 +323,68 @@ export default function Header() {
                   }`}
                 >
                   {label}
-                  {to === "/feedback-hub" && (
-                    <span className="text-[10px] bg-[#fdf3d8] text-[#b8962e] border border-[#f0d98a] px-2 py-0.5 rounded-full font-semibold">
-                      New
-                    </span>
-                  )}
                 </Link>
               ))}
+
+              {/* Events section — accordion on mobile */}
+              <div>
+                <button
+                  onClick={() => setEventsMobileOpen(o => !o)}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isEventsActive ? "text-[#2d3748] bg-[#f7f4ee]" : "text-[#4a4a4a] hover:bg-[#fafaf9]"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    Events
+                    {activeEvents.length > 0 && (
+                      <span className="text-[10px] bg-[#fdf8e7] text-[#b8962e] border border-[#f0d98a] px-2 py-0.5 rounded-full font-semibold">
+                        {activeEvents.length} active
+                      </span>
+                    )}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 transition-transform text-[#9a8c7a] ${eventsMobileOpen ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {eventsMobileOpen && (
+                  <div className="mt-1 ml-4 space-y-1 border-l-2 border-[#f0ebe3] pl-3">
+                    {activeEvents.length > 0 ? (
+                      <>
+                        {activeEvents.map(ev => (
+                          <Link
+                            key={ev.id}
+                            to={`/events/${ev.id}`}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-[#4a4a4a] hover:bg-[#faf7f2] transition-colors"
+                          >
+                            <span>{ev.type === "DAYS_CHALLENGE" ? "🔥" : ev.type === "WORKSHOP" ? "🎓" : "📣"}</span>
+                            <span className="flex-1 truncate font-medium">{ev.title}</span>
+                            {ev.endDate && (
+                              <span className="text-[10px] text-[#9a8c7a] flex-shrink-0">{daysLeft(ev.endDate)}</span>
+                            )}
+                          </Link>
+                        ))}
+                        <Link
+                          to="/events"
+                          className="block px-3 py-2 rounded-xl text-xs font-semibold text-[#d4af37] hover:bg-[#faf7f2] transition-colors"
+                        >
+                          View all events →
+                        </Link>
+                      </>
+                    ) : (
+                      <Link
+                        to="/events"
+                        className="block px-3 py-2 rounded-xl text-sm text-[#9a8c7a] hover:bg-[#faf7f2] transition-colors"
+                      >
+                        Browse events
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="border-t border-[#e5e5e5] my-2" />
 

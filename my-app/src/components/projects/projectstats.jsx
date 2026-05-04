@@ -199,6 +199,130 @@ function OverallArcItem({ percent, label, line1, line2, color }) {
   );
 }
 
+// ─── Streak Running Totals ───────────────────────────────────
+function StreakRunningTotals({ dayLogs }) {
+  if (!dayLogs?.length) return (
+    <div className="bg-gradient-to-br from-[#fdf2f8] to-[#fff0fa] rounded-2xl border border-dashed border-[#f9a8d4] p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+        <p className="text-[10px] uppercase tracking-widest font-bold text-[#be185d]">Built through this streak</p>
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {["words written", "chapters drafted", "scenes completed", "minutes spent"].map((label, i) => (
+          <div key={i} className="text-center opacity-40">
+            <p className="font-serif font-bold text-2xl text-[#9d174d]">—</p>
+            <p className="text-[10px] text-[#be185d] uppercase tracking-wide font-semibold mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-center text-[#f472b6] leading-relaxed mt-3">
+        Log your first day to start building your streak stats. Your words, chapters, and minutes will all appear right here — one day at a time. 🔥
+      </p>
+    </div>
+  );
+  const totals = dayLogs.reduce(
+    (acc, l) => ({
+      words:    acc.words    + (l.wordsLogged    || 0),
+      chapters: acc.chapters + (l.chaptersLogged || 0),
+      scenes:   acc.scenes   + (l.scenesLogged   || 0),
+      minutes:  acc.minutes  + (l.minutesLogged  || 0),
+    }),
+    { words: 0, chapters: 0, scenes: 0, minutes: 0 }
+  );
+  const items = [
+    { key: "words",    label: "words written",    value: totals.words,    show: totals.words > 0 },
+    { key: "chapters", label: "chapters drafted", value: totals.chapters, show: totals.chapters > 0 },
+    { key: "scenes",   label: "scenes completed", value: totals.scenes,   show: totals.scenes > 0 },
+    { key: "minutes",  label: "minutes spent",    value: totals.minutes,  show: totals.minutes > 0 },
+  ].filter(i => i.show);
+
+  if (!items.length) return null;
+
+  return (
+    <div className="bg-gradient-to-br from-[#fdf2f8] to-[#fff0fa] rounded-2xl border border-[#fbcfe8] p-5 space-y-3">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+        <p className="text-[10px] uppercase tracking-widest font-bold text-[#be185d]">Built through this streak</p>
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {items.map(item => (
+          <div key={item.key} className="text-center">
+            <p className="font-serif font-bold text-2xl text-[#9d174d]">{(item.value ?? 0).toLocaleString()}</p>
+            <p className="text-[10px] text-[#be185d] uppercase tracking-wide font-semibold mt-0.5">{item.label}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-center text-[#f472b6] leading-relaxed">
+        Every number above was built one day at a time. Keep the chain alive.
+      </p>
+    </div>
+  );
+}
+
+// ─── Session Running Totals ──────────────────────────────────
+function SessionRunningTotals({ sessionLogs }) {
+  if (!sessionLogs?.length) return (
+    <div className="bg-gradient-to-br from-[#fdf2f8] to-[#fce7f3] rounded-2xl border border-dashed border-[#f9a8d4] p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+        <p className="text-[10px] uppercase tracking-widest font-bold text-[#be185d]">Across all sessions</p>
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {["words written", "chapters drafted", "scenes completed", "minutes logged"].map((label, i) => (
+          <div key={i} className="text-center opacity-40">
+            <p className="font-serif font-bold text-2xl text-[#9d174d]">—</p>
+            <p className="text-[10px] text-[#be185d] uppercase tracking-wide font-semibold mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-center text-[#f472b6] leading-relaxed mt-3">
+        Log your first session and watch your totals fill in here. Every minute and every word counts. ✍️
+      </p>
+    </div>
+  );
+  const totals = sessionLogs.reduce(
+    (acc, l) => ({
+      words:    acc.words    + (l.wordsWritten    || 0),
+      chapters: acc.chapters + (l.chaptersWritten || 0),
+      scenes:   acc.scenes   + (l.scenesWritten   || 0),
+      minutes:  acc.minutes  + (l.minutesWritten  || 0),
+    }),
+    { words: 0, chapters: 0, scenes: 0, minutes: 0 }
+  );
+  const items = [
+    { key: "words",    label: "words written",    value: totals.words,    show: totals.words > 0 },
+    { key: "chapters", label: "chapters drafted", value: totals.chapters, show: totals.chapters > 0 },
+    { key: "scenes",   label: "scenes completed", value: totals.scenes,   show: totals.scenes > 0 },
+    { key: "minutes",  label: "minutes logged",   value: totals.minutes,  show: totals.minutes > 0 },
+  ].filter(i => i.show);
+
+  if (!items.length) return null;
+
+  return (
+    <div className="bg-gradient-to-br from-[#fdf2f8] to-[#fce7f3] rounded-2xl border border-[#fbcfe8] p-5 space-y-3">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+        <p className="text-[10px] uppercase tracking-widest font-bold text-[#be185d]">Across all sessions</p>
+        <div className="h-px flex-1 bg-[#fbcfe8]" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {items.map(item => (
+          <div key={item.key} className="text-center">
+            <p className="font-serif font-bold text-2xl text-[#9d174d]">{(item.value ?? 0).toLocaleString()}</p>
+            <p className="text-[10px] text-[#be185d] uppercase tracking-wide font-semibold mt-0.5">{item.label}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-center text-[#f472b6] leading-relaxed">
+        {sessionLogs.length} session{sessionLogs.length !== 1 ? "s" : ""} logged in total.
+      </p>
+    </div>
+  );
+}
+
 // ─── History Log ──────────────────────────────────────────────
 function HistoryLog({ logs }) {
   const [expanded, setExpanded] = useState(false);
@@ -252,11 +376,11 @@ function HistoryLog({ logs }) {
 }
 
 // ─── Progress Modal ───────────────────────────────────────────
+// Only handles progress types — sessions have their own modal
 const TRACK_TYPES = [
   { key: "words",    label: "Words",    color: "#2d6e5a", bg: "#f0fdf4" },
   { key: "chapters", label: "Chapters", color: "#b8962e", bg: "#fffbeb" },
   { key: "scenes",   label: "Scenes",   color: "#6d28d9", bg: "#f5f3ff" },
-  { key: "session",  label: "Session",  color: "#2d3748", bg: "#f8fafc" },
 ];
 
 function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) {
@@ -275,7 +399,6 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
   const sc = trackerSummary?.scenes;
 
   const availableTypes = TRACK_TYPES.filter(t => {
-    if (t.key === "session")  return true;
     if (t.key === "words")    return !!wc;
     if (t.key === "chapters") return !!ch;
     if (t.key === "scenes")   return !!sc;
@@ -283,7 +406,6 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
   });
 
   const currentType = TRACK_TYPES.find(t => t.key === activeType);
-  const isSession   = activeType === "session";
 
   useEffect(() => {
     setAmount("");
@@ -318,16 +440,13 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
   }
 
   async function handleAdd() {
-    if (!isSession && (!amount || isNaN(amount) || Number(amount) <= 0)) {
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
       setError("Please enter a valid number."); return;
     }
     setLoading(true); setError("");
     try {
       let url, body;
-      if (isSession) {
-        url = `${API_URL}/projects/${projectId}/logSession`;
-        body = {};
-      } else if (activeType === "words") {
+      if (activeType === "words") {
         url = `${API_URL}/projects/${projectId}/logWords`;
         body = { wordsAdded: Number(amount) };
       } else {
@@ -378,7 +497,7 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
 
         <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#f0ebe3]">
           <div>
-            <p className="text-[10px] text-[#ea580c] uppercase tracking-widest font-semibold mb-0.5">Log Progress</p>
+            <p className="text-[10px] text-[#ea580c] uppercase tracking-widest font-semibold mb-0.5">Enter Progress</p>
             <h2 className="font-serif text-xl text-[#2d3748] leading-tight">What did you write?</h2>
           </div>
           <button onClick={onClose}
@@ -404,37 +523,30 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
         </div>
 
         <div className="px-6 pt-5 pb-2">
-          {isSession ? (
-            <div className="rounded-2xl border border-[#e8e0d0] bg-[#faf7f2] p-4 text-center">
-              <p className="text-sm text-[#2d3748] font-medium">Mark this writing session as complete</p>
-              <p className="text-xs text-[#9a8c7a] mt-1">No count needed — just log the session.</p>
-            </div>
-          ) : (
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-2 block">
-                Number of {currentType?.label}
-              </label>
-              <input
-                ref={inputRef}
-                type="number" min="1"
-                value={amount}
-                onChange={e => { setAmount(e.target.value); setError(""); setPreview(null); setRemoveMode(false); }}
-                onBlur={e => { if (removeMode) fetchPreview(activeType, e.target.value); }}
-                onFocus={e => e.target.style.borderColor = currentType?.color}
-                placeholder={`e.g. ${activeType === "words" ? "500" : "1"}`}
-                className="w-full px-4 py-3.5 rounded-2xl border text-[#2d3748] font-serif text-xl font-bold outline-none transition-all"
-                style={{ borderColor: error ? "#fca5a5" : "#e8e0d0" }}
-              />
-              {error && (
-                <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
-                  <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-                  </svg>
-                  {error}
-                </p>
-              )}
-            </div>
-          )}
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-2 block">
+              Number of {currentType?.label}
+            </label>
+            <input
+              ref={inputRef}
+              type="number" min="1"
+              value={amount}
+              onChange={e => { setAmount(e.target.value); setError(""); setPreview(null); setRemoveMode(false); }}
+              onBlur={e => { if (removeMode) fetchPreview(activeType, e.target.value); }}
+              onFocus={e => e.target.style.borderColor = currentType?.color}
+              placeholder={`e.g. ${activeType === "words" ? "500" : "1"}`}
+              className="w-full px-4 py-3.5 rounded-2xl border text-[#2d3748] font-serif text-xl font-bold outline-none transition-all"
+              style={{ borderColor: error ? "#fca5a5" : "#e8e0d0" }}
+            />
+            {error && (
+              <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+                <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                {error}
+              </p>
+            )}
+          </div>
 
           {preview && !isSession && (
             <div className="mt-3 p-3.5 rounded-2xl border border-amber-200 bg-amber-50">
@@ -458,29 +570,27 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
         </div>
 
         <div className="px-6 pt-3 pb-7 flex gap-3">
-          {!isSession && (
-            <button
-              onClick={() => {
-                setRemoveMode(true); setPreview(null);
-                if (amount) fetchPreview(activeType, amount);
-                handleDelete();
-              }}
-              disabled={loading || !amount}
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ borderColor: "#fca5a5", color: "#ef4444", background: "#fff1f2" }}>
-              {loading
-                ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
-                : <>
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Remove
-                </>}
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setRemoveMode(true); setPreview(null);
+              if (amount) fetchPreview(activeType, amount);
+              handleDelete();
+            }}
+            disabled={loading || !amount}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ borderColor: "#fca5a5", color: "#ef4444", background: "#fff1f2" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+              : <>
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Remove
+              </>}
+          </button>
           <button
             onClick={() => { setRemoveMode(false); setPreview(null); handleAdd(); }}
-            disabled={loading || (!isSession && !amount)}
+            disabled={loading || !amount}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: loading ? "#9a8c7a" : currentType?.color }}>
             {loading
@@ -489,7 +599,7 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                {isSession ? "Log Session" : "Add to Today"}
+                Add to progress
               </>}
           </button>
         </div>
@@ -499,7 +609,7 @@ function ProgressModal({ open, onClose, projectId, trackerSummary, onSuccess }) 
 }
 
 // ─── Log Day Modal ────────────────────────────────────────────
-function LogDayModal({ open, onClose, projectId, trackerSummary, onSuccess }) {
+function LogDayModal({ open, onClose, projectId, trackerSummary, onSuccess, dayLogs, currentStreak, daysTarget }) {
   const overlayRef = useRef(null);
   const [reflection, setReflection] = useState("");
   const [wordsToday, setWordsToday]   = useState("");
@@ -512,6 +622,8 @@ function LogDayModal({ open, onClose, projectId, trackerSummary, onSuccess }) {
   const wc = trackerSummary?.wordCount;
   const ch = trackerSummary?.chapters;
   const sc = trackerSummary?.scenes;
+  const streak = currentStreak || 0;
+  const target = daysTarget || 0;
 
   useEffect(() => {
     if (open) {
@@ -587,6 +699,39 @@ function LogDayModal({ open, onClose, projectId, trackerSummary, onSuccess }) {
         </div>
 
         <div className="px-6 pt-5 pb-2 space-y-5 overflow-y-auto max-h-[70vh]">
+
+          {/* Streak progress indicator */}
+          {target > 0 && (
+            <div className="flex items-center gap-3 bg-[#fdf2f8] rounded-2xl px-4 py-3 border border-[#fbcfe8]">
+              <div className="flex-shrink-0">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <circle cx="14" cy="14" r="12" stroke="#fbcfe8" strokeWidth="3" />
+                  <circle cx="14" cy="14" r="12" stroke="#be185d" strokeWidth="3"
+                    strokeDasharray={`${2 * Math.PI * 12}`}
+                    strokeDashoffset={`${2 * Math.PI * 12 * (1 - Math.min(streak / target, 1))}`}
+                    strokeLinecap="round"
+                    style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
+                  />
+                  <text x="14" y="18" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#9d174d">{streak}</text>
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold text-[#9d174d]">
+                  {streak === 0
+                    ? "Start your streak today"
+                    : streak >= target
+                    ? "Streak complete — you did it"
+                    : `${streak} of ${target} days — ${target - streak} to go`}
+                </p>
+                <p className="text-[10px] text-[#f472b6] mt-0.5">
+                  {streak === 0
+                    ? "Log today to begin the chain."
+                    : "Log today to keep the chain alive."}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-2 block">
               Share a reflection <span className="font-normal text-[#c4bdb4] normal-case tracking-normal">(optional)</span>
@@ -607,34 +752,29 @@ function LogDayModal({ open, onClose, projectId, trackerSummary, onSuccess }) {
             <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-3">
               What did you write today? <span className="font-normal text-[#c4bdb4] normal-case tracking-normal">— enter at least one</span>
             </p>
+            {/* All four fields always shown — writers log whatever they did */}
             <div className="grid grid-cols-2 gap-3">
-              {wc && (
-                <div>
-                  <label className="text-[10px] font-semibold text-[#2d6e5a] uppercase tracking-wider mb-1.5 block">Words</label>
-                  <input type="number" min="0" value={wordsToday} onChange={e => setWordsToday(e.target.value)}
-                    placeholder="e.g. 800"
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
-                    onFocus={e => e.target.style.borderColor = "#2d6e5a"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
-                </div>
-              )}
-              {ch && (
-                <div>
-                  <label className="text-[10px] font-semibold text-[#b8962e] uppercase tracking-wider mb-1.5 block">Chapters</label>
-                  <input type="number" min="0" value={chaptersToday} onChange={e => setChaptersToday(e.target.value)}
-                    placeholder="e.g. 1"
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
-                    onFocus={e => e.target.style.borderColor = "#b8962e"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
-                </div>
-              )}
-              {sc && (
-                <div>
-                  <label className="text-[10px] font-semibold text-[#6d28d9] uppercase tracking-wider mb-1.5 block">Scenes</label>
-                  <input type="number" min="0" value={scenesToday} onChange={e => setScenesToday(e.target.value)}
-                    placeholder="e.g. 2"
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
-                    onFocus={e => e.target.style.borderColor = "#6d28d9"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
-                </div>
-              )}
+              <div>
+                <label className="text-[10px] font-semibold text-[#2d6e5a] uppercase tracking-wider mb-1.5 block">Words</label>
+                <input type="number" min="0" value={wordsToday} onChange={e => setWordsToday(e.target.value)}
+                  placeholder="e.g. 800"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
+                  onFocus={e => e.target.style.borderColor = "#2d6e5a"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-[#b8962e] uppercase tracking-wider mb-1.5 block">Chapters</label>
+                <input type="number" min="0" value={chaptersToday} onChange={e => setChaptersToday(e.target.value)}
+                  placeholder="e.g. 1"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
+                  onFocus={e => e.target.style.borderColor = "#b8962e"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-[#6d28d9] uppercase tracking-wider mb-1.5 block">Scenes</label>
+                <input type="number" min="0" value={scenesToday} onChange={e => setScenesToday(e.target.value)}
+                  placeholder="e.g. 2"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
+                  onFocus={e => e.target.style.borderColor = "#6d28d9"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
+              </div>
               <div>
                 <label className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wider mb-1.5 block">Minutes</label>
                 <input type="number" min="0" value={minutesToday} onChange={e => setMinutesToday(e.target.value)}
@@ -683,7 +823,152 @@ function LogDayModal({ open, onClose, projectId, trackerSummary, onSuccess }) {
   );
 }
 
-// ─── Todo Tab ─────────────────────────────────────────────────
+// ─── Log Session Modal ────────────────────────────────────────
+// For session-tracked projects — writers log what they did in the session
+function LogSessionModal({ open, onClose, projectId, onSuccess }) {
+  const overlayRef = useRef(null);
+  const [wordsWritten, setWordsWritten]   = useState("");
+  const [chapters, setChapters]           = useState("");
+  const [scenes, setScenes]               = useState("");
+  const [minutes, setMinutes]             = useState("");
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setWordsWritten(""); setChapters(""); setScenes(""); setMinutes(""); setError("");
+    }
+  }, [open]);
+
+  function handleOverlayClick(e) {
+    if (e.target === overlayRef.current) onClose();
+  }
+
+  async function handleSubmit() {
+    setError("");
+    const words    = Number(wordsWritten) || 0;
+    const chaps    = Number(chapters)     || 0;
+    const scs      = Number(scenes)       || 0;
+    const mins     = Number(minutes)      || 0;
+
+    setLoading(true);
+    try {
+      const r = await fetch(`${API_URL}/projects/${projectId}/logSession`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wordsWritten: words, chaptersWritten: chaps, scenesWritten: scs, minutesWritten: mins }),
+      });
+      if (!r.ok) {
+        const d = await r.json();
+        setError(d.message || "Could not log the session.");
+        return;
+      }
+      onSuccess(); onClose();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div ref={overlayRef} onClick={handleOverlayClick}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-0 sm:px-4"
+      style={{ background: "rgba(30,24,16,0.45)", backdropFilter: "blur(4px)" }}>
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{ boxShadow: "0 32px 64px rgba(30,24,16,0.24), 0 8px 24px rgba(30,24,16,0.12)" }}>
+
+        <div className="bg-[#be185d] px-6 pt-5 pb-4 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-pink-200 uppercase tracking-widest font-semibold mb-0.5">Session Tracker</p>
+            <h2 className="font-serif text-xl text-white leading-tight">Log your writing session</h2>
+          </div>
+          <button onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-all">
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 pt-5 pb-2 space-y-5 overflow-y-auto max-h-[70vh]">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-3">
+              What did you do this session? <span className="font-normal text-[#c4bdb4] normal-case tracking-normal">— all optional</span>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-semibold text-[#2d6e5a] uppercase tracking-wider mb-1.5 block">Words</label>
+                <input type="number" min="0" value={wordsWritten} onChange={e => setWordsWritten(e.target.value)}
+                  placeholder="e.g. 800"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
+                  onFocus={e => e.target.style.borderColor = "#2d6e5a"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-[#b8962e] uppercase tracking-wider mb-1.5 block">Chapters</label>
+                <input type="number" min="0" value={chapters} onChange={e => setChapters(e.target.value)}
+                  placeholder="e.g. 1"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
+                  onFocus={e => e.target.style.borderColor = "#b8962e"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-[#6d28d9] uppercase tracking-wider mb-1.5 block">Scenes</label>
+                <input type="number" min="0" value={scenes} onChange={e => setScenes(e.target.value)}
+                  placeholder="e.g. 2"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
+                  onFocus={e => e.target.style.borderColor = "#6d28d9"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wider mb-1.5 block">Minutes</label>
+                <input type="number" min="0" value={minutes} onChange={e => setMinutes(e.target.value)}
+                  placeholder="e.g. 45"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#2d3748] outline-none transition-all font-semibold"
+                  onFocus={e => e.target.style.borderColor = "#9a8c7a"} onBlur={e => e.target.style.borderColor = "#e8e0d0"} />
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-500 flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+              <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              {error}
+            </p>
+          )}
+
+          <div className="flex items-start gap-2 text-[11px] text-[#9a8c7a] bg-[#fdf2f8] rounded-xl px-3.5 py-3 border border-[#fbcfe8]">
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" className="flex-shrink-0 mt-0.5">
+              <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 16v-4m0-4h.01" />
+            </svg>
+            <span className="leading-relaxed">This logs one writing session toward your session goal. All work fields are optional — fill in what you tracked.</span>
+          </div>
+        </div>
+
+        <div className="px-6 pt-3 pb-7">
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold text-white transition-all disabled:opacity-40"
+            style={{ background: loading ? "#9a8c7a" : "linear-gradient(135deg, #be185d 0%, #9d174d 100%)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <>
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Log this session
+              </>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 const PLACEHOLDER_TODOS = [
   { id: "pt1", task: "Outline your next chapter before writing it",      markComplete: false, createdAt: null },
   { id: "pt2", task: "Write the hardest scene first, while you're fresh", markComplete: false, createdAt: null },
@@ -983,10 +1268,51 @@ export default function ProjectStats() {
   const [activeTab, setActiveTab] = useState("overview");
   const [modalOpen, setModalOpen] = useState(false);
   const [logDayOpen, setLogDayOpen] = useState(false);
+  const [logSessionOpen, setLogSessionOpen] = useState(false);
+  const [joinEventOpen, setJoinEventOpen] = useState(false);
+  const [activeEvents, setActiveEvents] = useState([]);
+  const [joiningEvent, setJoiningEvent] = useState(false);
+  const [joinEventId, setJoinEventId] = useState("");
+  const [joinEventError, setJoinEventError] = useState("");
   // Track if user logged a day this session (so streak arc shows "today counted")
   const [todayDayLogged, setTodayDayLogged] = useState(false);
 
   useEffect(() => { loadDashboard(); }, [projectId]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/events/active`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const daysChallenges = (d?.events || []).filter(ev => ev.type === "DAYS_CHALLENGE");
+        setActiveEvents(daysChallenges);
+        if (daysChallenges.length > 0) setJoinEventId(String(daysChallenges[0].id));
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleJoinEvent() {
+    if (!joinEventId) return;
+    setJoiningEvent(true);
+    setJoinEventError("");
+    try {
+      const r = await fetch(`${API_URL}/projects/${projectId}/enrollEvent`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: Number(joinEventId) }),
+      });
+      if (r.ok) {
+        setJoinEventOpen(false);
+        setJoinEventError("");
+        loadDashboard();
+      } else {
+        const d = await r.json();
+        setJoinEventError(d.message || "Could not join the challenge. Please try again.");
+      }
+    } catch {
+      setJoinEventError("Network error. Please try again.");
+    }
+    finally { setJoiningEvent(false); }
+  }
 
   function loadDashboard() {
     return fetch(`${API_URL}/projects/${projectId}/dashboard`, { credentials: "include" })
@@ -1034,6 +1360,9 @@ export default function ProjectStats() {
     ...(project.progressLogs || []).map(l => ({ ...l, _type: "progress" })),
   ].sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
 
+  const dayLogs     = project.dayLogs     || [];
+  const sessionLogs = project.sessionLogs || [];
+
   const hasGoals = wc || ch || sc || ss || hasDaysTarget;
   const hasTodayGoals = wc?.dailyTarget || ch?.dailyTarget || sc?.dailyTarget || ss || hasDaysTarget;
 
@@ -1079,7 +1408,7 @@ export default function ProjectStats() {
             ← Projects
           </button>
           <div className="flex items-center gap-2">
-            {(hasDaysTarget || wc || ch || sc) && (
+            {hasDaysTarget && (
               <button onClick={() => setLogDayOpen(true)}
                 className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-full border border-[#d4af37] text-[#b8962e] bg-[#fffbeb] hover:bg-[#fef3c7] transition-all">
                 <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
@@ -1088,14 +1417,25 @@ export default function ProjectStats() {
                 Log day
               </button>
             )}
-            <button onClick={() => setModalOpen(true)}
-              className="flex items-center gap-2 text-xs font-semibold text-white px-4 py-2 rounded-full transition-all"
-              style={{ background: "linear-gradient(135deg, #2d6e5a 0%, #1e5244 100%)", boxShadow: "0 2px 8px rgba(45,110,90,0.35)" }}>
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Enter Progress
-            </button>
+            {ss && (
+              <button onClick={() => setLogSessionOpen(true)}
+                className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-full border border-[#fbcfe8] text-[#be185d] bg-[#fdf2f8] hover:bg-[#fce7f3] transition-all">
+                <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Log session
+              </button>
+            )}
+            {(wc || ch || sc) && (
+              <button onClick={() => setModalOpen(true)}
+                className="flex items-center gap-2 text-xs font-semibold text-white px-4 py-2 rounded-full transition-all"
+                style={{ background: "linear-gradient(135deg, #2d6e5a 0%, #1e5244 100%)", boxShadow: "0 2px 8px rgba(45,110,90,0.35)" }}>
+                <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Enter progress
+              </button>
+            )}
             <button onClick={() => navigate(`/projects/${projectId}/edit`)}
               className="text-xs font-semibold text-[#b8962e] hover:text-[#d4af37] transition-colors border border-[#fde68a] bg-[#fffbeb] px-3.5 py-1.5 rounded-full">
               Edit
@@ -1117,9 +1457,24 @@ export default function ProjectStats() {
                 🔥 {currentStreak} / {daysTarget} day streak
               </span>
             )}
+            {hasDaysTarget && activeEvents.length > 0 && !project.eventEntries?.length && (
+              <button onClick={() => setJoinEventOpen(true)}
+                className="text-[11px] font-semibold bg-[#fefce8] border border-[#fde68a] text-[#92680a] px-2.5 py-1 rounded-full hover:bg-[#fef3c7] transition-all flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#d97706] animate-pulse" />
+                Join challenge
+              </button>
+            )}
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl text-[#2d3748] leading-tight mb-2">{project.title}</h1>
           {project.description && <p className="text-sm text-[#9a8c7a] max-w-xl leading-relaxed">{project.description}</p>}
+          {project.createdAt && (
+            <p className="text-[11px] text-[#c4bdb4] mt-2 flex items-center gap-1.5">
+              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              Started {new Date(project.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+            </p>
+          )}
         </div>
 
         {/* ── Quick stat numbers (text only, no squares) ── */}
@@ -1352,6 +1707,20 @@ export default function ProjectStats() {
                   </div>
                 )}
 
+                {/* Streak running totals — always show (empty state when no logs) */}
+                {hasDaysTarget && (
+                  <div className="pt-6 border-t border-[#f0ebe3]">
+                    <StreakRunningTotals dayLogs={dayLogs} />
+                  </div>
+                )}
+
+                {/* Session running totals — always show (empty state when no logs) */}
+                {ss && (
+                  <div className="pt-6 border-t border-[#f0ebe3]">
+                    <SessionRunningTotals sessionLogs={sessionLogs} />
+                  </div>
+                )}
+
                 {/* Deadline arc — if no streak/session to pair with */}
                 {daysLeft !== null && !hasDaysTarget && !ss && (
                   <div className="pt-6 border-t border-[#f0ebe3]">
@@ -1405,15 +1774,27 @@ export default function ProjectStats() {
 
             {/* Action buttons */}
             <div className="flex gap-3">
-              <button onClick={() => setModalOpen(true)}
-                className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.99]"
-                style={{ background: "linear-gradient(135deg, #ea580c 0%, #c2410c 100%)", boxShadow: "0 4px 14px rgba(234,88,12,0.35)" }}>
-                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Log today's writing
-              </button>
-              {(hasDaysTarget || wc || ch || sc) && (
+              {(wc || ch || sc) && (
+                <button onClick={() => setModalOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.99]"
+                  style={{ background: "linear-gradient(135deg, #2d6e5a 0%, #1e5244 100%)", boxShadow: "0 4px 14px rgba(45,110,90,0.35)" }}>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Enter progress
+                </button>
+              )}
+              {ss && (
+                <button onClick={() => setLogSessionOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.99]"
+                  style={{ background: "linear-gradient(135deg, #be185d 0%, #9d174d 100%)", boxShadow: "0 4px 14px rgba(190,24,93,0.35)" }}>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Log session
+                </button>
+              )}
+              {hasDaysTarget && (
                 <button onClick={() => setLogDayOpen(true)}
                   className="flex items-center justify-center gap-2 px-5 py-4 rounded-2xl text-sm font-semibold border border-[#fde68a] text-[#b8962e] bg-[#fffbeb] hover:bg-[#fef3c7] transition-all">
                   <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
@@ -1516,6 +1897,20 @@ export default function ProjectStats() {
               </div>
             </div>
 
+            {/* Streak running totals in progress tab */}
+            {hasDaysTarget && dayLogs.length > 0 && (
+              <div>
+                <StreakRunningTotals dayLogs={dayLogs} />
+              </div>
+            )}
+
+            {/* Session running totals in progress tab */}
+            {ss && sessionLogs.length > 0 && (
+              <div>
+                <SessionRunningTotals sessionLogs={sessionLogs} />
+              </div>
+            )}
+
             {/* History — also visible under progress */}
             {allLogs.length > 0 && (
               <div className="bg-white rounded-3xl border border-[#e8e0d0] p-6 sm:p-8"
@@ -1560,7 +1955,144 @@ export default function ProjectStats() {
         projectId={projectId}
         trackerSummary={trackerSummary}
         onSuccess={handleDayLogSuccess}
+        dayLogs={dayLogs}
+        currentStreak={currentStreak}
+        daysTarget={daysTarget}
       />
+
+      <LogSessionModal
+        open={logSessionOpen}
+        onClose={() => setLogSessionOpen(false)}
+        projectId={projectId}
+        onSuccess={handleProgressSuccess}
+      />
+
+      {/* Join Event Modal */}
+      {joinEventOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-0 sm:px-4"
+          style={{ background: "rgba(30,24,16,0.45)", backdropFilter: "blur(4px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setJoinEventOpen(false); }}>
+          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden"
+            style={{ boxShadow: "0 32px 64px rgba(30,24,16,0.24)" }}>
+            <div className="px-6 pt-5 pb-4 border-b border-[#f0ebe3] flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-[#d97706] uppercase tracking-widest font-semibold mb-0.5">Days Challenge</p>
+                <h2 className="font-serif text-xl text-[#2d3748]">Join a challenge</h2>
+              </div>
+              <button onClick={() => { setJoinEventOpen(false); setJoinEventError(""); }}
+                className="w-7 h-7 rounded-full bg-[#f5f0ea] hover:bg-[#e8e0d0] flex items-center justify-center text-[#9a8c7a] transition-all">
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 pt-5 pb-2 space-y-4">
+              <p className="text-sm text-[#9a8c7a] leading-relaxed">
+                Write every single day of the challenge to stay on the community leaderboard. Your project will be made public.
+              </p>
+
+              {/* Eligibility checklist */}
+              {(() => {
+                const selectedEvent = activeEvents.find(ev => String(ev.id) === joinEventId);
+                const checks = selectedEvent ? [
+                  {
+                    label: "Project existed on challenge start day",
+                    pass: project.createdAt && new Date(new Date(project.createdAt).toDateString()) <= new Date(new Date(selectedEvent.startDate).toDateString()),
+                    fail: "Your project was created after the challenge started. Only projects that existed on day one can join.",
+                  },
+                  {
+                    label: "No existing streak",
+                    pass: (project.currentStreak ?? 0) === 0,
+                    fail: `Your project already has a ${project.currentStreak}-day streak. To join, your project streak must be at 0 (start fresh).`,
+                  },
+                  {
+                    label: `Consecutive days target matches challenge (${selectedEvent.daysTarget} days)`,
+                    pass: project.consecutiveDaysTarget === selectedEvent.daysTarget,
+                    fail: `Your project's days target is ${project.consecutiveDaysTarget ?? "not set"}, but this challenge requires ${selectedEvent.daysTarget}. Edit your project to set it to ${selectedEvent.daysTarget}, then try again.`,
+                  },
+                  {
+                    label: "Not already enrolled in this challenge",
+                    pass: !project.eventEntries?.some(e => String(e.eventId) === joinEventId && !e.disqualified),
+                    fail: "You already have a project in this challenge.",
+                  },
+                ] : [];
+                const allPass = checks.every(c => c.pass);
+                const firstFail = checks.find(c => !c.pass);
+                return checks.length > 0 ? (
+                  <div className="rounded-2xl border border-[#f0ebe3] bg-[#faf7f2] px-4 py-3.5 space-y-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-1">Eligibility requirements</p>
+                    {checks.map((c, i) => (
+                      <div key={i} className="flex items-start gap-2.5">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {c.pass
+                            ? <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#dcfce7"/><path stroke="#16a34a" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="M7 13l3 3 7-7"/></svg>
+                            : <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fef2f2"/><path stroke="#ef4444" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="M15 9l-6 6M9 9l6 6"/></svg>
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-[11px] font-semibold leading-snug ${c.pass ? "text-[#2d3748]" : "text-red-600"}`}>{c.label}</p>
+                          {!c.pass && <p className="text-[10px] text-red-500 mt-0.5 leading-relaxed">{c.fail}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+
+              <div className="space-y-2">
+                {activeEvents.map(ev => (
+                  <button key={ev.id} type="button" onClick={() => { setJoinEventId(String(ev.id)); setJoinEventError(""); }}
+                    className="w-full text-left rounded-2xl border px-4 py-3 transition-all"
+                    style={{
+                      borderColor: joinEventId === String(ev.id) ? "#d97706" : "#fde68a",
+                      background:  joinEventId === String(ev.id) ? "#fffbeb" : "white",
+                    }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[#2d3748]">{ev.title}</p>
+                        {ev.daysTarget && <p className="text-[11px] text-[#9a8c7a] mt-0.5">{ev.daysTarget} consecutive days</p>}
+                        {ev.startDate && (
+                          <p className="text-[10px] text-[#9a8c7a] mt-0.5">
+                            Started {new Date(ev.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+                      {ev.endDate && (
+                        <span className="text-[10px] text-[#92680a] bg-[#fef3c7] px-2 py-0.5 rounded-full flex-shrink-0">
+                          Ends {new Date(ev.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Error from server (shown after a failed join attempt) */}
+              {joinEventError && (
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+                  <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" className="flex-shrink-0 mt-0.5 text-red-400">
+                    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                  </svg>
+                  <p className="text-[12px] text-red-600 leading-relaxed">{joinEventError}</p>
+                </div>
+              )}
+            </div>
+            <div className="px-6 pt-3 pb-7 flex gap-3">
+              <button onClick={() => { setJoinEventOpen(false); setJoinEventError(""); }}
+                className="flex-1 py-3.5 rounded-2xl border border-[#e8e0d0] text-sm font-semibold text-[#9a8c7a] hover:text-[#2d3748] transition-all">
+                Cancel
+              </button>
+              <button onClick={handleJoinEvent} disabled={joiningEvent || !joinEventId}
+                className="flex-1 py-3.5 rounded-2xl text-sm font-semibold text-white transition-all disabled:opacity-40"
+                style={{ background: "linear-gradient(135deg, #d97706 0%, #b45309 100%)" }}>
+                {joiningEvent
+                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin mx-auto" />
+                  : "Join challenge"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

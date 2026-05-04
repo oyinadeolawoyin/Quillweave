@@ -30,6 +30,8 @@ import Settings from './components/profile/settings';
 import ProjectsPage from './components/projects/projectspage';
 import CreateEditProject from './components/projects/createeditproject';
 import ProjectStats from './components/projects/projectstats';
+import AdminEvents from './components/projects/adminevents';
+import EventPage from './components/projects/eventpage';
 import FeedbackHub from './components/feedbackHub/feedbackhub';
 import SubmitFeedback from './components/feedbackHub/submitFeedback';
 import FeedbackPage from './components/feedbackHub/feedbackPage';
@@ -132,6 +134,14 @@ const router = createBrowserRouter([
   { 
     path: "/projects/:projectId/edit", 
     element: <CreateEditProject /> 
+  },
+  {
+    path: "/admin/events",
+    element: <AdminEvents />
+  },
+  {
+    path: "/events/:eventId",
+    element: <EventPage />
   },
   { 
     path: "/feedback", 

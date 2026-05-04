@@ -487,100 +487,166 @@ function HeroImage() {
   );
 }
 
-// ─── Community Events Carousel ─────────────────────────────────
-const COMMUNITY_EVENTS = [
-  {
-    id: "reading-sprint",
-    tag: "Reading Sprint",
-    tagColor: "#d4af37",
-    title: "Story Genius",
-    dates: "April 22 – May 20",
-    schedule: "Every Wednesday on Discord",
-    status: "Happening now",
-    statusColor: "#4ade80",
-    description: "Every Wednesday we read Story Genius together — a craft book that teaches writers how to build stories from the inside out. Read alongside the community, share reflections, and sharpen your instincts as a writer.",
-    bg: "linear-gradient(135deg, #1a2218 0%, #1e3a2e 50%, #2d3748 100%)",
-  },
-  {
-    id: "5day-sprint",
-    tag: "Writing Challenge",
-    tagColor: "#a78bfa",
-    title: "Five Days of Writing",
-    dates: "Date coming soon",
-    schedule: "5 consecutive days on Discord",
-    status: "Coming soon",
-    statusColor: "#a78bfa",
-    description: "Five days straight. We show up together and write using the Inkwell quiet sprint room. A challenge for writers who want to break through resistance and build real momentum.",
-    bg: "linear-gradient(135deg, #1a1225 0%, #2d2048 60%, #2d3748 100%)",
-  },
-];
+// ─── Community Events Carousel (fetches from backend) ──────────
+// Converts a PlatformEvent into display metadata
+function eventToCarouselItem(ev) {
+  const typeStyles = {
+    DAYS_CHALLENGE: {
+      tagColor: "#a78bfa",
+      bg: "linear-gradient(135deg, #1a1225 0%, #2d2048 60%, #2d3748 100%)",
+    },
+    WORKSHOP: {
+      tagColor: "#34d399",
+      bg: "linear-gradient(135deg, #0d2018 0%, #1a3a2a 50%, #2d3748 100%)",
+    },
+    ANNOUNCEMENT: {
+      tagColor: "#60a5fa",
+      bg: "linear-gradient(135deg, #0f1e35 0%, #1a2e50 50%, #2d3748 100%)",
+    },
+    OTHER: {
+      tagColor: "#d4af37",
+      bg: "linear-gradient(135deg, #1a2218 0%, #1e3a2e 50%, #2d3748 100%)",
+    },
+  };
+
+  const typeLabels = {
+    DAYS_CHALLENGE: "Writing Challenge",
+    WORKSHOP:       "Workshop",
+    ANNOUNCEMENT:   "Announcement",
+    OTHER:          "Community Event",
+  };
+
+  const style = typeStyles[ev.type] || typeStyles.OTHER;
+  const now   = new Date();
+  const start = new Date(ev.startDate);
+  const end   = new Date(ev.endDate);
+
+  const isLive    = now >= start && now <= end;
+  const isUpcoming = now < start;
+  const status      = isLive ? "Happening now" : isUpcoming ? "Coming soon" : "Ended";
+  const statusColor = isLive ? "#4ade80" : isUpcoming ? "#a78bfa" : "#9a8c7a";
+
+  const formatDateRange = (s, e) => {
+    const opts = { month: "short", day: "numeric" };
+    const sStr = new Date(s).toLocaleDateString("en-US", opts);
+    const eStr = new Date(e).toLocaleDateString("en-US", opts);
+    return `${sStr} – ${eStr}`;
+  };
+
+  return {
+    id:          ev.id,
+    tag:         typeLabels[ev.type] || "Event",
+    tagColor:    style.tagColor,
+    title:       ev.title,
+    dates:       formatDateRange(ev.startDate, ev.endDate),
+    schedule:    ev.daysTarget ? `${ev.daysTarget} consecutive days` : "Check Discord for schedule",
+    status,
+    statusColor,
+    description: ev.description,
+    bg:          style.bg,
+    bannerUrl:   ev.bannerUrl || null,
+  };
+}
 
 function CommunityEventsCarousel() {
-  const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [events, setEvents]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [active, setActive]   = useState(0);
+  const [paused, setPaused]   = useState(false);
 
   useEffect(() => {
-    if (paused) return;
-    const t = setInterval(() => setActive(i => (i + 1) % COMMUNITY_EVENTS.length), 6000);
-    return () => clearInterval(t);
-  }, [paused]);
+    fetch(`${API_URL}/events/active`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const items = (d?.events || []).map(eventToCarouselItem);
+        setEvents(items);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
-  const ev = COMMUNITY_EVENTS[active];
+  useEffect(() => {
+    if (paused || events.length <= 1) return;
+    const t = setInterval(() => setActive(i => (i + 1) % events.length), 6000);
+    return () => clearInterval(t);
+  }, [paused, events.length]);
+
+  // Nothing to show
+  if (!loading && events.length === 0) return null;
+
+  const ev = events[active] || null;
 
   return (
     <section className="mb-12">
       <SectionLabel>Community events</SectionLabel>
-      <div
-        className="relative rounded-3xl overflow-hidden cursor-pointer"
-        style={{ background: ev.bg, transition: "background 0.7s ease", minHeight: 200 }}
-        onClick={() => setPaused(p => !p)}
-        title={paused ? "Click to resume" : "Click to pause"}
-      >
-        {/* texture */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 1px,transparent 14px)" }} />
-
-        <div className="relative px-6 sm:px-10 py-8 sm:py-10 flex flex-col sm:flex-row gap-6 sm:gap-10 items-start sm:items-center">
-          {/* Text */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2.5 mb-3">
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: ev.statusColor, boxShadow: `0 0 7px ${ev.statusColor}` }} />
-              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: ev.tagColor }}>{ev.tag}</span>
-              <span className="text-[10px] text-white/40 font-semibold uppercase tracking-widest">{ev.status}</span>
-            </div>
-            <h3 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">{ev.title}</h3>
-            <p className="text-white/65 text-sm leading-relaxed max-w-lg mb-4">{ev.description}</p>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-[12px] text-white/45">{ev.dates}</span>
-              <span className="w-1 h-1 rounded-full bg-white/25 flex-shrink-0" />
-              <span className="text-[12px] text-white/45">{ev.schedule}</span>
-            </div>
-          </div>
-
-          {/* Dots + pause hint */}
-          <div className="flex-shrink-0 flex flex-col items-center gap-4">
-            <div className="flex items-center gap-2">
-              {COMMUNITY_EVENTS.map((e, i) => (
-                <button
-                  key={e.id}
-                  onClick={(ev) => { ev.stopPropagation(); setActive(i); setPaused(true); }}
-                  aria-label={`Go to event ${i + 1}`}
-                  className="focus:outline-none transition-all"
-                  style={{
-                    width: i === active ? 22 : 8,
-                    height: 8,
-                    borderRadius: 4,
-                    background: i === active ? ev.tagColor : "rgba(255,255,255,0.2)",
-                    transition: "all 0.35s ease",
-                  }}
-                />
-              ))}
-            </div>
-            <p className="text-[10px] text-white/25 uppercase tracking-widest">
-              {paused ? "Paused — click to resume" : "Click card to pause"}
-            </p>
+      {loading ? (
+        <div className="rounded-3xl overflow-hidden animate-pulse" style={{ minHeight: 200, background: "#2d3748" }}>
+          <div className="px-8 py-10 space-y-4">
+            <div className="h-3 bg-white/10 rounded w-1/4" />
+            <div className="h-8 bg-white/10 rounded w-1/2" />
+            <div className="h-4 bg-white/10 rounded w-3/4" />
+            <div className="h-4 bg-white/10 rounded w-2/3" />
           </div>
         </div>
-      </div>
+      ) : ev && (
+        <div
+          className="relative rounded-3xl overflow-hidden cursor-pointer"
+          style={{ background: ev.bg, transition: "background 0.7s ease", minHeight: 200 }}
+          onClick={() => setPaused(p => !p)}
+          title={paused ? "Click to resume" : "Click to pause"}
+        >
+          {/* Banner image overlay */}
+          {ev.bannerUrl && (
+            <div className="absolute inset-0 opacity-20">
+              <img src={ev.bannerUrl} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
+          {/* Texture */}
+          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 1px,transparent 14px)" }} />
+
+          <div className="relative px-6 sm:px-10 py-8 sm:py-10 flex flex-col sm:flex-row gap-6 sm:gap-10 items-start sm:items-center">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: ev.statusColor, boxShadow: `0 0 7px ${ev.statusColor}` }} />
+                <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: ev.tagColor }}>{ev.tag}</span>
+                <span className="text-[10px] text-white/40 font-semibold uppercase tracking-widest">{ev.status}</span>
+              </div>
+              <h3 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">{ev.title}</h3>
+              <p className="text-white/65 text-sm leading-relaxed max-w-lg mb-4">{ev.description}</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-[12px] text-white/45">{ev.dates}</span>
+                <span className="w-1 h-1 rounded-full bg-white/25 flex-shrink-0" />
+                <span className="text-[12px] text-white/45">{ev.schedule}</span>
+              </div>
+            </div>
+
+            {events.length > 1 && (
+              <div className="flex-shrink-0 flex flex-col items-center gap-4">
+                <div className="flex items-center gap-2">
+                  {events.map((e, i) => (
+                    <button
+                      key={e.id}
+                      onClick={(evt) => { evt.stopPropagation(); setActive(i); setPaused(true); }}
+                      aria-label={`Go to event ${i + 1}`}
+                      className="focus:outline-none transition-all"
+                      style={{
+                        width: i === active ? 22 : 8,
+                        height: 8,
+                        borderRadius: 4,
+                        background: i === active ? ev.tagColor : "rgba(255,255,255,0.2)",
+                        transition: "all 0.35s ease",
+                      }}
+                    />
+                  ))}
+                </div>
+                <p className="text-[10px] text-white/25 uppercase tracking-widest">
+                  {paused ? "Paused — click to resume" : "Click card to pause"}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -624,9 +690,9 @@ function buildTimeLabel(utcHour24) {
 }
 
 const COMMUNITY_SCHEDULE_DATA = [
-  { day: "Wednesday", utcHour: 16, label: "Reading Sprint",  note: "Read Story Genius together to improve your craft" },
-  { day: "Friday",    utcHour: 16, label: "Writing Sprint",  note: "Come together and write using the Inkwell quiet sprint room" },
-  { day: "Saturday",  utcHour: 16, label: "Writing Sprint",  note: "Come together and write using the Inkwell quiet sprint room" },
+  { day: "Wednesday", utcHour: 16, label: "Reading Sprint",     note: "Read Story Genius together to improve your craft" },
+  { day: "Friday",    utcHour: 16, label: "Writing Sprint",     note: "Come together and write using the Inkwell quiet sprint room" },
+  { day: "Saturday",  utcHour: 16, label: "Feedback Session",   note: "Share your work and give thoughtful feedback to fellow writers" },
 ];
 
 export function CommunitySchedule({ discordInviteLink }) {
@@ -846,18 +912,15 @@ export default function Homepage() {
         <section className="mb-10"><WeeklySchedule /></section>
 
         {/* Community sprint times + Discord link */}
-        <CommunitySchedule />
+        <CommunitySchedule discordInviteLink={DISCORD_INVITE_LINK} />
+
+        {/* Community events — fetched from backend — reading & writing challenges */}
+        <CommunityEventsCarousel />
 
         {/* Community projects — habit tracking and progress tracking separated */}
         <section className="mb-12"><CommunityProjects /></section>
 
         <section className="mb-12"><ContributeSoundscape /></section>
-
-        {/* Discord community banner */}
-        <DiscordBanner />
-
-        {/* Community events — reading & writing challenges */}
-        <CommunityEventsCarousel />
 
         {!user && (
           <section

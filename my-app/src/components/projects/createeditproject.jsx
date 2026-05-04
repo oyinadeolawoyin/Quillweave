@@ -141,7 +141,7 @@ export default function CreateEditProject() {
     sessionGoalType: "WEEKLY", sessionGoalCount: "",
     consecutiveDaysTarget: "",
   });
-  const [trackingKey, setTrackingKey] = useState("none");
+  const [trackingKey, setTrackingKey] = useState("words");
   const [errors, setErrors]   = useState({});
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(isEdit);
@@ -184,11 +184,27 @@ export default function CreateEditProject() {
     if (form.deadline && new Date(form.deadline) <= new Date()) e.deadline = "Deadline must be a future date.";
     if (form.daysPerWeek && (Number(form.daysPerWeek) < 1 || Number(form.daysPerWeek) > 7)) e.daysPerWeek = "Must be between 1 and 7.";
 
-    if (trackingKey === "words"    && form.targetWordCount    && Number(form.targetWordCount)    <= 0) e.targetWordCount = "Must be a positive number.";
-    if (trackingKey === "chapters" && form.targetChapters     && Number(form.targetChapters)     <= 0) e.targetChapters = "Must be a positive number.";
-    if (trackingKey === "scenes"   && form.targetScenes       && Number(form.targetScenes)       <= 0) e.targetScenes = "Must be a positive number.";
-    if (trackingKey === "sessions" && form.sessionGoalCount   && Number(form.sessionGoalCount)   <= 0) e.sessionGoalCount = "Must be a positive number.";
-    if (trackingKey === "days"     && form.consecutiveDaysTarget && Number(form.consecutiveDaysTarget) <= 0) e.consecutiveDaysTarget = "Must be a positive number.";
+    // Required fields per tracking type — without these, project stats can't display progress
+    if (trackingKey === "words") {
+      if (!form.targetWordCount || Number(form.targetWordCount) <= 0)
+        e.targetWordCount = "Target word count is required to track progress.";
+    }
+    if (trackingKey === "chapters") {
+      if (!form.targetChapters || Number(form.targetChapters) <= 0)
+        e.targetChapters = "Target chapters is required to track progress.";
+    }
+    if (trackingKey === "scenes") {
+      if (!form.targetScenes || Number(form.targetScenes) <= 0)
+        e.targetScenes = "Target scenes is required to track progress.";
+    }
+    if (trackingKey === "sessions") {
+      if (!form.sessionGoalCount || Number(form.sessionGoalCount) <= 0)
+        e.sessionGoalCount = "Session count goal is required to track progress.";
+    }
+    if (trackingKey === "days") {
+      if (!form.consecutiveDaysTarget || Number(form.consecutiveDaysTarget) <= 0)
+        e.consecutiveDaysTarget = "Consecutive days target is required for streak tracking.";
+    }
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -199,14 +215,16 @@ export default function CreateEditProject() {
     if (!validate()) return;
     setLoading(true);
 
+    const hasDeadlineFields = ["words", "chapters", "scenes"].includes(trackingKey);
+
     const payload = {
       title:       form.title,
       description: form.description,
       link:        form.link,
       genre:       form.genre,
       visibility:  form.visibility,
-      deadline:    form.deadline || null,
-      daysPerWeek: Number(form.daysPerWeek),
+      deadline:    hasDeadlineFields ? (form.deadline || null) : null,
+      daysPerWeek: hasDeadlineFields ? Number(form.daysPerWeek) : null,
       phase:       form.phase || "DRAFTING",
       ...(isEdit && { status: form.status }),
       targetWordCount:       null,
@@ -236,7 +254,7 @@ export default function CreateEditProject() {
         : `${API_URL}/projects/createProject`;
 
       const res = await fetch(url, {
-        method: "POST",
+        method:"POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload),
@@ -437,7 +455,7 @@ export default function CreateEditProject() {
             {/* ── Tracking detail inputs ── */}
             {trackingKey === "words" && (
               <div className="space-y-4 pt-2 border-t border-[#f0ebe3]">
-                <InputField label="Target word count" error={errors.targetWordCount}>
+                <InputField label="Target word count *" error={errors.targetWordCount}>
                   <input
                     type="number" value={form.targetWordCount} onChange={e => set("targetWordCount", e.target.value)}
                     placeholder="85,000" min="1"
@@ -460,7 +478,7 @@ export default function CreateEditProject() {
 
             {trackingKey === "chapters" && (
               <div className="space-y-4 pt-2 border-t border-[#f0ebe3]">
-                <InputField label="Target chapters" error={errors.targetChapters}>
+                <InputField label="Target chapters *" error={errors.targetChapters}>
                   <input
                     type="number" value={form.targetChapters} onChange={e => set("targetChapters", e.target.value)}
                     placeholder="30" min="1"
@@ -475,7 +493,7 @@ export default function CreateEditProject() {
 
             {trackingKey === "scenes" && (
               <div className="space-y-4 pt-2 border-t border-[#f0ebe3]">
-                <InputField label="Target scenes" error={errors.targetScenes}>
+                <InputField label="Target scenes *" error={errors.targetScenes}>
                   <input
                     type="number" value={form.targetScenes} onChange={e => set("targetScenes", e.target.value)}
                     placeholder="90" min="1"
@@ -497,7 +515,7 @@ export default function CreateEditProject() {
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <InputField label="Session count goal" hint="e.g. 5 sessions" error={errors.sessionGoalCount}>
+                  <InputField label="Session count goal *" hint="e.g. 5 sessions" error={errors.sessionGoalCount}>
                     <input
                       type="number" value={form.sessionGoalCount} onChange={e => set("sessionGoalCount", e.target.value)}
                       placeholder="5" min="1"
@@ -533,7 +551,7 @@ export default function CreateEditProject() {
                     Each day you log writing advances your streak. Miss a day and it resets to zero.
                   </p>
                 </div>
-                <InputField label="Consecutive days target" hint="How many days in a row do you want to write?" error={errors.consecutiveDaysTarget}>
+                <InputField label="Consecutive days target *" hint="How many days in a row do you want to write?" error={errors.consecutiveDaysTarget}>
                   <input
                     type="number" value={form.consecutiveDaysTarget} onChange={e => set("consecutiveDaysTarget", e.target.value)}
                     placeholder="30" min="1"
