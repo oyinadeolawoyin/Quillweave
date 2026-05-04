@@ -51,7 +51,7 @@ export default function AdminEvents() {
         credentials: "include",
       });
       const data = await res.json();
-      setEvents(data.events || []);
+      setEvents(data.events || []); console.log("evens", data);
     } catch {
       setError("Failed to load events.");
     } finally {
@@ -112,7 +112,7 @@ export default function AdminEvents() {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      const data = await res.json(); console.log("dta", data);
       if (!res.ok) {
         setError(data.message || "Something went wrong.");
         return;
