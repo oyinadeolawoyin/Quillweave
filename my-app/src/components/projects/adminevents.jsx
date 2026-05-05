@@ -1,493 +1,587 @@
-import { useState, useEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../auth/authContext";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import Header from "../profile/header";
+import API_URL from "../../config/api";
 
-const API = import.meta.env.VITE_API_URL;
+// ─── Helpers ──────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+function fmtDateShort(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  return Math.max(0, Math.ceil((new Date(dateStr) - Date.now()) / (1000 * 60 * 60 * 24)));
+}
+function fmt(n) { return (n ?? 0).toLocaleString(); }
 
-const EVENT_TYPES = ["DAYS_CHALLENGE", "ANNOUNCEMENT", "WORKSHOP", "OTHER"];
+// ─── Arc Progress ─────────────────────────────────────────────
+function ArcProgress({ percent = 0, size = 80, color = "#d4af37", trackColor = "rgba(212,175,55,0.15)", strokeW = 7, children }) {
+  const r = (size - strokeW) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (Math.min(percent, 100) / 100) * circ;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={strokeW} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={strokeW}
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 1.6s cubic-bezier(.4,0,.2,1)" }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-1">
+        {children}
+      </div>
+    </div>
+  );
+}
 
-const emptyForm = {
-  title: "",
-  description: "",
-  bannerUrl: "",
-  type: "DAYS_CHALLENGE",
-  daysTarget: "",
-  startDate: "",
-  endDate: "",
-  isActive: true,
+// ─── Fade-in wrapper ──────────────────────────────────────────
+function FadeIn({ children, delay = 0, className = "" }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), delay);
+    return () => clearTimeout(t);
+  }, [delay]);
+  return (
+    <div className={className} style={{
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(20px)",
+      transition: "opacity 0.6s ease, transform 0.6s ease",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Role badge ───────────────────────────────────────────────
+const ROLE_CONFIG = {
+  IRON_PEN:      { label: "Iron Pen",      emoji: "⚔️",  color: "#c4b5fd", bg: "rgba(109,40,217,0.12)", border: "rgba(196,181,253,0.4)" },
+  CHAMPION:      { label: "Champion",      emoji: "🏆",  color: "#d4af37", bg: "rgba(212,175,55,0.12)", border: "rgba(212,175,55,0.4)" },
+  STREAK_KEEPER: { label: "Streak Keeper", emoji: "🔥",  color: "#6ee7b7", bg: "rgba(16,185,129,0.12)", border: "rgba(110,231,183,0.4)" },
 };
 
-export default function AdminEvents() {
-  const { user, token } = useContext(AuthContext);
-  const navigate = useNavigate();
+function RoleBadge({ role }) {
+  const cfg = ROLE_CONFIG[role] || ROLE_CONFIG.STREAK_KEEPER;
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border"
+      style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}>
+      <span>{cfg.emoji}</span> {cfg.label}
+    </span>
+  );
+}
 
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+// ─── Leaderboard row ──────────────────────────────────────────
+function LeaderboardRow({ entry, index, daysTarget }) {
+  const pct = daysTarget > 0 ? Math.min(Math.round((entry.streak / daysTarget) * 100), 100) : 0;
+  const isTop3 = index < 3;
+  const medals = ["🥇", "🥈", "🥉"];
 
-  // Redirect non-admins immediately
+  return (
+    <FadeIn delay={60 + index * 40}>
+      <div className={`flex items-center gap-3 py-3 px-4 rounded-2xl transition-all ${
+        isTop3
+          ? "bg-white/5 border border-white/10"
+          : "hover:bg-white/5"
+      }`}>
+        <div className="w-7 text-center flex-shrink-0">
+          {index < 3
+            ? <span className="text-base">{medals[index]}</span>
+            : <span className="text-xs font-bold text-white/40">{index + 1}</span>}
+        </div>
+
+        <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden border-2"
+          style={{ borderColor: isTop3 ? "rgba(212,175,55,0.4)" : "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.1)" }}>
+          {entry.avatar
+            ? <img src={entry.avatar} alt={entry.username} className="w-full h-full object-cover" />
+            : <span className="text-white">{(entry.username || "?").charAt(0).toUpperCase()}</span>}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white truncate">@{entry.username}</p>
+          <p className="text-xs text-white/50 truncate">{entry.projectTitle}</p>
+        </div>
+
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="hidden sm:block">
+            <div className="w-28 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${pct}%`, background: "linear-gradient(90deg, #d4af37, #f0c040)" }} />
+            </div>
+            <p className="text-[10px] text-white/40 mt-0.5 text-right">{pct}%</p>
+          </div>
+          <div className="text-right">
+            <p className="text-base font-bold" style={{ color: "#d4af37" }}>{entry.streak}</p>
+            <p className="text-[10px] text-white/40">days</p>
+          </div>
+        </div>
+      </div>
+    </FadeIn>
+  );
+}
+
+// ─── Winner card ──────────────────────────────────────────────
+function WinnerCard({ winner, index }) {
+  const isChampion = winner.challengeRole === "CHAMPION";
+  const isIronPen  = winner.challengeRole === "IRON_PEN";
+
+  return (
+    <FadeIn delay={80 + index * 60}>
+      <div className={`relative rounded-2xl p-5 border transition-all ${
+        isIronPen
+          ? "bg-gradient-to-br from-purple-900/30 to-purple-800/10 border-purple-500/20"
+          : isChampion
+          ? "bg-gradient-to-br from-[#d4af37]/15 to-[#d4af37]/5 border-[#d4af37]/25"
+          : "bg-white/5 border-white/10"
+      }`}>
+        <div className="flex items-center gap-4">
+          {/* Rank */}
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+            style={{
+              background: index === 0 ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.08)",
+              color: index === 0 ? "#d4af37" : "rgba(255,255,255,0.4)",
+              border: `1px solid ${index === 0 ? "rgba(212,175,55,0.4)" : "rgba(255,255,255,0.1)"}`,
+            }}>
+            {index + 1}
+          </div>
+
+          {/* Avatar */}
+          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden border-2"
+            style={{ borderColor: isIronPen ? "rgba(196,181,253,0.5)" : isChampion ? "rgba(212,175,55,0.5)" : "rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.1)" }}>
+            {winner.user?.avatar
+              ? <img src={winner.user.avatar} alt={winner.username} className="w-full h-full object-cover" />
+              : <span>{(winner.username || "?").charAt(0).toUpperCase()}</span>}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white truncate">@{winner.username}</p>
+            <p className="text-xs text-white/50 truncate">{winner.projectTitle}</p>
+          </div>
+
+          {/* Stats + badge */}
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            <RoleBadge role={winner.challengeRole} />
+            <div className="flex items-center gap-3">
+              {winner.finalStreak > 0 && (
+                <span className="text-xs font-bold" style={{ color: "#d4af37" }}>🔥 {winner.finalStreak}d</span>
+              )}
+              {winner.totalWords > 0 && (
+                <span className="text-xs text-white/40">{fmt(winner.totalWords)}w</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </FadeIn>
+  );
+}
+
+// ─── Community Progress Ring ──────────────────────────────────
+function CommunityRing({ communityStreak, daysTarget, participantCount }) {
+  const pct = daysTarget > 0 ? Math.min(Math.round((communityStreak / daysTarget) * 100), 100) : 0;
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-8">
+      <div className="relative">
+        <ArcProgress percent={pct} size={120} color="#d4af37" trackColor="rgba(212,175,55,0.15)" strokeW={9}>
+          <span className="font-serif font-bold text-white leading-none" style={{ fontSize: 26 }}>{communityStreak}</span>
+          <span className="text-white/50 leading-none" style={{ fontSize: 10 }}>of {daysTarget}</span>
+        </ArcProgress>
+        {/* Glow behind ring */}
+        <div className="absolute inset-0 rounded-full pointer-events-none"
+          style={{ boxShadow: "0 0 32px rgba(212,175,55,0.25)" }} />
+      </div>
+      <div>
+        <p className="text-[10px] uppercase tracking-widest font-bold mb-1" style={{ color: "#d4af37" }}>Community Progress</p>
+        <p className="font-serif text-3xl font-bold text-white">Day {communityStreak}</p>
+        <p className="text-sm text-white/60 mt-1">
+          of {daysTarget} · {participantCount} writer{participantCount !== 1 ? "s" : ""} in sync · {pct}% done
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Stat Pill ────────────────────────────────────────────────
+function StatPill({ label, value, emoji }) {
+  return (
+    <div className="flex flex-col items-center gap-1 px-5 py-4 rounded-2xl border"
+      style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)" }}>
+      <span className="text-xl">{emoji}</span>
+      <p className="font-serif font-bold text-2xl text-white">{value}</p>
+      <p className="text-[10px] uppercase tracking-widest text-white/40 font-semibold">{label}</p>
+    </div>
+  );
+}
+
+// ─── Main Event Page ──────────────────────────────────────────
+export default function EventPage() {
+  const { eventId } = useParams();
+  const navigate    = useNavigate();
+
+  const [event,         setEvent]         = useState(null);
+  const [communityData, setCommunityData] = useState(null);
+  const [winnersData,   setWinnersData]   = useState(null);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState("");
+
   useEffect(() => {
-    if (user && user.role !== "ADMIN") {
-      navigate("/");
-    }
-  }, [user, navigate]);
+    if (!eventId) return;
+    loadEvent();
+  }, [eventId]);
 
-  useEffect(() => {
-    if (user?.role === "ADMIN") fetchEvents();
-  }, [user]);
-
-  async function fetchEvents() {
+  async function loadEvent() {
     setLoading(true);
+    setError("");
     try {
-      const res = await fetch(`${API}/events/admin/all`, {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      const data = await res.json();
-      setEvents(data.events || []); console.log("evens", data);
+      const res = await fetch(`${API_URL}/events/${eventId}`);
+      if (!res.ok) { setError("Event not found."); setLoading(false); return; }
+      const { event: ev } = await res.json();
+      setEvent(ev);
+
+      if (ev.type === "DAYS_CHALLENGE") {
+        const [streakRes, winnersRes] = await Promise.allSettled([
+          fetch(`${API_URL}/events/${eventId}/communityStreak`),
+          fetch(`${API_URL}/events/${eventId}/winners`),
+        ]);
+        if (streakRes.status === "fulfilled" && streakRes.value.ok)
+          setCommunityData(await streakRes.value.json());
+        if (winnersRes.status === "fulfilled" && winnersRes.value.ok)
+          setWinnersData(await winnersRes.value.json());
+      }
     } catch {
-      setError("Failed to load events.");
+      setError("Something went wrong loading this event.");
     } finally {
       setLoading(false);
     }
   }
 
-  function openCreate() {
-    setEditingEvent(null);
-    setForm(emptyForm);
-    setError("");
-    setSuccessMsg("");
-    setShowForm(true);
+  const isChallenge    = event?.type === "DAYS_CHALLENGE";
+  const isActive       = event?.isActive && new Date(event.endDate) > new Date();
+  const isEnded        = !isActive && event;
+  const daysLeft       = event ? daysUntil(event.endDate) : null;
+  const hasWinners     = winnersData?.winners?.length > 0;
+  const hasLeaderboard = communityData?.leaderboard?.length > 0;
+
+  function getTypeInfo(type) {
+    if (type === "DAYS_CHALLENGE") return { label: "Days Challenge", emoji: "🔥", color: "#d4af37" };
+    if (type === "WORKSHOP")       return { label: "Workshop",        emoji: "🎓", color: "#6ee7b7" };
+    if (type === "ANNOUNCEMENT")   return { label: "Announcement",    emoji: "📣", color: "#93c5fd" };
+    return                                { label: "Event",           emoji: "✨", color: "#c4b5fd" };
   }
 
-  function openEdit(ev) {
-    setEditingEvent(ev);
-    setForm({
-      title: ev.title,
-      description: ev.description,
-      bannerUrl: ev.bannerUrl || "",
-      type: ev.type,
-      daysTarget: ev.daysTarget || "",
-      startDate: ev.startDate ? ev.startDate.slice(0, 10) : "",
-      endDate: ev.endDate ? ev.endDate.slice(0, 10) : "",
-      isActive: ev.isActive,
-    });
-    setError("");
-    setSuccessMsg("");
-    setShowForm(true);
-  }
-
-  function closeForm() {
-    setShowForm(false);
-    setEditingEvent(null);
-    setError("");
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setSubmitting(true);
-
-    try {
-      const url = editingEvent
-        ? `${API}/events/admin/${editingEvent.id}/update`
-        : `${API}/events/admin/create`;
-
-      const body = {
-        ...form,
-        daysTarget: form.daysTarget ? Number(form.daysTarget) : undefined,
-      };
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json(); console.log("dta", data);
-      if (!res.ok) {
-        setError(data.message || "Something went wrong.");
-        return;
-      }
-
-      setSuccessMsg(editingEvent ? "Event updated!" : "Event created!");
-      setShowForm(false);
-      fetchEvents();
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleDelete(eventId) {
-    try {
-      const res = await fetch(`${API}/events/admin/${eventId}/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error();
-      setDeleteConfirm(null);
-      setSuccessMsg("Event deleted.");
-      fetchEvents();
-    } catch {
-      setError("Failed to delete event.");
-    }
-  }
-
-  async function toggleActive(ev) {
-    try {
-      const res = await fetch(`${API}/events/admin/${ev.id}/update`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ isActive: !ev.isActive }),
-      });
-      if (!res.ok) throw new Error();
-      fetchEvents();
-    } catch {
-      setError("Failed to update event.");
-    }
-  }
-
-  if (!user || user.role !== "ADMIN") return null;
-
-  const typeColors = {
-    DAYS_CHALLENGE: "bg-pink-100 text-pink-700",
-    ANNOUNCEMENT: "bg-blue-100 text-blue-700",
-    WORKSHOP: "bg-yellow-100 text-yellow-700",
-    OTHER: "bg-gray-100 text-gray-600",
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f5f0eb]">
+  // ── Loading ────────────────────────────────────────────────
+  if (loading) return (
+    <div className="min-h-screen" style={{ background: "linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #1a202c 100%)" }}>
       <Header />
-      {/* Page sub-header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/")}
-            className="text-gray-400 hover:text-gray-700 transition-colors text-sm"
-          >
-            ← Back
-          </button>
-          <h1 className="text-xl font-bold text-gray-900">Events Admin</h1>
+      <div className="flex items-center justify-center py-40">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: "rgba(212,175,55,0.3)", borderTopColor: "#d4af37" }} />
+          <p className="text-sm text-white/50">Loading event...</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="bg-[#c0392b] text-white px-4 py-2 rounded-xl font-semibold text-sm hover:bg-[#a93226] transition-colors"
-        >
-          + New Event
+      </div>
+    </div>
+  );
+
+  if (error || !event) return (
+    <div className="min-h-screen" style={{ background: "linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #1a202c 100%)" }}>
+      <Header />
+      <div className="max-w-3xl mx-auto px-4 py-32 text-center">
+        <p className="text-4xl mb-4">🌙</p>
+        <p className="text-white/60 mb-6">{error || "Event not found."}</p>
+        <button onClick={() => navigate("/snippets")}
+          className="px-6 py-2.5 rounded-xl text-sm font-semibold text-[#1a202c] transition-all hover:scale-105"
+          style={{ background: "linear-gradient(135deg, #d4af37, #f0c040)" }}>
+          Back to Community
         </button>
       </div>
+    </div>
+  );
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {successMsg && (
-          <div className="mb-4 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
-            {successMsg}
+  const typeInfo = getTypeInfo(event.type);
+
+  return (
+    <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #1a202c 0%, #243048 40%, #1e2a3a 100%)" }}>
+      <Header />
+
+      {/* ── HERO SECTION ───────────────────────────────────── */}
+      <div className="relative overflow-hidden">
+        {/* Background texture */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.08) 0%, transparent 60%),
+                              radial-gradient(ellipse at 80% 20%, rgba(45,55,72,0.6) 0%, transparent 60%)`,
+          }} />
+
+        {/* Banner image overlay */}
+        {event.bannerUrl && (
+          <div className="absolute inset-0">
+            <img src={event.bannerUrl} alt="" className="w-full h-full object-cover opacity-10" />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(26,32,44,0.3), rgba(26,32,44,0.95))" }} />
           </div>
         )}
-        {error && !showForm && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-            {error}
-          </div>
-        )}
 
-        {loading ? (
-          <div className="text-center py-20 text-gray-400">Loading events…</div>
-        ) : events.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-gray-400 mb-4">No events yet.</p>
-            <button
-              onClick={openCreate}
-              className="bg-[#c0392b] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#a93226] transition-colors"
-            >
-              Create your first event
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {events.map((ev) => (
-              <div
-                key={ev.id}
-                className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span
-                        className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          typeColors[ev.type] || typeColors.OTHER
-                        }`}
-                      >
-                        {ev.type.replace("_", " ")}
-                      </span>
-                      {ev.type === "DAYS_CHALLENGE" && ev.daysTarget && (
-                        <span className="text-xs bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full font-medium">
-                          {ev.daysTarget} days
-                        </span>
-                      )}
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          ev.isActive
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {ev.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-gray-900 text-lg truncate">{ev.title}</h3>
-                    <p className="text-gray-500 text-sm mt-1 line-clamp-2">{ev.description}</p>
-                    <p className="text-xs text-gray-400 mt-2">
-                      {new Date(ev.startDate).toLocaleDateString()} →{" "}
-                      {new Date(ev.endDate).toLocaleDateString()}
-                      {ev._count && (
-                        <span className="ml-3 font-medium text-gray-500">
-                          {ev._count.entries} entries
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => toggleActive(ev)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
-                        ev.isActive
-                          ? "border-gray-200 text-gray-600 hover:bg-gray-50"
-                          : "border-green-300 text-green-700 hover:bg-green-50"
-                      }`}
-                    >
-                      {ev.isActive ? "Deactivate" : "Activate"}
-                    </button>
-                    <button
-                      onClick={() => openEdit(ev)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm(ev)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-16">
+          {/* Back link */}
+          <FadeIn delay={0}>
+            <Link to="/snippets"
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-white/40 hover:text-white/80 transition-colors mb-8">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              Community
+            </Link>
+          </FadeIn>
+
+          <div className="grid lg:grid-cols-[1fr_360px] gap-10 lg:gap-16 items-start">
+            {/* Left — Title & meta */}
+            <div>
+              <FadeIn delay={60}>
+                <div className="flex flex-wrap items-center gap-2 mb-5">
+                  {/* Type badge */}
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border"
+                    style={{ color: typeInfo.color, background: `${typeInfo.color}18`, borderColor: `${typeInfo.color}35` }}>
+                    <span>{typeInfo.emoji}</span> {typeInfo.label}
+                  </span>
+                  {/* Status */}
+                  <span className="text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border"
+                    style={isActive
+                      ? { color: "#6ee7b7", background: "rgba(110,231,183,0.1)", borderColor: "rgba(110,231,183,0.25)" }
+                      : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}>
+                    {isActive ? "● Live" : "Ended"}
+                  </span>
+                  {/* Days left */}
+                  {isActive && daysLeft !== null && (
+                    <span className="text-[11px] font-semibold text-white/50">
+                      {daysLeft === 0 ? "Last day!" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining`}
+                    </span>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </FadeIn>
 
-      {/* Create/Edit Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div>
-                <p className="text-xs font-semibold text-[#c0392b] uppercase tracking-widest">
-                  {editingEvent ? "Edit Event" : "New Event"}
-                </p>
-                <h2 className="text-lg font-bold text-gray-900">
-                  {editingEvent ? editingEvent.title : "Create a platform event"}
-                </h2>
-              </div>
-              <button
-                onClick={closeForm}
-                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"
-              >
-                ✕
-              </button>
+              <FadeIn delay={100}>
+                <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-4">
+                  {event.title}
+                </h1>
+              </FadeIn>
+
+              <FadeIn delay={140}>
+                <div className="text-base text-white/60 leading-relaxed max-w-xl mb-8">
+                  {event.description.split("\n").map((line, i) =>
+                    line.trim() === ""
+                      ? <br key={i} />
+                      : <p key={i}>{line}</p>
+                  )}
+                </div>
+              </FadeIn>
+
+              {/* Date pills */}
+              <FadeIn delay={160}>
+                <div className="flex flex-wrap gap-3">
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border"
+                    style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)" }}>
+                    <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div>
+                      <p className="text-[9px] text-white/30 uppercase tracking-widest font-semibold">Start</p>
+                      <p className="text-xs font-semibold text-white/80">{fmtDate(event.startDate)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border"
+                    style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)" }}>
+                    <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="text-[9px] text-white/30 uppercase tracking-widest font-semibold">End</p>
+                      <p className="text-xs font-semibold text-white/80">{fmtDate(event.endDate)}</p>
+                    </div>
+                  </div>
+                  {isChallenge && event.daysTarget && (
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border"
+                      style={{ background: "rgba(212,175,55,0.06)", borderColor: "rgba(212,175,55,0.2)" }}>
+                      <span className="text-sm">🎯</span>
+                      <div>
+                        <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "rgba(212,175,55,0.6)" }}>Target</p>
+                        <p className="text-xs font-semibold" style={{ color: "#d4af37" }}>{event.daysTarget} consecutive days</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </FadeIn>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-                  {error}
+            {/* Right — Live stats card */}
+            {isChallenge && isActive && communityData && communityData.participantCount > 0 && (
+              <FadeIn delay={200}>
+                <div className="rounded-3xl border overflow-hidden"
+                  style={{ background: "rgba(212,175,55,0.05)", borderColor: "rgba(212,175,55,0.2)", boxShadow: "0 0 40px rgba(212,175,55,0.08)" }}>
+                  {/* Gold top bar */}
+                  <div className="h-1 w-full"
+                    style={{ background: "linear-gradient(90deg, #b8962e, #d4af37, #f0c040, #d4af37, #b8962e)" }} />
+                  <div className="p-6">
+                    <p className="text-[10px] uppercase tracking-widest font-bold mb-5" style={{ color: "#d4af37" }}>Live Community Progress</p>
+                    <CommunityRing
+                      communityStreak={communityData.communityStreak}
+                      daysTarget={communityData.daysTarget}
+                      participantCount={communityData.participantCount}
+                    />
+                  </div>
                 </div>
-              )}
+              </FadeIn>
+            )}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                  Event Type
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {EVENT_TYPES.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, type: t }))}
-                      className={`py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
-                        form.type === t
-                          ? "border-[#c0392b] bg-red-50 text-[#c0392b]"
-                          : "border-gray-200 text-gray-600 hover:border-gray-300"
-                      }`}
-                    >
-                      {t.replace("_", " ")}
-                    </button>
+            {/* Right — Ended summary */}
+            {isChallenge && isEnded && hasWinners && (
+              <FadeIn delay={200}>
+                <div className="rounded-3xl border overflow-hidden"
+                  style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)" }}>
+                  <div className="h-1 w-full"
+                    style={{ background: "linear-gradient(90deg, #6d28d9, #d4af37, #be185d)" }} />
+                  <div className="p-6">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-3">Challenge Summary</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <StatPill label="Finishers" value={winnersData.winners.length} emoji="🏅" />
+                      <StatPill label="Days" value={winnersData.daysTarget ?? "—"} emoji="📅" />
+                      <StatPill
+                        label="Top Words"
+                        value={fmt(Math.max(...winnersData.winners.map(w => w.totalWords || 0)))}
+                        emoji="✍️"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </FadeIn>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── DIVIDER ────────────────────────────────────────── */}
+      <div className="relative">
+        <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.2), transparent)" }} />
+      </div>
+
+      {/* ── CONTENT SECTION ────────────────────────────────── */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 space-y-10">
+
+        {/* ── Winners shoutout ─── */}
+        {isChallenge && isEnded && hasWinners && (
+          <FadeIn delay={60}>
+            <section>
+              <div className="flex items-end justify-between mb-6">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest font-bold mb-1" style={{ color: "#d4af37" }}>
+                    Challenge Complete
+                  </p>
+                  <h2 className="font-serif text-2xl font-bold text-white">Hall of Fame</h2>
+                  <p className="text-sm text-white/50 mt-1">Writers who kept the chain alive</p>
+                </div>
+                {/* Role legend */}
+                <div className="hidden sm:flex items-center gap-4">
+                  {Object.entries(ROLE_CONFIG).map(([key, cfg]) => (
+                    <div key={key} className="flex items-center gap-1.5">
+                      <span className="text-sm">{cfg.emoji}</span>
+                      <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.4)" }}>{cfg.label}</span>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                  Title *
-                </label>
-                <input
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  required
-                  placeholder="e.g. 30-Day Writing Challenge"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#c0392b]/20 focus:border-[#c0392b]"
-                />
+              {/* Mobile legend */}
+              <div className="sm:hidden flex flex-wrap gap-3 mb-5">
+                {Object.entries(ROLE_CONFIG).map(([key, cfg]) => (
+                  <div key={key} className="flex items-center gap-1.5">
+                    <span>{cfg.emoji}</span>
+                    <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.4)" }}>{cfg.label}</span>
+                  </div>
+                ))}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                  Description *
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  required
-                  rows={3}
-                  placeholder="Describe the event..."
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#c0392b]/20 focus:border-[#c0392b] resize-none"
-                />
+              <div className="space-y-3">
+                {winnersData.winners.map((winner, i) => (
+                  <WinnerCard key={winner.userId || i} winner={winner} index={i} />
+                ))}
+              </div>
+            </section>
+          </FadeIn>
+        )}
+
+        {/* ── Live leaderboard ─── */}
+        {isChallenge && isActive && hasLeaderboard && (
+          <FadeIn delay={80}>
+            <section>
+              <div className="mb-6">
+                <p className="text-[10px] uppercase tracking-widest font-bold mb-1" style={{ color: "#d4af37" }}>
+                  Live Leaderboard
+                </p>
+                <h2 className="font-serif text-2xl font-bold text-white">Writers in this challenge</h2>
+                <p className="text-sm text-white/50 mt-1">Ranked by streak — miss a day and the chain breaks</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                  Banner Image URL (optional)
-                </label>
-                <input
-                  value={form.bannerUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, bannerUrl: e.target.value }))}
-                  placeholder="https://..."
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#c0392b]/20 focus:border-[#c0392b]"
-                />
-              </div>
-
-              {form.type === "DAYS_CHALLENGE" && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                    Days Target *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.daysTarget}
-                    onChange={(e) => setForm((f) => ({ ...f, daysTarget: e.target.value }))}
-                    required
-                    placeholder="e.g. 30"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#c0392b]/20 focus:border-[#c0392b]"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    How many consecutive days writers need to hit to complete the challenge.
-                  </p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                    Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={form.startDate}
-                    onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-                    required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#c0392b]/20 focus:border-[#c0392b]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                    End Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={form.endDate}
-                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-                    required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#c0392b]/20 focus:border-[#c0392b]"
-                  />
+              <div className="rounded-3xl border overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.08)" }}>
+                <div className="p-2">
+                  {communityData.leaderboard.map((entry, i) => (
+                    <LeaderboardRow key={entry.projectId} entry={entry} index={i} daysTarget={communityData.daysTarget} />
+                  ))}
                 </div>
               </div>
+            </section>
+          </FadeIn>
+        )}
 
-              {editingEvent && (
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                  <label className="text-sm font-medium text-gray-700 flex-1">
-                    Event is active
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, isActive: !f.isActive }))}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${
-                      form.isActive ? "bg-green-500" : "bg-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                        form.isActive ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-[#c0392b] text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-[#a93226] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-              >
-                {submitting
-                  ? "Saving…"
-                  : editingEvent
-                  ? "Save Changes"
-                  : "Create Event"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-            <h3 className="font-bold text-gray-900 text-lg mb-2">Delete event?</h3>
-            <p className="text-gray-500 text-sm mb-6">
-              "{deleteConfirm.title}" will be permanently deleted and all enrolled projects will be
-              unenrolled. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm.id)}
-                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors"
-              >
-                Delete
-              </button>
+        {/* Empty — active but no participants yet */}
+        {isChallenge && isActive && !hasLeaderboard && (
+          <FadeIn delay={60}>
+            <div className="text-center py-20">
+              <div className="text-5xl mb-4">🔥</div>
+              <p className="font-serif text-xl font-bold text-white mb-2">The challenge has begun</p>
+              <p className="text-sm text-white/50 mb-6">No participants yet — be the first to join from your project page</p>
+              <Link to="/projects"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-[#1a202c] hover:scale-105 transition-transform"
+                style={{ background: "linear-gradient(135deg, #d4af37, #f0c040)" }}>
+                Go to my projects
+              </Link>
             </div>
-          </div>
-        </div>
-      )}
+          </FadeIn>
+        )}
+
+        {/* Ended — no winners recorded yet */}
+        {isChallenge && isEnded && !hasWinners && (
+          <FadeIn delay={60}>
+            <div className="text-center py-20">
+              <div className="text-5xl mb-4">📜</div>
+              <p className="font-serif text-xl font-bold text-white mb-2">Challenge complete</p>
+              <p className="text-sm text-white/50">Results are being tallied and will appear here soon</p>
+            </div>
+          </FadeIn>
+        )}
+
+        {/* Non-challenge event */}
+        {!isChallenge && (
+          <FadeIn delay={60}>
+            <div className="text-center py-20">
+              <div className="text-5xl mb-4">{typeInfo.emoji}</div>
+              <p className="font-serif text-xl font-bold text-white mb-2">Check the community for updates</p>
+              <p className="text-sm text-white/50 mb-6">Follow along in the community feed for the latest on this event</p>
+              <Link to="/snippets"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-[#1a202c] hover:scale-105 transition-transform"
+                style={{ background: "linear-gradient(135deg, #d4af37, #f0c040)" }}>
+                Go to Community
+              </Link>
+            </div>
+          </FadeIn>
+        )}
+      </div>
+
+      {/* ── FOOTER GLOW ────────────────────────────────────── */}
+      <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.15), transparent)" }} />
+      <div className="pb-16" />
     </div>
   );
 }
