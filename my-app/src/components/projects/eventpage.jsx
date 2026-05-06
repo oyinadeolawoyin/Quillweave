@@ -410,7 +410,7 @@ export default function EventPage() {
               </FadeIn>
 
               <FadeIn delay={140}>
-                <div className="max-w-xl mb-8">
+                <div className="max-w-xl mb-8 text-white">
                   <MarkdownBody content={event.description || ""} />
                 </div>
               </FadeIn>
