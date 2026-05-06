@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import Header from "../profile/header";
 import API_URL from "../../config/api";
 
@@ -216,6 +218,30 @@ function StatPill({ label, value, emoji }) {
   );
 }
 
+// ─── Markdown renderer ────────────────────────────────────────
+function MarkdownBody({ content }) {
+  return (
+    <div className="prose prose-invert prose-sm max-w-none
+      prose-headings:font-serif prose-headings:text-white prose-headings:font-bold
+      prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg
+      prose-p:text-white/60 prose-p:leading-relaxed
+      prose-strong:text-white/90 prose-em:text-white/70
+      prose-li:text-white/60 prose-li:leading-relaxed
+      prose-ul:list-disc prose-ol:list-decimal
+      prose-blockquote:border-l-2 prose-blockquote:border-[#d4af37]/50
+      prose-blockquote:text-white/50 prose-blockquote:pl-4 prose-blockquote:italic
+      prose-code:text-[#d4af37] prose-code:bg-white/5
+      prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
+      prose-pre:bg-white/5 prose-pre:border prose-pre:border-white/10
+      prose-hr:border-white/10
+      prose-a:text-[#d4af37] prose-a:no-underline hover:prose-a:underline">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 // ─── Main Event Page ──────────────────────────────────────────
 export default function EventPage() {
   const { eventId } = useParams();
@@ -236,9 +262,20 @@ export default function EventPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/events/${eventId}`);
+      // 10-second timeout so the page never spins forever
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch(`${API_URL}/events/${eventId}`, { signal: controller.signal });
+      clearTimeout(timer);
+
       if (!res.ok) { setError("Event not found."); setLoading(false); return; }
-      const { event: ev } = await res.json();
+
+      const data = await res.json();
+      // Handle both { event: {...} } and flat { id, title, ... } response shapes
+      const ev = data.event ?? data;
+
+      if (!ev || !ev.id) { setError("Event not found."); setLoading(false); return; }
       setEvent(ev);
 
       if (ev.type === "DAYS_CHALLENGE") {
@@ -251,8 +288,12 @@ export default function EventPage() {
         if (winnersRes.status === "fulfilled" && winnersRes.value.ok)
           setWinnersData(await winnersRes.value.json());
       }
-    } catch {
-      setError("Something went wrong loading this event.");
+    } catch (err) {
+      if (err.name === "AbortError") {
+        setError("Request timed out. Please check your connection and try again.");
+      } else {
+        setError("Something went wrong loading this event.");
+      }
     } finally {
       setLoading(false);
     }
@@ -369,9 +410,9 @@ export default function EventPage() {
               </FadeIn>
 
               <FadeIn delay={140}>
-                <p className="text-base text-white/60 leading-relaxed max-w-xl mb-8">
-                  {event.description}
-                </p>
+                <div className="max-w-xl mb-8">
+                  <MarkdownBody content={event.description || ""} />
+                </div>
               </FadeIn>
 
               {/* Date pills */}
