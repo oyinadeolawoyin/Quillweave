@@ -136,7 +136,7 @@ function WalletCard({ wallet, isOwner }) {
 
 // ─── SUBMISSION ROW ───────────────────────────────────────────────────────────
 
-function SubmissionRow({ sub, isOwner, onDelete, onClose }) {
+function SubmissionRow({ sub, isOwner, onDelete, onClose, onReopen }) {
   const responses = sub._count?.responses ?? 0;
   const comments = sub._count?.paragraphComments ?? 0;
 
@@ -204,9 +204,17 @@ function SubmissionRow({ sub, isOwner, onDelete, onClose }) {
           {isOwner && sub.isOpen && (
             <button
               onClick={() => onClose(sub)}
-              className="px-3 py-1.5 rounded-lg border border-[#e8e0d0] text-xs text-[#6b5c4a] hover:border-[#2d3748] hover:text-[#2d3748] transition-all font-medium"
+              className="px-3 py-1.5 rounded-lg border border-[#e8c97a] text-xs text-[#8a6c00] bg-[#fdfbea] hover:bg-[#faf5d0] transition-all font-medium"
             >
               Close
+            </button>
+          )}
+          {isOwner && !sub.isOpen && (
+            <button
+              onClick={() => onReopen(sub)}
+              className="px-3 py-1.5 rounded-lg border border-[#bbf7d0] text-xs text-[#166534] bg-[#f0fdf4] hover:bg-[#dcfce7] transition-all font-medium"
+            >
+              Reopen
             </button>
           )}
           {isOwner && (
@@ -300,6 +308,97 @@ function DiscoveryCard({ story, isOwner, onDeleteStory }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── CRITIQUE ROW ─────────────────────────────────────────────────────────────
+
+function CritiqueRow({ response }) {
+  const upvotes = response.upvotes ?? response._count?.upvotes ?? 0;
+
+  return (
+    <div className="group bg-white border border-[#e8e0d0] rounded-2xl p-4 sm:p-5 transition-all hover:border-[#c4b8a8] hover:shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 mb-2.5">
+        {response.submission?.genre && (
+          <span className="text-[11px] font-semibold text-[#2d3748] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
+            {response.submission.genre}
+          </span>
+        )}
+        <span className="text-[11px] text-[#9a8c7a] border border-[#e8e0d0] px-2.5 py-0.5 rounded-full">
+          Critique
+        </span>
+        {upvotes > 0 && (
+          <span className="text-[11px] font-semibold text-[#166534] bg-[#f0fdf4] border border-[#bbf7d0] px-2.5 py-0.5 rounded-full ml-auto">
+            ▲ {upvotes} {upvotes === 1 ? "upvote" : "upvotes"}
+          </span>
+        )}
+      </div>
+
+      {response.submission?.title && (
+        <Link
+          to={`/feedback/${response.submission.id}#critique-${response.id}`}
+          className="block font-serif text-[#1e2a38] text-sm leading-snug mb-1.5 hover:text-[#2d3748] transition-colors line-clamp-1"
+        >
+          On: {response.submission.title}
+        </Link>
+      )}
+
+      <p className="text-xs text-[#9a8c7a] leading-relaxed mb-3 line-clamp-3">
+        {response.content}
+      </p>
+
+      <div className="flex items-center justify-between pt-3 border-t border-[#f0ebe3]">
+        <span className="text-xs text-[#b0a090]">{timeAgo(response.createdAt)}</span>
+        <Link
+          to={`/feedback/${response.submission?.id}#critique-${response.id}`}
+          className="px-3 py-1.5 rounded-lg border border-[#e8e0d0] text-xs text-[#6b5c4a] hover:border-[#2d3748] hover:text-[#2d3748] transition-all font-medium"
+        >
+          View
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ─── SNIPPET CARD ─────────────────────────────────────────────────────────────
+
+function SnippetCard({ snippet }) {
+  const likes = snippet._count?.likes ?? 0;
+  const comments = snippet._count?.comments ?? 0;
+
+  return (
+    <Link
+      to={`/snippets/${snippet.id}`}
+      className="group block bg-white border border-[#e8e0d0] rounded-2xl p-4 transition-all hover:border-[#c4b8a8] hover:shadow-sm"
+    >
+      {snippet.mediaUrl && (
+        <div className="h-28 overflow-hidden rounded-xl mb-3">
+          <img
+            src={snippet.mediaUrl}
+            alt="Snippet media"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        </div>
+      )}
+
+      {snippet.sourceType && (
+        <span className="inline-block text-[11px] font-semibold text-[#5248a8] bg-[#f2f0fc] border border-[#c4bef0] px-2.5 py-0.5 rounded-full mb-2.5">
+          {snippet.sourceType === "STANDALONE" ? "Standalone" : snippet.sourceType}
+        </span>
+      )}
+
+      {snippet.context && (
+        <p className="text-sm text-[#1e2a38] leading-relaxed line-clamp-4 font-serif mb-3">
+          {snippet.context}
+        </p>
+      )}
+
+      <div className="flex items-center gap-3 text-[11px] text-[#b0a090] pt-2.5 border-t border-[#f0ebe3]">
+        <span>♥ {likes}</span>
+        <span>💬 {comments}</span>
+        <span className="ml-auto">{timeAgo(snippet.createdAt)}</span>
+      </div>
+    </Link>
   );
 }
 
@@ -413,6 +512,12 @@ export default function ProfilePage() {
   const [subPage, setSubPage]                 = useState(1);
   const [subTotalPages, setSubTotalPages]     = useState(1);
 
+  // Critiques given (submissions this user has responded to)
+  const [critiquesGiven, setCritiquesGiven]         = useState([]);
+  const [critiqueLoading, setCritiqueLoading]       = useState(true);
+  const [critiquePage, setCritiquePage]             = useState(1);
+  const [critiqueTotalPages, setCritiqueTotalPages] = useState(1);
+
   // Discovery stories
   const [approvedStories, setApprovedStories]   = useState([]);
   const [pendingStories, setPendingStories]     = useState([]);
@@ -420,9 +525,16 @@ export default function ProfilePage() {
   const [storyPage, setStoryPage]               = useState(1);
   const [storyTotalPages, setStoryTotalPages]   = useState(1);
 
+  // Snippets
+  const [snippets, setSnippets]             = useState([]);
+  const [snippetLoading, setSnippetLoading] = useState(true);
+  const [snippetPage, setSnippetPage]       = useState(1);
+  const [snippetTotalPages, setSnippetTotalPages] = useState(1);
+
   // Modal / feedback
-  const [deleteTarget, setDeleteTarget]     = useState(null);
-  const [closeTarget, setCloseTarget]       = useState(null);
+  const [deleteTarget, setDeleteTarget]           = useState(null);
+  const [closeTarget, setCloseTarget]             = useState(null);
+  const [reopenTarget, setReopenTarget]           = useState(null);
   const [deleteStoryTarget, setDeleteStoryTarget] = useState(null);
   const [actionLoading, setActionLoading]   = useState(false);
   const [toast, setToast]                   = useState(null);
@@ -459,7 +571,7 @@ export default function ProfilePage() {
     fetchWallet();
   }, [profileUserId, isOwner]);
 
-  // ── Fetch submissions ──
+  // ── Fetch submissions (owner: /mine, visitor: public list filtered by userId) ──
   useEffect(() => {
     async function fetchSubmissions() {
       setSubLoading(true);
@@ -478,6 +590,26 @@ export default function ProfilePage() {
     }
     fetchSubmissions();
   }, [profileUserId, isOwner, subPage]);
+
+  // ── Fetch critiques given by this user ──
+  useEffect(() => {
+    async function fetchCritiques() {
+      setCritiqueLoading(true);
+      try {
+        const res = await fetch(
+          `${API_URL}/feedback/responses/by-user/${profileUserId}?page=${critiquePage}&limit=10`,
+          { credentials: "include" }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setCritiquesGiven(data.items ?? data.responses ?? []);
+          setCritiqueTotalPages(data.pages ?? data.totalPages ?? 1);
+        }
+      } catch {}
+      setCritiqueLoading(false);
+    }
+    fetchCritiques();
+  }, [profileUserId, critiquePage]);
 
   // ── Fetch discovery stories ──
   // NOTE: The backend /discovery endpoint needs a userId query param added.
@@ -515,7 +647,25 @@ export default function ProfilePage() {
     fetchStories();
   }, [profileUserId, isOwner, storyPage]);
 
-  // ── Delete submission ──
+  // ── Fetch snippets shared by this user ──
+  useEffect(() => {
+    async function fetchSnippets() {
+      setSnippetLoading(true);
+      try {
+        const res = await fetch(
+          `${API_URL}/snippets/user/${profileUserId}?page=${snippetPage}&limit=6`,
+          { credentials: "include" }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSnippets(data.snippets ?? []);
+          setSnippetTotalPages(data.totalPages ?? 1);
+        }
+      } catch {}
+      setSnippetLoading(false);
+    }
+    fetchSnippets();
+  }, [profileUserId, snippetPage]);
   async function confirmDelete() {
     if (!deleteTarget) return;
     setActionLoading(true);
@@ -559,6 +709,28 @@ export default function ProfilePage() {
       setToast({ type: "error", message: e.message });
     }
     setCloseTarget(null);
+    setActionLoading(false);
+  }
+
+  // ── Reopen submission ──
+  async function confirmReopen() {
+    if (!reopenTarget) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/feedback/submissions/${reopenTarget.id}/reopen`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to reopen.");
+      setSubmissions(prev =>
+        prev.map(s => s.id === reopenTarget.id ? { ...s, isOpen: true } : s)
+      );
+      setToast({ type: "success", message: "Submission reopened — it's now accepting new critiques." });
+    } catch (e) {
+      setToast({ type: "error", message: e.message });
+    }
+    setReopenTarget(null);
     setActionLoading(false);
   }
 
@@ -780,10 +952,92 @@ export default function ProfilePage() {
                       isOwner={isOwner}
                       onDelete={setDeleteTarget}
                       onClose={setCloseTarget}
+                      onReopen={setReopenTarget}
                     />
                   ))}
                 </div>
                 <Pagination page={subPage} totalPages={subTotalPages} onChange={setSubPage} />
+              </>
+            )}
+          </Section>
+
+          {/* ── CRITIQUES GIVEN ──────────────────────────────────────── */}
+          <Section
+            title={isOwner ? "Critiques I've Given" : "Critiques Given"}
+            badge={!critiqueLoading ? critiquesGiven.length : undefined}
+          >
+            {critiqueLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="border border-[#e8e0d0] rounded-2xl p-5">
+                    <div className="flex gap-2 mb-3">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-full mb-1" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                ))}
+              </div>
+            ) : critiquesGiven.length === 0 ? (
+              <EmptyState
+                message="No critiques given yet"
+                cta={isOwner ? "Browse submissions" : undefined}
+                ctaTo={isOwner ? "/feedback" : undefined}
+              />
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {critiquesGiven.map(r => (
+                    <CritiqueRow key={r.id} response={r} />
+                  ))}
+                </div>
+                <Pagination page={critiquePage} totalPages={critiqueTotalPages} onChange={setCritiquePage} />
+              </>
+            )}
+          </Section>
+
+          {/* ── DAILY WRITING SNIPPETS ───────────────────────────────── */}
+          <Section
+            title="Writing Snippets"
+            badge={!snippetLoading ? snippets.length : undefined}
+            action={
+              <Link to="/snippets" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
+                All snippets →
+              </Link>
+            }
+            description={
+              isOwner
+                ? "Your daily writing shared with the community."
+                : `Writing ${profileUser?.username ?? "this writer"} has shared with the community.`
+            }
+          >
+            {snippetLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="border border-[#e8e0d0] rounded-2xl p-4">
+                    <Skeleton className="h-28 w-full rounded-xl mb-3" />
+                    <Skeleton className="h-4 w-2/3 mb-2" />
+                    <Skeleton className="h-3 w-full mb-1" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : snippets.length === 0 ? (
+              <EmptyState
+                message="No writing snippets shared yet"
+                cta={isOwner ? "Share a snippet" : undefined}
+                ctaTo={isOwner ? "/snippets/new" : undefined}
+              />
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {snippets.map(s => (
+                    <SnippetCard key={s.id} snippet={s} />
+                  ))}
+                </div>
+                <Pagination page={snippetPage} totalPages={snippetTotalPages} onChange={setSnippetPage} />
               </>
             )}
           </Section>
@@ -877,11 +1131,22 @@ export default function ProfilePage() {
       {isOwner && closeTarget && (
         <ConfirmModal
           title="Close submission?"
-          body={`Closing "${closeTarget.title}" will stop it from accepting new critiques. Existing feedback remains visible.`}
+          body={`"${closeTarget.title}" will stop accepting new critiques. Existing feedback stays visible, and you can reopen it any time from your profile.`}
           confirmLabel={actionLoading ? "Closing..." : "Close submission"}
           danger={false}
           onConfirm={confirmClose}
           onCancel={() => setCloseTarget(null)}
+        />
+      )}
+
+      {isOwner && reopenTarget && (
+        <ConfirmModal
+          title="Reopen submission?"
+          body={`"${reopenTarget.title}" will be open to new critiques again.`}
+          confirmLabel={actionLoading ? "Reopening..." : "Reopen"}
+          danger={false}
+          onConfirm={confirmReopen}
+          onCancel={() => setReopenTarget(null)}
         />
       )}
 

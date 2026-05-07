@@ -71,51 +71,109 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function renderMarkdown(text) {
+function renderInline(text, keyPrefix) {
   if (!text) return null;
-  const parts = text.split(/(\*\*[\s\S]*?\*\*|\*[\s\S]*?\*)/g);
+  // Split on **bold** and *italic* markers
+  const parts = text.split(/(\*\*(?:[^*]|\*(?!\*))+\*\*|\*(?:[^*])+\*)/g);
   return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    if (part.startsWith("*") && part.endsWith("*") && part.length > 2)
-      return <em key={i}>{part.slice(1, -1)}</em>;
-    return <span key={i}>{part}</span>;
+    if (/^\*\*(.+)\*\*$/.test(part))
+      return <strong key={`${keyPrefix}-b${i}`}>{part.slice(2, -2)}</strong>;
+    if (/^\*([^*]+)\*$/.test(part))
+      return <em key={`${keyPrefix}-i${i}`}>{part.slice(1, -1)}</em>;
+    return <span key={`${keyPrefix}-s${i}`}>{part}</span>;
   });
 }
 
-// ─── STAR RATING ─────────────────────────────────────────────────────────────
+function renderMarkdown(text) {
+  if (!text) return null;
 
-function StarRating({ value, onChange, readOnly = false }) {
-  const [hover, setHover] = useState(0);
-  return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          disabled={readOnly}
-          onClick={() => !readOnly && onChange?.(star)}
-          onMouseEnter={() => !readOnly && setHover(star)}
-          onMouseLeave={() => !readOnly && setHover(0)}
-          className={`transition-all ${readOnly ? "cursor-default" : "cursor-pointer"}`}
-        >
-          <svg
-            className="w-5 h-5 transition-colors"
-            fill={(hover || value) >= star ? "#d4af37" : "none"}
-            stroke={(hover || value) >= star ? "#d4af37" : "#d6cfc4"}
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-            />
-          </svg>
-        </button>
-      ))}
-    </div>
-  );
+  // Normalise line endings, split into blocks on blank lines
+  const blocks = text.replace(/\r\n/g, "\n").split(/\n{2,}/);
+
+  return blocks.map((block, bi) => {
+    const trimmed = block.trim();
+    if (!trimmed) return null;
+
+    const lines = trimmed.split("\n");
+
+    // ### Heading  (standard markdown h3)
+    if (/^#{1,3}\s+/.test(lines[0])) {
+      const headingText = lines[0].replace(/^#{1,3}\s+/, "").trim();
+      const rest = lines.slice(1).join("\n").trim();
+      return (
+        <div key={bi} className="mt-5 first:mt-0">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-1.5">
+            {renderInline(headingText, `${bi}-h`)}
+          </p>
+          {rest && (
+            <p className="text-sm text-[#4a4a4a] leading-[1.85]">
+              {rest.split("\n").map((line, li, arr) => (
+                <span key={li}>
+                  {renderInline(line.replace(/^\s*[-*]\s*/, ""), `${bi}-rl${li}`)}
+                  {li < arr.length - 1 && <br />}
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // [SECTION HEADING]  (custom bracket style used in the critique template)
+    const bracketMatch = trimmed.match(/^\[([^\]]+)\]([\s\S]*)/);
+    if (bracketMatch) {
+      const heading = bracketMatch[1].trim();
+      const rest    = bracketMatch[2].trim();
+      return (
+        <div key={bi} className="mt-5 first:mt-0">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-1.5">
+            {heading}
+          </p>
+          {rest && (
+            <p className="text-sm text-[#4a4a4a] leading-[1.85]">
+              {rest.split("\n").map((line, li, arr) => (
+                <span key={li}>
+                  {renderInline(line, `${bi}-bl${li}`)}
+                  {li < arr.length - 1 && <br />}
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Bullet list lines starting with - or *
+    const isList = lines.every((l) => /^\s*[-*]\s+/.test(l));
+    if (isList) {
+      return (
+        <ul key={bi} className="mt-4 first:mt-0 space-y-1 pl-4">
+          {lines.map((line, li) => (
+            <li key={li} className="text-sm text-[#4a4a4a] leading-[1.85] list-disc">
+              {renderInline(line.replace(/^\s*[-*]\s+/, ""), `${bi}-li${li}`)}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    // --- horizontal rule
+    if (/^-{3,}$/.test(trimmed)) {
+      return <hr key={bi} className="my-4 border-[#e8e0d0]" />;
+    }
+
+    // Regular paragraph
+    return (
+      <p key={bi} className="text-sm text-[#4a4a4a] leading-[1.85] mt-4 first:mt-0">
+        {lines.map((line, li) => (
+          <span key={li}>
+            {renderInline(line, `${bi}-p${li}`)}
+            {li < lines.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    );
+  });
 }
 
 // ─── AUTHOR CHIP ─────────────────────────────────────────────────────────────
@@ -214,8 +272,9 @@ function CommentSidebar({
   isAuthor,
   user,
 }) {
-  const [replyOpen, setReplyOpen]       = useState(null);
+  const [replyOpen, setReplyOpen]       = useState(null); // commentId or `reply-${replyId}`
   const [replyText, setReplyText]       = useState("");
+  const [replyingTo, setReplyingTo]     = useState(null); // { username } for @mention prefix
   const [commentText, setCommentText]   = useState("");
   const [posting, setPosting]           = useState(false);
   const [replyPosting, setReplyPosting] = useState(false);
@@ -223,6 +282,13 @@ function CommentSidebar({
   const [editText, setEditText]         = useState("");
   const [editSaving, setEditSaving]     = useState(false);
   const [deletingId, setDeletingId]     = useState(null);
+
+  function openReply(commentId, mention = null) {
+    if (replyOpen === commentId && !mention) { setReplyOpen(null); setReplyText(""); setReplyingTo(null); return; }
+    setReplyOpen(commentId);
+    setReplyingTo(mention);
+    setReplyText(mention ? `@${mention.username} ` : "");
+  }
 
   async function submitComment() {
     if (!commentText.trim()) return;
@@ -255,6 +321,7 @@ function CommentSidebar({
       });
       if (res.ok) {
         const data = await res.json();
+        // Append reply locally so it shows instantly (no refresh needed)
         onNewComment({ type: "reply", commentId, reply: data });
         setReplyText("");
         setReplyOpen(null);
@@ -410,10 +477,10 @@ function CommentSidebar({
                       />
                       {user && (
                         <button
-                          onClick={() => setReplyOpen(replyOpen === c.id ? null : c.id)}
+                          onClick={() => openReply(c.id)}
                           className="text-[11px] text-[#9a8c7a] hover:text-[#2d3748] transition-colors font-medium"
                         >
-                          {replyOpen === c.id ? "Cancel" : "Reply"}
+                          {replyOpen === c.id && !replyingTo ? "Cancel" : "Reply"}
                         </button>
                       )}
                     </div>
@@ -423,28 +490,60 @@ function CommentSidebar({
                   {c.replies?.length > 0 && (
                     <div className="mt-3 pl-3 border-l-2 border-[#f0ebe3] space-y-3">
                       {c.replies.map((r) => (
-                        <div key={r.id}>
+                        <div key={r.id} className="group/reply">
                           <div className="flex items-center gap-1.5 mb-0.5">
+                            <div className="w-5 h-5 rounded-full bg-[#6b5c4a] flex items-center justify-center text-white text-[9px] font-semibold flex-shrink-0">
+                              {r.author?.username?.charAt(0).toUpperCase() ?? "?"}
+                            </div>
                             <span className="text-[11px] font-semibold text-[#2d3748]">{r.author?.username}</span>
                             <span className="text-[10px] text-[#b8a898]">{timeAgo(r.createdAt)}</span>
                           </div>
-                          <p className="text-xs text-[#6b5c4a] leading-relaxed">{r.content}</p>
+                          <p className="text-xs text-[#6b5c4a] leading-relaxed pl-7">
+                            {r.content?.split(/(@\w+)/g).map((seg, si) =>
+                              /^@\w+$/.test(seg)
+                                ? <span key={si} className="text-[#6558d4] font-semibold">{seg}</span>
+                                : seg
+                            )}
+                          </p>
+                          {user && (
+                            <button
+                              onClick={() => openReply(c.id, { username: r.author?.username })}
+                              className="ml-7 mt-1 text-[10px] text-[#b8a898] hover:text-[#2d3748] transition-colors font-medium"
+                            >
+                              Reply
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* Reply box */}
+                  {/* Reply box — shown for both direct replies and reply-to-reply */}
                   {replyOpen === c.id && (
                     <div className="mt-3 pl-3 border-l-2 border-[#e8e0d0]">
+                      {replyingTo && (
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="text-[10px] text-[#9a8c7a]">Replying to</span>
+                          <span className="text-[10px] font-semibold text-[#6558d4]">@{replyingTo.username}</span>
+                          <button
+                            onClick={() => { setReplyingTo(null); setReplyText(""); }}
+                            className="text-[10px] text-[#b8a898] hover:text-[#c0392b] ml-1 transition-colors"
+                          >✕</button>
+                        </div>
+                      )}
                       <textarea
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         rows={2}
-                        placeholder="Write a reply..."
+                        autoFocus
+                        placeholder={replyingTo ? `Reply to @${replyingTo.username}...` : "Write a reply..."}
                         className="w-full border border-[#e8e0d0] rounded-xl px-3 py-2 text-xs text-[#2d3748] placeholder-[#c4b9ab] bg-[#faf7f2] focus:outline-none focus:border-[#2d3748] resize-none transition-all"
                       />
-                      <div className="flex justify-end mt-1.5">
+                      <div className="flex items-center justify-between mt-1.5">
+                        <button
+                          onClick={() => { setReplyOpen(null); setReplyText(""); setReplyingTo(null); }}
+                          className="text-[11px] text-[#9a8c7a] hover:text-[#2d3748] transition-colors"
+                        >Cancel</button>
                         <button
                           onClick={() => submitReply(c.id)}
                           disabled={replyPosting || !replyText.trim()}
@@ -490,27 +589,15 @@ function CommentSidebar({
 // ─── CRITIQUE FORM ────────────────────────────────────────────────────────────
 
 function CritiqueForm({ submissionId, onSuccess }) {
-  const [ratings, setRatings] = useState({
-    overallRating: 0, clarityRating: 0, pacingRating: 0, believabilityRating: 0,
-  });
   const [feedback, setFeedback]     = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
 
   const wordCount = countWords(feedback);
-  const ratingLabels = [
-    { key: "overallRating",       label: "Overall" },
-    { key: "clarityRating",       label: "Clarity" },
-    { key: "pacingRating",        label: "Pacing" },
-    { key: "believabilityRating", label: "Believability" },
-  ];
 
   async function handleSubmit() {
-    for (const r of ratingLabels) {
-      if (!ratings[r.key]) { setError(`Please rate ${r.label}.`); return; }
-    }
-    if (wordCount < 100) {
-      setError(`General feedback must be at least 100 words (currently ${wordCount}).`);
+    if (wordCount < 150) {
+      setError(`Critique must be at least 150 words (currently ${wordCount}).`);
       return;
     }
     setSubmitting(true);
@@ -520,7 +607,7 @@ function CritiqueForm({ submissionId, onSuccess }) {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...ratings, generalFeedback: feedback }),
+        body: JSON.stringify({ generalFeedback: feedback }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to submit critique.");
@@ -567,7 +654,7 @@ function CritiqueForm({ submissionId, onSuccess }) {
               </li>
               <li className="flex items-start gap-1.5">
                 <span className="text-[#b8860b] mt-0.5 flex-shrink-0">—</span>
-                Aligns ratings with the actual comments written
+                Engages genuinely with the actual writing — not a generic summary
               </li>
             </ul>
           </div>
@@ -577,39 +664,25 @@ function CritiqueForm({ submissionId, onSuccess }) {
       <div className="p-6">
         <h3 className="font-serif text-xl text-[#2d3748] mb-1">Leave a critique</h3>
         <p className="text-sm text-[#9a8c7a] mb-7">
-          Rate each dimension, then write your general feedback (minimum 100 words).
-          You will earn points for a complete critique.
+          Write your feedback (minimum 150 words). You will earn points for a complete critique.
         </p>
-
-        {/* Ratings */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 mb-7 pb-7 border-b border-[#f0ebe3]">
-          {ratingLabels.map((r) => (
-            <div key={r.key} className="flex items-center justify-between gap-4">
-              <span className="text-sm font-medium text-[#6b5c4a] w-28 flex-shrink-0">{r.label}</span>
-              <StarRating
-                value={ratings[r.key]}
-                onChange={(v) => setRatings((prev) => ({ ...prev, [r.key]: v }))}
-              />
-            </div>
-          ))}
-        </div>
 
         {/* General feedback */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-semibold text-[#2d3748]">General feedback</label>
+            <label className="text-sm font-semibold text-[#2d3748]">Your critique</label>
             <span className={`text-xs font-semibold transition-colors ${
-              wordCount >= 100 ? "text-[#6b8c6b]" : wordCount > 0 ? "text-[#b8860b]" : "text-[#b8a898]"
+              wordCount >= 150 ? "text-[#6b8c6b]" : wordCount > 0 ? "text-[#b8860b]" : "text-[#b8a898]"
             }`}>
-              {wordCount} / 100 words min
+              {wordCount} / 150 words min
             </span>
           </div>
           <div className="h-1 bg-[#f0ebe3] rounded-full mb-3 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
-                wordCount >= 100 ? "bg-[#6b8c6b]" : "bg-[#d4af37]"
+                wordCount >= 150 ? "bg-[#6b8c6b]" : "bg-[#d4af37]"
               }`}
-              style={{ width: `${Math.min((wordCount / 100) * 100, 100)}%` }}
+              style={{ width: `${Math.min((wordCount / 150) * 100, 100)}%` }}
             />
           </div>
           <textarea
@@ -660,12 +733,6 @@ function CritiqueCard({ response, submissionAuthorId, user, onUpvote, onEdit, on
   const upvCount     = response._count?.upvotes ?? 0;
 
   const [editing, setEditing]       = useState(false);
-  const [editRatings, setEditRatings] = useState({
-    overallRating:       response.overallRating,
-    clarityRating:       response.clarityRating,
-    pacingRating:        response.pacingRating,
-    believabilityRating: response.believabilityRating,
-  });
   const [editFeedback, setEditFeedback] = useState(response.generalFeedback ?? "");
   const [editSaving, setEditSaving]   = useState(false);
   const [editError, setEditError]     = useState("");
@@ -674,19 +741,9 @@ function CritiqueCard({ response, submissionAuthorId, user, onUpvote, onEdit, on
 
   const editWordCount = countWords(editFeedback);
 
-  const ratingLabels = [
-    { key: "overallRating",       label: "Overall" },
-    { key: "clarityRating",       label: "Clarity" },
-    { key: "pacingRating",        label: "Pacing" },
-    { key: "believabilityRating", label: "Believability" },
-  ];
-
   async function saveEdit() {
-    for (const r of ratingLabels) {
-      if (!editRatings[r.key]) { setEditError(`Please rate ${r.label}.`); return; }
-    }
-    if (editWordCount < 100) {
-      setEditError(`Feedback must be at least 100 words (currently ${editWordCount}).`);
+    if (editWordCount < 150) {
+      setEditError(`Critique must be at least 150 words (currently ${editWordCount}).`);
       return;
     }
     setEditSaving(true);
@@ -696,11 +753,11 @@ function CritiqueCard({ response, submissionAuthorId, user, onUpvote, onEdit, on
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...editRatings, generalFeedback: editFeedback }),
+        body: JSON.stringify({ generalFeedback: editFeedback }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to update critique.");
-      onEdit(response.id, { ...editRatings, generalFeedback: editFeedback });
+      onEdit(response.id, { generalFeedback: editFeedback });
       setEditing(false);
     } catch (e) {
       setEditError(e.message);
@@ -800,45 +857,20 @@ function CritiqueCard({ response, submissionAuthorId, user, onUpvote, onEdit, on
       </div>
 
       <div className="px-6 py-5 space-y-5">
-        {/* Ratings row */}
-        {editing ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 pb-5 border-b border-[#f0ebe3]">
-            {ratingLabels.map((r) => (
-              <div key={r.key} className="flex items-center justify-between gap-4">
-                <span className="text-sm font-medium text-[#6b5c4a] w-28 flex-shrink-0">{r.label}</span>
-                <StarRating
-                  value={editRatings[r.key]}
-                  onChange={(v) => setEditRatings((prev) => ({ ...prev, [r.key]: v }))}
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pb-5 border-b border-[#f0ebe3]">
-            {ratingLabels.map((r) => (
-              <div key={r.label} className="bg-[#faf7f2] rounded-xl px-3 py-3 text-center">
-                <p className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wide mb-1">{r.label}</p>
-                <p className="text-base font-bold text-[#2d3748]">
-                  {response[r.key]}<span className="text-xs text-[#d6cfc4] font-normal">/5</span>
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* General feedback */}
         {editing ? (
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm font-semibold text-[#2d3748]">General feedback</label>
-              <span className={`text-xs font-semibold ${editWordCount >= 100 ? "text-[#6b8c6b]" : "text-[#b8860b]"}`}>
-                {editWordCount} / 100 min
+              <label className="text-sm font-semibold text-[#2d3748]">Your critique</label>
+              <span className={`text-xs font-semibold ${editWordCount >= 150 ? "text-[#6b8c6b]" : "text-[#b8860b]"}`}>
+                {editWordCount} / 150 min
               </span>
             </div>
             <div className="h-1 bg-[#f0ebe3] rounded-full mb-3 overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${editWordCount >= 100 ? "bg-[#6b8c6b]" : "bg-[#d4af37]"}`}
-                style={{ width: `${Math.min((editWordCount / 100) * 100, 100)}%` }}
+                className={`h-full rounded-full transition-all ${editWordCount >= 150 ? "bg-[#6b8c6b]" : "bg-[#d4af37]"}`}
+                style={{ width: `${Math.min((editWordCount / 150) * 100, 100)}%` }}
               />
             </div>
             <textarea
@@ -849,9 +881,9 @@ function CritiqueCard({ response, submissionAuthorId, user, onUpvote, onEdit, on
             />
           </div>
         ) : (
-          <p className="text-sm text-[#4a4a4a] leading-[1.85] whitespace-pre-wrap">
+          <div className="text-sm text-[#4a4a4a] leading-[1.85]">
             {renderMarkdown(response.generalFeedback)}
-          </p>
+          </div>
         )}
 
         {editError && (
@@ -1061,7 +1093,10 @@ export default function FeedbackPage() {
   }
 
   const isAuthor    = user?.id === submission?.userId;
-  const canCritique = user && !isAuthor && !hasResponded && submission?.isOpen;
+  // Archived (isOutdated) posts still accept critiques at half points.
+  // Only manually-closed (isOpen=false AND NOT isOutdated) posts block new critiques.
+  const isAcceptingCritiques = submission?.isOpen || submission?.isOutdated;
+  const canCritique = user && !isAuthor && !hasResponded && isAcceptingCritiques;
 
   if (loading) {
     return (
@@ -1115,9 +1150,14 @@ export default function FeedbackPage() {
                 <span className="text-[11px] text-[#9a8c7a] border border-[#e8e0d0] px-2.5 py-0.5 rounded-full">
                   {DRAFT_LABELS[submission.draftStage]}
                 </span>
-                {!submission.isOpen && (
+                {!submission.isOpen && !submission.isOutdated && (
                   <span className="text-[11px] text-[#c0392b] bg-[#fdf1f0] border border-[#f5c6c3] px-2.5 py-0.5 rounded-full">
                     Closed
+                  </span>
+                )}
+                {submission.isOutdated && (
+                  <span className="text-[11px] text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2.5 py-0.5 rounded-full">
+                    Archive · half points
                   </span>
                 )}
               </div>
@@ -1272,8 +1312,8 @@ export default function FeedbackPage() {
                 </div>
               )}
 
-              {/* Submission closed */}
-              {user && !isAuthor && !submission.isOpen && !hasResponded && (
+              {/* Submission closed — only for manually closed, non-outdated posts */}
+              {user && !isAuthor && !submission.isOpen && !submission.isOutdated && !hasResponded && (
                 <div className="bg-[#faf7f2] border border-[#e8e0d0] rounded-2xl px-5 py-4 text-sm text-[#9a8c7a]">
                   This submission is closed and no longer accepting critiques.
                 </div>
