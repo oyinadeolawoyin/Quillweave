@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import API_URL from "../../config/api";
 
@@ -54,6 +54,118 @@ function trackingMode(project) {
 function getChallengeEntry(project) {
   if (!project.eventEntries?.length) return null;
   return project.eventEntries.find(e => e.event?.type === "DAYS_CHALLENGE") || null;
+}
+
+// ─── Activity score (higher = more active, floats to top) ─────
+// Weights: streak/sessions running > high % progress > word count > just public
+function activityScore(project) {
+  let score = 0;
+  const streak = project.currentStreak || 0;
+  const pctWords    = project.targetWordCount    > 0 ? project.currentWordCount    / project.targetWordCount    : 0;
+  const pctChapters = project.targetChapters     > 0 ? project.currentChapters     / project.targetChapters     : 0;
+  const pctScenes   = project.targetScenes       > 0 ? project.currentScenes       / project.targetScenes       : 0;
+  const pctSessions = project.sessionGoalCount   > 0 ? project.currentSessionCount / project.sessionGoalCount   : 0;
+  const maxPct = Math.max(pctWords, pctChapters, pctScenes, pctSessions);
+  // Active streak = very high weight
+  if (streak > 0) score += streak * 10;
+  // Challenge entry = boost
+  if (project.eventEntries?.some(e => e.event?.type === "DAYS_CHALLENGE" && !e.disqualified)) score += 50;
+  // High progress % bonus
+  score += maxPct * 40;
+  // Words written (log scale to avoid giant projects dominating)
+  if (project.currentWordCount > 0) score += Math.log10(project.currentWordCount + 1) * 5;
+  // Sessions running
+  if (project.currentSessionCount > 0) score += project.currentSessionCount * 2;
+  return score;
+}
+
+// ─── Carousel — 1 row of 3, sliding 3 at a time, swipeable ───
+function ProjectCarousel({ projects, renderCard }) {
+  const [page, setPage] = useState(0);
+  const startX = useRef(null);
+
+  const COLS = 3;
+  const totalPages = Math.ceil(projects.length / COLS);
+  const slice = projects.slice(page * COLS, (page + 1) * COLS);
+
+  const prev = useCallback(() => setPage(p => Math.max(0, p - 1)), []);
+  const next = useCallback(() => setPage(p => Math.min(totalPages - 1, p + 1)), [totalPages]);
+
+  function onTouchStart(e) { startX.current = e.touches[0].clientX; }
+  function onTouchEnd(e) {
+    if (startX.current === null) return;
+    const dx = e.changedTouches[0].clientX - startX.current;
+    if (dx < -40) next();
+    else if (dx > 40) prev();
+    startX.current = null;
+  }
+
+  if (projects.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {/* Single row */}
+      <div
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 select-none"
+      >
+        {slice.map(p => renderCard(p))}
+        {/* keep grid width stable on last page if fewer than 3 */}
+        {Array.from({ length: Math.max(0, COLS - slice.length) }).map((_, i) => (
+          <div key={`empty-${i}`} />
+        ))}
+      </div>
+
+      {/* Nav — only shown when there's more than one page */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-1">
+          <button
+            onClick={prev}
+            disabled={page === 0}
+            className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#e8e0d0] text-[#9a8c7a] hover:border-[#b8a898] hover:text-[#2d3748] disabled:opacity-30 disabled:cursor-not-allowed transition-all bg-white"
+          >
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Prev
+          </button>
+
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i)}
+                className="rounded-full transition-all"
+                style={{
+                  width: i === page ? 20 : 6,
+                  height: 6,
+                  background: i === page ? "#2d3748" : "#d4ccc0",
+                }}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={next}
+            disabled={page === totalPages - 1}
+            className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#e8e0d0] text-[#9a8c7a] hover:border-[#b8a898] hover:text-[#2d3748] disabled:opacity-30 disabled:cursor-not-allowed transition-all bg-white"
+          >
+            Next
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <p className="text-center text-[10px] text-[#b8a898]">
+          {page * COLS + 1}–{Math.min((page + 1) * COLS, projects.length)} of {projects.length} · swipe to browse
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ─── Progress bar ─────────────────────────────────────────────
@@ -354,7 +466,7 @@ function ChallengeCard({ project, communityStreak, eventDaysTarget }) {
   })() : null;
 
   const dayLabel = communityStreak != null && target > 0
-    ? `Community on Day ${communityStreak} of ${target}`
+    ? `Community on Day ${Math.max(1, communityStreak)} of ${target}`
     : null;
 
   const dayLogs = project.dayLogs || [];
@@ -569,7 +681,9 @@ function ChallengeShoutout({ eventId, eventTitle }) {
 // ─── Community Streak Banner ──────────────────────────────────
 function CommunityStreakBanner({ communityData }) {
   if (!communityData || communityData.participantCount === 0) return null;
-  const { communityStreak, daysTarget, participantCount, eventTitle } = communityData;
+  const { communityStreak: rawStreak, daysTarget, participantCount, eventTitle } = communityData;
+  // If the challenge is live but nobody has logged yet today, streak is 0 — show Day 1 minimum
+  const communityStreak = Math.max(1, rawStreak);
   const pct = daysTarget > 0 ? Math.min(Math.round((communityStreak / daysTarget) * 100), 100) : 0;
 
   return (
@@ -698,10 +812,10 @@ export default function CommunityProjects() {
       .catch(() => {});
   }, [projects]);
 
-  // ── Buckets ───────────────────────────────────────────────────
-  const challengeProjects = projects.filter(p =>
-    p.eventEntries?.some(e => e.event?.type === "DAYS_CHALLENGE")
-  ).slice(0, 6);
+  // ── Buckets (sorted by activity score — most active first) ───
+  const challengeProjects = projects
+    .filter(p => p.eventEntries?.some(e => e.event?.type === "DAYS_CHALLENGE"))
+    .sort((a, b) => activityScore(b) - activityScore(a));
 
   const activeChallengeEntry = challengeProjects
     .flatMap(p => p.eventEntries || [])
@@ -715,13 +829,13 @@ export default function CommunityProjects() {
     : false;
 
   const challengeIds = new Set(challengeProjects.map(p => p.id));
-  const habitProjects = projects.filter(p =>
-    !challengeIds.has(p.id) && ["days", "sessions"].includes(trackingMode(p))
-  ).slice(0, 6);
+  const habitProjects = projects
+    .filter(p => !challengeIds.has(p.id) && ["days", "sessions"].includes(trackingMode(p)))
+    .sort((a, b) => activityScore(b) - activityScore(a));
 
-  const progressProjects = projects.filter(p =>
-    !challengeIds.has(p.id) && !["days", "sessions"].includes(trackingMode(p))
-  ).slice(0, 6);
+  const progressProjects = projects
+    .filter(p => !challengeIds.has(p.id) && !["days", "sessions"].includes(trackingMode(p)))
+    .sort((a, b) => activityScore(b) - activityScore(a));
 
   const hasContent = challengeProjects.length > 0 || habitProjects.length > 0 || progressProjects.length > 0;
 
@@ -790,16 +904,17 @@ export default function CommunityProjects() {
                     <p className="text-[11px] text-[#9a8c7a] mb-5 text-center leading-relaxed">
                       These writers are running a consecutive-days streak. Miss a day and the chain breaks.
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {challengeProjects.map(project => (
+                    <ProjectCarousel
+                      projects={challengeProjects}
+                      renderCard={project => (
                         <ChallengeCard
                           key={project.id}
                           project={project}
                           communityStreak={communityData?.communityStreak ?? null}
                           eventDaysTarget={challengeDaysTarget}
                         />
-                      ))}
-                    </div>
+                      )}
+                    />
                   </>
                 )}
 
@@ -815,13 +930,14 @@ export default function CommunityProjects() {
                 <SubSectionLabel color="#9d174d" lineColor="#fbcfe8">
                   Habit Tracking
                 </SubSectionLabel>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {habitProjects.map(project =>
+                <ProjectCarousel
+                  projects={habitProjects}
+                  renderCard={project =>
                     trackingMode(project) === "days"
                       ? <StreakCard key={project.id} project={project} />
                       : <SessionCard key={project.id} project={project} />
-                  )}
-                </div>
+                  }
+                />
               </div>
             )}
 
@@ -831,11 +947,10 @@ export default function CommunityProjects() {
                 <SubSectionLabel color="#1d4ed8" lineColor="#dbeafe">
                   Progress Tracking
                 </SubSectionLabel>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {progressProjects.map(project => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
-                </div>
+                <ProjectCarousel
+                  projects={progressProjects}
+                  renderCard={project => <ProjectCard key={project.id} project={project} />}
+                />
               </div>
             )}
 

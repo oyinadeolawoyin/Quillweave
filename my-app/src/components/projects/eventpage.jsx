@@ -77,28 +77,17 @@ function RoleBadge({ role }) {
 
 // ─── Leaderboard row ──────────────────────────────────────────
 function LeaderboardRow({ entry, index, daysTarget }) {
-  const pct = daysTarget > 0 ? Math.min(Math.round((entry.streak / daysTarget) * 100), 100) : 0;
-  const isTop3 = index < 3;
-  const medals = ["🥇", "🥈", "🥉"];
+  const displayStreak = Math.max(1, entry.streak);
+  const pct = daysTarget > 0 ? Math.min(Math.round((displayStreak / daysTarget) * 100), 100) : 0;
 
   return (
     <FadeIn delay={60 + index * 40}>
-      <div className={`flex items-center gap-3 py-3 px-4 rounded-2xl transition-all ${
-        isTop3
-          ? "bg-white/5 border border-white/10"
-          : "hover:bg-white/5"
-      }`}>
-        <div className="w-7 text-center flex-shrink-0">
-          {index < 3
-            ? <span className="text-base">{medals[index]}</span>
-            : <span className="text-xs font-bold text-white/40">{index + 1}</span>}
-        </div>
-
-        <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden border-2"
-          style={{ borderColor: isTop3 ? "rgba(212,175,55,0.4)" : "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.1)" }}>
+      <div className="flex items-center gap-3 py-3 px-4 rounded-2xl transition-all hover:bg-white/5">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border-2"
+          style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.08)" }}>
           {entry.avatar
             ? <img src={entry.avatar} alt={entry.username} className="w-full h-full object-cover" />
-            : <span className="text-white">{(entry.username || "?").charAt(0).toUpperCase()}</span>}
+            : <span className="text-white text-sm font-bold">{(entry.username || "?").charAt(0).toUpperCase()}</span>}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -115,7 +104,7 @@ function LeaderboardRow({ entry, index, daysTarget }) {
             <p className="text-[10px] text-white/40 mt-0.5 text-right">{pct}%</p>
           </div>
           <div className="text-right">
-            <p className="text-base font-bold" style={{ color: "#d4af37" }}>{entry.streak}</p>
+            <p className="text-base font-bold" style={{ color: "#d4af37" }}>{displayStreak}</p>
             <p className="text-[10px] text-white/40">days</p>
           </div>
         </div>
@@ -182,7 +171,8 @@ function WinnerCard({ winner, index }) {
 }
 
 // ─── Community Progress Ring ──────────────────────────────────
-function CommunityRing({ communityStreak, daysTarget, participantCount }) {
+function CommunityRing({ communityStreak: rawStreak, daysTarget, participantCount }) {
+  const communityStreak = Math.max(1, rawStreak);
   const pct = daysTarget > 0 ? Math.min(Math.round((communityStreak / daysTarget) * 100), 100) : 0;
   return (
     <div className="flex flex-col sm:flex-row items-center gap-8">
@@ -549,15 +539,22 @@ export default function EventPage() {
         )}
 
         {/* ── Live leaderboard ─── */}
-        {isChallenge && isActive && hasLeaderboard && (
+        {isChallenge && isActive && hasLeaderboard && (() => {
+          const streaks = communityData.leaderboard.map(e => e.streak);
+          const allTied = streaks.length > 0 && streaks.every(s => s === streaks[0]);
+          return (
           <FadeIn delay={80}>
             <section>
               <div className="mb-6">
                 <p className="text-[10px] uppercase tracking-widest font-bold mb-1" style={{ color: "#d4af37" }}>
-                  Live Leaderboard
+                  {allTied ? "In This Challenge" : "Live Leaderboard"}
                 </p>
                 <h2 className="font-serif text-2xl font-bold text-white">Writers in this challenge</h2>
-                <p className="text-sm text-white/50 mt-1">Ranked by streak — miss a day and the chain breaks</p>
+                <p className="text-sm text-white/50 mt-1">
+                  {allTied
+                    ? "These writers are running a consecutive-days streak. Miss a day and the chain breaks."
+                    : "Ranked by streak — miss a day and the chain breaks"}
+                </p>
               </div>
 
               <div className="rounded-3xl border overflow-hidden"
@@ -570,7 +567,8 @@ export default function EventPage() {
               </div>
             </section>
           </FadeIn>
-        )}
+          );
+        })()}
 
         {/* Empty — active but no participants yet */}
         {isChallenge && isActive && !hasLeaderboard && (

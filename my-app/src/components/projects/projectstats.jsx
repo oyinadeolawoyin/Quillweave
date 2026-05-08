@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../profile/header";
 import API_URL from "@/config/api";
+import { StartGroupSprintModal } from "../sprint/groupSprintModal";
 
 function daysUntil(dateStr) {
   if (!dateStr) return null;
@@ -52,6 +53,46 @@ function Check({ color = DONE_COLOR, size = 20 }) {
     <svg width={size} height={size} fill="none" stroke={color} viewBox="0 0 24 24" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
+  );
+}
+
+// ─── Compact Alarm Clock Sprint Button ───────────────────────
+function CompactAlarmSprint({ onClick }) {
+  const [tick, setTick] = useState(false);
+  useEffect(() => {
+    const t = setInterval(() => setTick(p => !p), 900);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <button onClick={onClick}
+      className="group flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-[#d4af37] bg-[#fffbeb] hover:bg-[#fef3c7] transition-all"
+      aria-label="Start a sprint">
+      {/* mini clock */}
+      <div className="relative flex-shrink-0" style={{ width: 26, height: 26 }}>
+        {/* bells */}
+        <div className="absolute -top-1 left-1/2 flex gap-1.5"
+          style={{ transform: `translateX(-50%) rotate(${tick ? -12 : 12}deg)`, transition: "transform 0.45s ease" }}>
+          <div className="w-1.5 h-1.5 bg-[#d4af37] rounded-full" />
+          <div className="w-1.5 h-1.5 bg-[#d4af37] rounded-full" />
+        </div>
+        <div className="w-[26px] h-[26px] rounded-full border-[2px] border-[#2d3748] bg-[#fffdf8] flex items-center justify-center"
+          style={{
+            boxShadow: tick ? "0 0 0 0 rgba(212,175,55,0)" : "0 0 0 4px rgba(212,175,55,0.18)",
+            transition: "box-shadow 0.9s ease"
+          }}>
+          {/* clock hands */}
+          <div className="absolute" style={{ width: 1.5, height: 7, background: "#2d3748", borderRadius: 1, bottom: "50%", left: "calc(50% - 0.75px)", transformOrigin: "bottom", transform: "rotate(-30deg)" }} />
+          <div className="absolute" style={{ width: 1, height: 8, background: "#2d3748", borderRadius: 1, bottom: "50%", left: "calc(50% - 0.5px)", transformOrigin: "bottom", transform: "rotate(60deg)" }} />
+          <div className="absolute w-1.5 h-1.5 bg-[#d4af37] rounded-full z-10" />
+        </div>
+        {/* feet */}
+        <div className="flex justify-between px-1 -mt-0.5">
+          <div className="w-1.5 h-1 bg-[#2d3748] rounded-b-full" />
+          <div className="w-1.5 h-1 bg-[#2d3748] rounded-b-full" />
+        </div>
+      </div>
+      <span className="text-xs font-semibold text-[#b8962e]">Start Sprint</span>
+    </button>
   );
 }
 
@@ -1270,6 +1311,7 @@ export default function ProjectStats() {
   const [logDayOpen, setLogDayOpen] = useState(false);
   const [logSessionOpen, setLogSessionOpen] = useState(false);
   const [joinEventOpen, setJoinEventOpen] = useState(false);
+  const [showSprintModal, setShowSprintModal] = useState(false);
   const [activeEvents, setActiveEvents] = useState([]);
   const [joiningEvent, setJoiningEvent] = useState(false);
   const [joinEventId, setJoinEventId] = useState("");
@@ -1408,6 +1450,7 @@ export default function ProjectStats() {
             ← Projects
           </button>
           <div className="flex items-center gap-2">
+            <CompactAlarmSprint onClick={() => setShowSprintModal(true)} />
             {hasDaysTarget && (
               <button onClick={() => setLogDayOpen(true)}
                 className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-full border border-[#d4af37] text-[#b8962e] bg-[#fffbeb] hover:bg-[#fef3c7] transition-all">
@@ -1940,6 +1983,13 @@ export default function ProjectStats() {
           </button>
         </div>
       </main>
+
+      {/* Start Sprint Modal */}
+      <StartGroupSprintModal
+        isOpen={showSprintModal}
+        onClose={() => setShowSprintModal(false)}
+        onCreated={(s) => { setShowSprintModal(false); window.location.href = `/group-sprint/${s.id}`; }}
+      />
 
       <ProgressModal
         open={modalOpen}
