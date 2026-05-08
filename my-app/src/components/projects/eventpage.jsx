@@ -170,9 +170,18 @@ function WinnerCard({ winner, index }) {
   );
 }
 
+// ─── Calendar day helper (shared with leaderboard) ───────────
+function calendarDay(startDate, daysTarget) {
+  if (!startDate) return 1;
+  const start = new Date(new Date(startDate).toDateString());
+  const today = new Date(new Date().toDateString());
+  const diff  = Math.round((today - start) / (1000 * 60 * 60 * 24));
+  return Math.min(Math.max(1, diff + 1), daysTarget || 999);
+}
+
 // ─── Community Progress Ring ──────────────────────────────────
-function CommunityRing({ communityStreak: rawStreak, daysTarget, participantCount }) {
-  const communityStreak = Math.max(1, rawStreak);
+function CommunityRing({ startDate, daysTarget, participantCount }) {
+  const communityStreak = calendarDay(startDate, daysTarget);
   const pct = daysTarget > 0 ? Math.min(Math.round((communityStreak / daysTarget) * 100), 100) : 0;
   return (
     <div className="flex flex-col sm:flex-row items-center gap-8">
@@ -453,7 +462,7 @@ export default function EventPage() {
                   <div className="p-6">
                     <p className="text-[10px] uppercase tracking-widest font-bold mb-5" style={{ color: "#d4af37" }}>Live Community Progress</p>
                     <CommunityRing
-                      communityStreak={communityData.communityStreak}
+                      startDate={communityData.startDate}
                       daysTarget={communityData.daysTarget}
                       participantCount={communityData.participantCount}
                     />

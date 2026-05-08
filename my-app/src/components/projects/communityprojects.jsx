@@ -449,7 +449,7 @@ function SessionCard({ project }) {
 }
 
 // ─── Challenge card ────────────────────────────────────────────
-function ChallengeCard({ project, communityStreak, eventDaysTarget }) {
+function ChallengeCard({ project, eventStartDate, eventDaysTarget }) {
   const gc = genreColor(project.genre);
   const entry     = getChallengeEntry(project);
   const disq      = entry ? false : true;
@@ -458,6 +458,7 @@ function ChallengeCard({ project, communityStreak, eventDaysTarget }) {
   const pct       = target > 0 ? Math.min(Math.round((streak / target) * 100), 100) : 0;
   const eventTitle = entry?.event?.title || "Days Challenge";
   const endDate    = entry?.event?.endDate;
+  const startDate  = eventStartDate || entry?.event?.startDate;
   const daysLeft = endDate ? (() => {
     const end   = new Date(new Date(endDate).toDateString());
     const today = new Date(new Date().toDateString());
@@ -465,8 +466,10 @@ function ChallengeCard({ project, communityStreak, eventDaysTarget }) {
     return Math.max(0, diff);
   })() : null;
 
-  const dayLabel = communityStreak != null && target > 0
-    ? `Community on Day ${Math.max(1, communityStreak)} of ${target}`
+  // Calendar-based day — advances at midnight regardless of who has logged
+  const currentDay = calendarDay(startDate, target);
+  const dayLabel = startDate && target > 0
+    ? `Community on Day ${currentDay} of ${target}`
     : null;
 
   const dayLogs = project.dayLogs || [];
@@ -679,11 +682,22 @@ function ChallengeShoutout({ eventId, eventTitle }) {
 }
 
 // ─── Community Streak Banner ──────────────────────────────────
+// ─── Calendar day helper ──────────────────────────────────────
+// Returns how many days into the challenge we are based on the clock,
+// NOT based on who has logged. Day 1 = start date, Day 2 = start date + 1, etc.
+function calendarDay(startDate, daysTarget) {
+  if (!startDate) return 1;
+  const start = new Date(new Date(startDate).toDateString()); // midnight
+  const today = new Date(new Date().toDateString());
+  const diff  = Math.round((today - start) / (1000 * 60 * 60 * 24));
+  return Math.min(Math.max(1, diff + 1), daysTarget || 999);
+}
+
 function CommunityStreakBanner({ communityData }) {
   if (!communityData || communityData.participantCount === 0) return null;
-  const { communityStreak: rawStreak, daysTarget, participantCount, eventTitle } = communityData;
-  // If the challenge is live but nobody has logged yet today, streak is 0 — show Day 1 minimum
-  const communityStreak = Math.max(1, rawStreak);
+  const { daysTarget, participantCount, eventTitle, startDate } = communityData;
+  // Use calendar day — advances at midnight regardless of who has logged
+  const communityStreak = calendarDay(startDate, daysTarget);
   const pct = daysTarget > 0 ? Math.min(Math.round((communityStreak / daysTarget) * 100), 100) : 0;
 
   return (
@@ -910,7 +924,7 @@ export default function CommunityProjects() {
                         <ChallengeCard
                           key={project.id}
                           project={project}
-                          communityStreak={communityData?.communityStreak ?? null}
+                          eventStartDate={communityData?.startDate ?? activeChallengeEntry?.event?.startDate ?? null}
                           eventDaysTarget={challengeDaysTarget}
                         />
                       )}
