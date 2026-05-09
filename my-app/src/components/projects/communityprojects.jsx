@@ -626,16 +626,21 @@ function WinnerCard({ winner }) {
       )}
 
       <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: role.border }}>
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden"
-          style={{ background: av.bg, color: av.text }}
+        <Link
+          to={`/profile/${winner.user?.id}`}
+          className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity"
         >
-          {winner.user?.avatar
-            ? <img src={winner.user.avatar} alt={winner.username} className="w-full h-full object-cover" />
-            : initials(winner.username)
-          }
-        </div>
-        <span className="text-[11px] text-[#9a8c7a] truncate">@{winner.username}</span>
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden"
+            style={{ background: av.bg, color: av.text }}
+          >
+            {winner.user?.avatar
+              ? <img src={winner.user.avatar} alt={winner.username} className="w-full h-full object-cover" />
+              : initials(winner.username)
+            }
+          </div>
+          <span className="text-[11px] text-[#9a8c7a] truncate hover:underline">@{winner.username}</span>
+        </Link>
       </div>
     </div>
   );

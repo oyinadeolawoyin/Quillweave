@@ -81,12 +81,12 @@ function ReplyItem({ reply, snippetId, commentId, currentUser, onDeleted, onRepl
 
   return (
     <div className="flex gap-2.5">
-      <Avatar username={reply.user?.username} avatar={reply.user?.avatar} size="sm" />
+      <Link to={`/profile/${reply.user?.id}`}><Avatar username={reply.user?.username} avatar={reply.user?.avatar} size="sm" /></Link>
       <div className="flex-1 min-w-0">
         <div className="bg-white border border-gray-100 rounded-2xl px-3.5 py-2.5">
           <div className="flex items-center justify-between gap-2 mb-1">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-semibold text-ink-primary truncate">@{reply.user?.username}</span>
+              <Link to={`/profile/${reply.user?.id}`} className="text-xs font-semibold text-ink-primary truncate hover:underline">@{reply.user?.username}</Link>
               <span className="text-[10px] text-gray-400 flex-shrink-0">{timeAgo(reply.createdAt)}</span>
             </div>
             {canDelete && (
@@ -193,12 +193,12 @@ function CommentItem({ comment, snippetId, currentUser, onDeleted }) {
   return (
     <div className="space-y-2">
       <div className="flex gap-2.5">
-        <Avatar username={comment.user?.username} avatar={comment.user?.avatar} size="sm" />
+        <Link to={`/profile/${comment.user?.id}`}><Avatar username={comment.user?.username} avatar={comment.user?.avatar} size="sm" /></Link>
         <div className="flex-1 min-w-0">
           <div className="bg-ink-cream rounded-2xl px-3.5 py-2.5">
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-semibold text-ink-primary truncate">@{comment.user?.username}</span>
+                <Link to={`/profile/${comment.user?.id}`} className="text-xs font-semibold text-ink-primary truncate hover:underline">@{comment.user?.username}</Link>
                 <span className="text-[10px] text-gray-400 flex-shrink-0">{timeAgo(comment.createdAt)}</span>
               </div>
               {canDelete && (

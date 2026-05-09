@@ -20,6 +20,7 @@ const TIER_LABELS = {
   TIER_2000: "≤ 2,000 words",
   TIER_3000: "≤ 3,000 words",
   TIER_4000: "≤ 4,000 words",
+  TIER_5000: "≤ 5,000 words",
 };
 
 const DRAFT_LABELS = {

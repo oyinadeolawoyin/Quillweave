@@ -720,11 +720,11 @@ export default function GroupSprintWorkspace() {
                     <div className="flex flex-wrap gap-2">
                       {sprints.filter(s => s.isActive).map((s) => (
                         <div key={s.id} className="flex items-center gap-1.5 bg-white border border-[#e8dcc8] rounded-full px-2.5 py-1 shadow-sm">
-                          {s.user?.avatar
-                            ? <img src={s.user.avatar} alt={s.user?.username} className="w-5 h-5 rounded-full object-cover" />
-                            : <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${Number(s.userId) === Number(groupSprint.userId) ? "bg-[#d4af37] text-[#2d3748]" : "bg-[#2d3748] text-white"}`}>{getInitials(s.user?.username)}</div>
-                          }
                           <Link to={`/profile/${s.user?.id}`} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                            {s.user?.avatar
+                              ? <img src={s.user.avatar} alt={s.user?.username} className="w-5 h-5 rounded-full object-cover" />
+                              : <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${Number(s.userId) === Number(groupSprint.userId) ? "bg-[#d4af37] text-[#2d3748]" : "bg-[#2d3748] text-white"}`}>{getInitials(s.user?.username)}</div>
+                            }
                             <span className="text-xs text-[#5a4a30] font-medium">@{s.user?.username}</span>
                           </Link>
                           {Number(s.userId) === Number(groupSprint.userId) && <span className="text-[10px] text-[#b8962e]">host</span>}

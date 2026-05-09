@@ -83,15 +83,15 @@ function LeaderboardRow({ entry, index, daysTarget }) {
   return (
     <FadeIn delay={60 + index * 40}>
       <div className="flex items-center gap-3 py-3 px-4 rounded-2xl transition-all hover:bg-white/5">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border-2"
+        <Link to={`/profile/${entry.userId}`} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden border-2 hover:opacity-80 transition-opacity"
           style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.08)" }}>
           {entry.avatar
             ? <img src={entry.avatar} alt={entry.username} className="w-full h-full object-cover" />
             : <span className="text-white text-sm font-bold">{(entry.username || "?").charAt(0).toUpperCase()}</span>}
-        </div>
+        </Link>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">@{entry.username}</p>
+          <Link to={`/profile/${entry.userId}`} className="text-sm font-semibold text-white truncate hover:text-white/80 transition-colors block">@{entry.username}</Link>
           <p className="text-xs text-white/50 truncate">{entry.projectTitle}</p>
         </div>
 
@@ -139,16 +139,16 @@ function WinnerCard({ winner, index }) {
           </div>
 
           {/* Avatar */}
-          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden border-2"
+          <Link to={`/profile/${winner.user?.id}`} className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden border-2 hover:opacity-80 transition-opacity"
             style={{ borderColor: isIronPen ? "rgba(196,181,253,0.5)" : isChampion ? "rgba(212,175,55,0.5)" : "rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.1)" }}>
             {winner.user?.avatar
               ? <img src={winner.user.avatar} alt={winner.username} className="w-full h-full object-cover" />
               : <span>{(winner.username || "?").charAt(0).toUpperCase()}</span>}
-          </div>
+          </Link>
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">@{winner.username}</p>
+            <Link to={`/profile/${winner.user?.id}`} className="text-sm font-semibold text-white truncate hover:text-white/80 transition-colors block">@{winner.username}</Link>
             <p className="text-xs text-white/50 truncate">{winner.projectTitle}</p>
           </div>
 

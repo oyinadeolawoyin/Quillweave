@@ -432,15 +432,22 @@ export default function DiscoveryStoryPage() {
         {/* ── Submitted-by card ────────────────────────────────────────────── */}
         <section className="mt-2">
           <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(45,35,20,0.06)] p-5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-              {story.user?.username?.charAt(0).toUpperCase() ?? "?"}
-            </div>
+            <Link to={`/profile/${story.user?.id}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+              <div className="w-10 h-10 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
+                {story.user?.avatar
+                  ? <img src={story.user.avatar} alt={story.user.username} className="w-full h-full object-cover" />
+                  : <span>{story.user?.username?.charAt(0).toUpperCase() ?? "?"}</span>
+                }
+              </div>
+            </Link>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-[#9a8c7a] mb-0.5">Submitted by</p>
-              <p className="text-sm font-semibold text-[#2d3748] truncate">{story.user?.username ?? "Unknown"}</p>
+              <Link to={`/profile/${story.user?.id}`} className="text-sm font-semibold text-[#2d3748] truncate hover:underline">
+                {story.user?.username ?? "Unknown"}
+              </Link>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-xs text-[#b8a898]">{timeAgo(story.createdAt)}</p>
+              <p className="text-xs text-[#b8a898]">{date}</p>
               <div className="mt-1 inline-flex items-center gap-1.5 bg-[#f4f1ec] text-[#2d3748] text-[10px] font-bold px-2.5 py-0.5 rounded-full">
                 <span className="w-4 h-4 rounded bg-[#2d3748] text-white flex items-center justify-center text-[9px]">
                   {platformInitial}

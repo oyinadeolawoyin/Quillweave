@@ -11,6 +11,7 @@ const TIER_LABELS = {
   TIER_2000: "≤ 2,000 words",
   TIER_3000: "≤ 3,000 words",
   TIER_4000: "≤ 4,000 words",
+  TIER_5000: "≤ 5,000 words",
 };
 
 const DRAFT_LABELS = {
@@ -102,12 +103,19 @@ function ArchivedCard({ sub }) {
 
       {/* Bottom — author + stats */}
       <div className="flex items-center justify-between pt-3 border-t border-[#f0ebe3]">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-[#9a8c7a] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-            {author?.username?.charAt(0).toUpperCase() ?? "?"}
+        <Link
+          to={`/profile/${author?.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
+          <div className="w-7 h-7 rounded-full bg-[#9a8c7a] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 overflow-hidden">
+            {author?.avatar
+              ? <img src={author.avatar} alt={author.username} className="w-full h-full object-cover" />
+              : <span>{author?.username?.charAt(0).toUpperCase() ?? "?"}</span>
+            }
           </div>
-          <span className="text-sm text-[#6b5c4a] font-medium">{author?.username}</span>
-        </div>
+          <span className="text-sm text-[#6b5c4a] font-medium hover:underline">{author?.username}</span>
+        </Link>
         <div className="flex items-center gap-3 text-xs text-[#b8a898]">
           <span className="flex items-center gap-1">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

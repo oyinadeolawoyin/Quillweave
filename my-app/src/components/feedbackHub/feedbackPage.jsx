@@ -184,11 +184,14 @@ function AuthorChip({ user, size = "md" }) {
   const sz   = size === "sm" ? "w-6 h-6 text-[9px]" : "w-8 h-8 text-xs";
 
   return (
-    <div className="flex items-center gap-2">
+    <Link to={`/profile/${user?.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
       <div
-        className={`${sz} rounded-full bg-[#2d3748] flex items-center justify-center text-white font-semibold flex-shrink-0`}
+        className={`${sz} rounded-full bg-[#2d3748] flex items-center justify-center text-white font-semibold flex-shrink-0 overflow-hidden`}
       >
-        {user?.username?.charAt(0).toUpperCase() ?? "?"}
+        {user?.avatar
+          ? <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" />
+          : <span>{user?.username?.charAt(0).toUpperCase() ?? "?"}</span>
+        }
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
@@ -206,7 +209,7 @@ function AuthorChip({ user, size = "md" }) {
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -409,13 +412,16 @@ function CommentSidebar({
           return (
             <div key={c.id} className="group">
               <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 mt-0.5">
-                  {c.author?.username?.charAt(0).toUpperCase() ?? "?"}
-                </div>
+                <Link to={`/profile/${c.author?.id}`} className="w-7 h-7 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 mt-0.5 overflow-hidden hover:opacity-80 transition-opacity">
+                  {c.author?.avatar
+                    ? <img src={c.author.avatar} alt={c.author.username} className="w-full h-full object-cover" />
+                    : <span>{c.author?.username?.charAt(0).toUpperCase() ?? "?"}</span>
+                  }
+                </Link>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1.5 mb-1.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-[#2d3748]">{c.author?.username}</span>
+                      <Link to={`/profile/${c.author?.id}`} className="text-xs font-semibold text-[#2d3748] hover:underline">{c.author?.username}</Link>
                       <span className="text-[10px] text-[#b8a898]">{timeAgo(c.createdAt)}</span>
                     </div>
                     {/* Edit / Delete — only for the comment author */}
@@ -492,10 +498,13 @@ function CommentSidebar({
                       {c.replies.map((r) => (
                         <div key={r.id} className="group/reply">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <div className="w-5 h-5 rounded-full bg-[#6b5c4a] flex items-center justify-center text-white text-[9px] font-semibold flex-shrink-0">
-                              {r.author?.username?.charAt(0).toUpperCase() ?? "?"}
-                            </div>
-                            <span className="text-[11px] font-semibold text-[#2d3748]">{r.author?.username}</span>
+                            <Link to={`/profile/${r.author?.id}`} className="w-5 h-5 rounded-full bg-[#6b5c4a] flex items-center justify-center text-white text-[9px] font-semibold flex-shrink-0 overflow-hidden hover:opacity-80 transition-opacity">
+                              {r.author?.avatar
+                                ? <img src={r.author.avatar} alt={r.author.username} className="w-full h-full object-cover" />
+                                : <span>{r.author?.username?.charAt(0).toUpperCase() ?? "?"}</span>
+                              }
+                            </Link>
+                            <Link to={`/profile/${r.author?.id}`} className="text-[11px] font-semibold text-[#2d3748] hover:underline">{r.author?.username}</Link>
                             <span className="text-[10px] text-[#b8a898]">{timeAgo(r.createdAt)}</span>
                           </div>
                           <p className="text-xs text-[#6b5c4a] leading-relaxed pl-7">
@@ -1167,6 +1176,9 @@ export default function FeedbackPage() {
               </h1>
 
               <AuthorChip user={submission.user} />
+              <p className="text-xs text-[#b8a898] mt-2">
+                {new Date(submission.createdAt).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })}
+              </p>
 
               <p className="text-sm text-[#6b5c4a] mt-5 leading-relaxed border-t border-[#f0ebe3] pt-5">
                 {submission.summary}

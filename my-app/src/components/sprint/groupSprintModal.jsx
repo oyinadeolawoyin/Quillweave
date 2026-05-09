@@ -158,31 +158,164 @@ function ProjectDropdown({ selectedProjectId, onChange }) {
   );
 }
 
-// ─── Soundscape Picker (dropdown) ─────────────────────────────
+// ─── Soundscape Picker (with preview) ────────────────────────
 function SoundscapeDropdown({ soundscapeId, onChange, soundscapes, loading }) {
-  const allOptions = [{ id: null, name: "Write in silence", creatorName: null }].concat(soundscapes);
-  const selected = allOptions.find(s => s.id === soundscapeId) || allOptions[0];
+  const [previewId, setPreviewId] = useState(null);
+  const audioRef = useRef(null);
+
+  // Stop and destroy audio on unmount (modal close)
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  function togglePreview(sc, e) {
+    e.stopPropagation();
+
+    // Already previewing this one → stop
+    if (previewId === sc.id) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPreviewId(null);
+      return;
+    }
+
+    // Stop whatever was playing before
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // Start the new preview
+    const audio = new Audio(sc.fileUrl);
+    audio.volume = 0.45;
+    audio.loop = true;
+    audio.play().catch(() => {});
+    audioRef.current = audio;
+    setPreviewId(sc.id);
+  }
+
+  function handleSelect(id) {
+    // Stop any preview when user confirms a choice
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPreviewId(null);
+    onChange(id);
+  }
+
+  const allOptions = [{ id: null, name: "Write in silence", creatorName: null, fileUrl: null }].concat(soundscapes);
 
   return (
-    <Dropdown
-      label={<>Your soundscape <span className="text-[#9a8c7a] font-normal">(optional)</span></>}
-      hint="Pick an ambient sound to write to. Only you hear it."
-      loading={loading}
-      value={soundscapeId}
-      onChange={(opt) => onChange(opt.id)}
-      options={allOptions}
-      renderSelected={() =>
-        selected?.id
-          ? selected.name
-          : <span className="text-[#9a8c7a]">Write in silence</span>
-      }
-      renderOption={(opt) => (
-        <div>
-          <p className={`font-medium truncate ${opt.id ? "text-[#2d3748]" : "text-[#9a8c7a]"}`}>{opt.name}</p>
-          {opt.creatorName && <p className="text-xs text-[#9a8c7a]">by {opt.creatorName}</p>}
+    <div className="space-y-1.5">
+      <label className="block text-sm font-medium text-[#2d3748]">
+        Your soundscape <span className="text-[#9a8c7a] font-normal">(optional)</span>
+      </label>
+      <p className="text-xs text-[#9a8c7a] leading-relaxed">
+        Pick an ambient sound to write to. Press ▶ to preview before choosing. Only you hear it.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-[#e8e0d0] bg-[#faf7f2] text-sm text-[#9a8c7a]">
+          <Spinner /> Loading soundscapes…
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-52 overflow-y-auto pr-0.5">
+          {allOptions.map((opt) => {
+            const isSelected = soundscapeId === opt.id;
+            const isPreviewing = previewId === opt.id;
+
+            return (
+              <div
+                key={opt.id ?? "silence"}
+                onClick={() => handleSelect(opt.id)}
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                  isSelected
+                    ? "border-[#d4af37] bg-[#fffbf0]"
+                    : "border-[#e8e0d0] hover:border-[#c4b898] bg-[#faf7f2] hover:bg-[#f5f0e6]"
+                }`}
+              >
+                {/* Selection indicator */}
+                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                  isSelected ? "border-[#d4af37] bg-[#d4af37]" : "border-[#c4bdb4]"
+                }`}>
+                  {isSelected && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  )}
+                </div>
+
+                {/* Name + creator */}
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${opt.id ? "text-[#2d3748]" : "text-[#9a8c7a]"}`}>
+                    {opt.name}
+                  </p>
+                  {opt.creatorName && (
+                    <p className="text-[11px] text-[#9a8c7a] truncate">by {opt.creatorName}</p>
+                  )}
+                </div>
+
+                {/* Preview button — only for actual soundscapes */}
+                {opt.fileUrl && (
+                  <button
+                    type="button"
+                    onClick={(e) => togglePreview(opt, e)}
+                    title={isPreviewing ? "Stop preview" : "Preview this soundscape"}
+                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border transition-all ${
+                      isPreviewing
+                        ? "bg-[#d4af37] border-[#d4af37] text-white shadow-sm"
+                        : "bg-white border-[#e0d8cc] text-[#9a8c7a] hover:border-[#d4af37] hover:text-[#d4af37]"
+                    }`}
+                  >
+                    {isPreviewing ? (
+                      // Pause icon
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="4" width="4" height="16" rx="1" />
+                        <rect x="14" y="4" width="4" height="16" rx="1" />
+                      </svg>
+                    ) : (
+                      // Play icon
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    )}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
-    />
+
+      {/* Now-playing strip */}
+      {previewId && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#fffbf0] border border-[#f0dfa0]">
+          <span className="flex gap-[3px] items-end h-4 flex-shrink-0">
+            {[0, 1, 2].map(i => (
+              <span
+                key={i}
+                className="w-[3px] rounded-full bg-[#d4af37] animate-bounce"
+                style={{ height: `${10 + i * 4}px`, animationDelay: `${i * 0.15}s` }}
+              />
+            ))}
+          </span>
+          <p className="text-[11px] text-[#92680a] font-medium truncate">
+            Previewing: {soundscapes.find(s => s.id === previewId)?.name}
+          </p>
+          <button
+            type="button"
+            onClick={() => { audioRef.current?.pause(); audioRef.current = null; setPreviewId(null); }}
+            className="ml-auto text-[11px] text-[#9a8c7a] hover:text-[#2d3748] transition-colors flex-shrink-0 font-medium"
+          >
+            Stop
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
