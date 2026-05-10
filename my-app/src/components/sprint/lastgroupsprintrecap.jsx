@@ -11,6 +11,7 @@
 // with the updated version at the bottom of this file.
 
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import API_URL from "@/config/api";
 
 function fmt(n) {
@@ -133,28 +134,36 @@ export default function LastGroupSprintRecap() {
                     className="flex items-center gap-3 py-2.5 px-3.5 rounded-2xl bg-[#faf7f2]"
                   >
                     {/* Avatar */}
-                    {avatar ? (
-                      <img
-                        src={avatar}
-                        alt={username}
-                        className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-[#e8e0d0]"
-                      />
-                    ) : (
-                      <div
-                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center border border-[#e8e0d0]"
-                        style={{ background: "#e8e0d0" }}
-                      >
-                        <span className="text-[11px] font-semibold text-[#9a8c7a] uppercase">
-                          {username.charAt(0)}
-                        </span>
-                      </div>
-                    )}
+                    <Link
+                      to={`/profile/${s.user?.id}`}
+                      className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                    >
+                      {avatar ? (
+                        <img
+                          src={avatar}
+                          alt={username}
+                          className="w-8 h-8 rounded-full object-cover border border-[#e8e0d0]"
+                        />
+                      ) : (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center border border-[#e8e0d0]"
+                          style={{ background: "#e8e0d0" }}
+                        >
+                          <span className="text-[11px] font-semibold text-[#9a8c7a] uppercase">
+                            {username.charAt(0)}
+                          </span>
+                        </div>
+                      )}
+                    </Link>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#2d3748] leading-tight truncate">
+                      <Link
+                        to={`/profile/${s.user?.id}`}
+                        className="text-sm font-semibold text-[#2d3748] leading-tight truncate hover:underline block"
+                      >
                         @{username}
-                      </p>
+                      </Link>
                       {project && (
                         <p className="text-[11px] text-[#9a8c7a] truncate">
                           working on{" "}

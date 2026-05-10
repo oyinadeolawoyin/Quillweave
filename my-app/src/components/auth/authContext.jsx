@@ -32,9 +32,10 @@ export function AuthProvider({ children }) {
           localStorage.removeItem("user");
         } else if (res.ok) {
           const data = await res.json();
-          // getMe returns the user object directly (not wrapped in { user })
+          // getMe now always returns { user: {...} } with fresh DB data including avatar
           const freshUser = data.user ?? data;
           setUser(freshUser);
+          localStorage.setItem("user", JSON.stringify(freshUser));
         } else {
           setUser(null);
           localStorage.removeItem("user");

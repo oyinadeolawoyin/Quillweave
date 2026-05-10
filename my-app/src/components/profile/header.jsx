@@ -236,9 +236,16 @@ export default function Header() {
                   >
                     <div className="w-8 h-8 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold shrink-0 overflow-hidden">
                       {user?.avatar
-                        ? <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" />
-                        : <span>{user?.username?.charAt(0).toUpperCase() || "U"}</span>
-                      }
+                        ? <img
+                            src={user.avatar}
+                            alt={user.username}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
+                          />
+                        : null}
+                      <span style={{ display: user?.avatar ? "none" : "flex" }} className="w-full h-full items-center justify-center">
+                        {user?.username?.charAt(0).toUpperCase() || "U"}
+                      </span>
                     </div>
                     <span className="text-sm font-medium text-[#2d3748] hidden lg:block max-w-[120px] truncate">
                       {user?.username}
@@ -396,9 +403,16 @@ export default function Header() {
                   >
                     <div className="w-7 h-7 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-xs font-semibold shrink-0 overflow-hidden">
                       {user?.avatar
-                        ? <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" />
-                        : <span>{user?.username?.charAt(0).toUpperCase() || "U"}</span>
-                      }
+                        ? <img
+                            src={user.avatar}
+                            alt={user.username}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
+                          />
+                        : null}
+                      <span style={{ display: user?.avatar ? "none" : "flex" }} className="w-full h-full items-center justify-center">
+                        {user?.username?.charAt(0).toUpperCase() || "U"}
+                      </span>
                     </div>
                     <span>{user?.username}</span>
                     <span className="ml-auto text-xs text-[#737373]">Profile</span>

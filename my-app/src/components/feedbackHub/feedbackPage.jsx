@@ -988,7 +988,9 @@ export default function FeedbackPage() {
   }
 
   const paragraphs = (submission?.content ?? "")
-    .split(/\n\n+/)
+    .replace(/\r\n/g, "\n")
+    .replace(/([^\n])\n([^\n])/g, "$1\n\n$2")
+    .split(/\n{2,}/)
     .map((p) => p.trim())
     .filter(Boolean);
 
