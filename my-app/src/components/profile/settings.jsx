@@ -2,9 +2,10 @@ import { useState, useRef } from "react";
 import { useAuth } from "../auth/authContext";
 import Header from "./header";
 import API_URL from "@/config/api";
+import NotificationSettings from "./notificationsettings";
 
 export default function Settings() {
-  const { user, updateUserContext } = useAuth();
+  const { user, updateUserContext, logout } = useAuth();
 
   // ─── Profile state ────────────────────────────────────────────
   const [profileForm, setProfileForm] = useState({
@@ -41,6 +42,13 @@ export default function Settings() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError]     = useState("");
   const [emailSuccess, setEmailSuccess] = useState("");
+
+  // ─── Delete account state ─────────────────────────────────────
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError]     = useState("");
+  const DELETE_PHRASE = "delete my account";
 
   const isDiscordLinked = !!user?.discordId;
   const isDiscordOnly   = isDiscordLinked && !user?.password;
@@ -185,6 +193,33 @@ export default function Settings() {
       setEmailError("Something went wrong. Please try again.");
     } finally {
       setEmailLoading(false);
+    }
+  }
+
+  // ─── Delete account handler ───────────────────────────────────
+  async function handleDeleteAccount() {
+    setDeleteError("");
+    if (deleteConfirmText.toLowerCase() !== DELETE_PHRASE) return;
+
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/me`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteError(data.message || "Failed to delete account. Please try again.");
+        return;
+      }
+      // Log the user out on the client side
+      if (logout) logout();
+      // Redirect to home / landing page
+      window.location.href = "/";
+    } catch {
+      setDeleteError("Something went wrong. Please try again.");
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -387,59 +422,59 @@ export default function Settings() {
           </section>
         )}
 
-        {/* ─── Recovery Email (Discord-only users) ─────────────────── */}
-          <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-serif text-ink-primary">Recovery Email</h2>
-                <p className="text-sm text-ink-gray mt-0.5">
-                  Update your Email
-                </p>
-              </div>
+        {/* ─── Recovery Email ───────────────────────────────────────── */}
+        <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-serif text-ink-primary">Recovery Email</h2>
+              <p className="text-sm text-ink-gray mt-0.5">
+                Update your Email
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveEmail} className="space-y-4">
+            <div>
+              <label htmlFor="recoveryEmail" className="block text-sm font-medium text-ink-primary mb-2">
+                Email Address
+              </label>
+              <input
+                id="recoveryEmail"
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setEmailError(""); setEmailSuccess(""); }}
+                placeholder="you@example.com"
+                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
+                disabled={emailLoading}
+              />
             </div>
 
-            <form onSubmit={handleSaveEmail} className="space-y-4">
-              <div>
-                <label htmlFor="recoveryEmail" className="block text-sm font-medium text-ink-primary mb-2">
-                  Email Address
-                </label>
-                <input
-                  id="recoveryEmail"
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setEmailError(""); setEmailSuccess(""); }}
-                  placeholder="you@example.com"
-                  className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
-                  disabled={emailLoading}
-                />
+            {emailError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <p className="text-sm text-red-800">{emailError}</p>
               </div>
+            )}
+            {emailSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <p className="text-sm text-green-800">{emailSuccess}</p>
+              </div>
+            )}
 
-              {emailError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                  <p className="text-sm text-red-800">{emailError}</p>
-                </div>
-              )}
-              {emailSuccess && (
-                <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                  <p className="text-sm text-green-800">{emailSuccess}</p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={emailLoading}
-                className="w-full py-3 px-6 bg-amber-500 text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {emailLoading ? "Saving..." : hasEmail ? "Update Email" : "Save Email"}
-              </button>
-            </form>
-          </section>
+            <button
+              type="submit"
+              disabled={emailLoading}
+              className="w-full py-3 px-6 bg-amber-500 text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {emailLoading ? "Saving..." : hasEmail ? "Update Email" : "Save Email"}
+            </button>
+          </form>
+        </section>
 
         {/* ─── Password section ─────────────────────────────────── */}
         <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
@@ -539,7 +574,134 @@ export default function Settings() {
           </form>
         </section>
 
+        {/* ─── Notification section ─────────────────────────────────── */}
+        <NotificationSettings />
+
+        {/* ─── Danger Zone ──────────────────────────────────────────── */}
+        <section className="rounded-2xl border-2 border-red-200 bg-white p-6 sm:p-8">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-serif text-red-700">Danger Zone</h2>
+              <p className="text-sm text-ink-gray mt-0.5">
+                Irreversible actions — please read carefully before proceeding.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-red-100 bg-red-50">
+            <div>
+              <p className="text-sm font-medium text-ink-primary">Delete account</p>
+              <p className="text-xs text-ink-gray mt-1 leading-relaxed">
+                Your profile, projects, sprints, and private data will be permanently removed.
+                Comments and feedback you left on other writers' work will remain but show as <span className="font-mono font-medium">[deleted]</span>.
+              </p>
+            </div>
+            <button
+              onClick={() => { setShowDeleteModal(true); setDeleteError(""); setDeleteConfirmText(""); }}
+              className="shrink-0 px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              Delete account
+            </button>
+          </div>
+        </section>
+
       </main>
+
+      {/* ─── Delete account confirmation modal ───────────────────── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => { if (!deleteLoading) setShowDeleteModal(false); }}
+          />
+
+          {/* Modal */}
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-5">
+
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-serif text-ink-primary">Delete your account?</h3>
+                <p className="text-sm text-ink-gray mt-0.5">This cannot be undone.</p>
+              </div>
+            </div>
+
+            {/* What gets deleted vs preserved */}
+            <div className="space-y-3 text-sm">
+              <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 space-y-1">
+                <p className="font-medium text-red-700 mb-1">Permanently deleted</p>
+                <ul className="text-red-600 space-y-0.5 list-disc list-inside text-xs">
+                  <li>Your profile, avatar, and bio</li>
+                  <li>All projects, sprints, notes, and to-do lists</li>
+                  <li>Your notifications and account credentials</li>
+                </ul>
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 space-y-1">
+                <p className="font-medium text-amber-700 mb-1">Preserved (shown as <span className="font-mono">[deleted]</span>)</p>
+                <ul className="text-amber-600 space-y-0.5 list-disc list-inside text-xs">
+                  <li>Comments you left on blog posts and snippets</li>
+                  <li>Feedback and critiques you gave in the Feedback Hub</li>
+                  <li>Wall posts you wrote on other members' profiles</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Confirmation input */}
+            <div>
+              <label htmlFor="deleteConfirm" className="block text-sm font-medium text-ink-primary mb-2">
+                Type <span className="font-mono font-semibold text-red-600">{DELETE_PHRASE}</span> to confirm
+              </label>
+              <input
+                id="deleteConfirm"
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => { setDeleteConfirmText(e.target.value); setDeleteError(""); }}
+                placeholder={DELETE_PHRASE}
+                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 transition-all text-ink-gray"
+                disabled={deleteLoading}
+                autoComplete="off"
+              />
+            </div>
+
+            {deleteError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <p className="text-sm text-red-800">{deleteError}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+                className="flex-1 py-2.5 px-4 text-sm font-medium text-ink-primary border border-ink-lightgray rounded-xl hover:bg-ink-cream transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading || deleteConfirmText.toLowerCase() !== DELETE_PHRASE}
+                className="flex-1 py-2.5 px-4 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deleteLoading ? "Deleting…" : "Yes, delete my account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
