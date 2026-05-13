@@ -560,21 +560,22 @@ export default function SnippetFeed() {
       <Header />
 
       {/* Hero */}
-      <div className="bg-ink-primary relative overflow-hidden">
-        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-ink-gold/10 pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0d1320 0%, #141c2e 40%, #1a2540 70%, #1e2d4a 100%)" }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
+        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg, transparent 5%, #d4af37 35%, #d4af37 65%, transparent 95%)" }} />
+        <div className="absolute pointer-events-none" style={{ top: "-80px", right: "-60px", width: "380px", height: "380px", borderRadius: "50%", background: "radial-gradient(circle, rgba(212,175,55,0.07) 0%, transparent 65%)" }} />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 relative">
-          <p className="text-ink-gold text-xs font-bold uppercase tracking-widest mb-3">Inkwell Community</p>
+          <p className="text-[10px] font-bold tracking-[0.25em] uppercase mb-3" style={{ color: "#d4af37" }}>Inkwell Community</p>
           <h1 className="text-2xl sm:text-5xl font-serif text-white leading-tight mb-4">
             How is your writing today?<br className="hidden sm:block" /> Any wins or struggles?
           </h1>
-          <p className="text-white/60 text-sm sm:text-lg max-w-xl mb-7">Writing tips, honest reflections, and lessons from writers in the community.</p>
+          <p className="text-white text-sm sm:text-lg max-w-xl mb-7" style={{ opacity: 0.65 }}>Writing tips, honest reflections, and lessons from writers in the community.</p>
           {user
-            ? <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-ink-gold text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all shadow-soft">
+            ? <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 text-sm font-semibold rounded-xl transition-all" style={{ background: "linear-gradient(135deg, #d4af37 0%, #c09a28 100%)", color: "#12181f", boxShadow: "0 4px 16px rgba(212,175,55,0.35)" }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                 Share yours
               </button>
-            : <Link to="/signup" className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-ink-gold text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all shadow-soft">Join to share</Link>
+            : <Link to="/signup" className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 text-sm font-semibold rounded-xl transition-all" style={{ background: "linear-gradient(135deg, #d4af37 0%, #c09a28 100%)", color: "#12181f", boxShadow: "0 4px 16px rgba(212,175,55,0.35)" }}>Join to share</Link>
           }
         </div>
       </div>

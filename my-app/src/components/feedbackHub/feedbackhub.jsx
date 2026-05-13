@@ -276,15 +276,19 @@ export default function FeedbackHub() {
       <Header />
 
       {/* Hero banner */}
-      <div className="bg-ink-primary relative overflow-hidden">
-        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-ink-gold/10 pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0d1320 0%, #141c2e 40%, #1a2540 70%, #1e2d4a 100%)" }}>
+        {/* Dot grid texture */}
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
+        {/* Gold top line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg, transparent 5%, #d4af37 35%, #d4af37 65%, transparent 95%)" }} />
+        {/* Warm glow */}
+        <div className="absolute pointer-events-none" style={{ top: "-80px", right: "-60px", width: "380px", height: "380px", borderRadius: "50%", background: "radial-gradient(circle, rgba(212,175,55,0.07) 0%, transparent 65%)" }} />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative">
-          <p className="text-ink-gold text-xs font-bold uppercase tracking-widest mb-3">Inkwell</p>
+          <p className="text-[10px] font-bold tracking-[0.25em] uppercase mb-3" style={{ color: "#d4af37" }}>Inkwell</p>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif text-white leading-tight mb-4">
             Feedback Hub
           </h1>
-          <p className="text-white/60 text-base sm:text-lg max-w-xl">
+          <p className="text-white text-base sm:text-lg max-w-xl" style={{ opacity: 0.65 }}>
             Read a chapter, leave a critique, earn points to post your own work.
           </p>
         </div>

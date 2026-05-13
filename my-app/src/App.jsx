@@ -4,11 +4,11 @@ import { useAuth } from "./components/auth/authContext";
 import Header from "./components/profile/header";
 import { AppMetaTags } from "./components/utilis/metatags";
 import { StartGroupSprintModal, JoinGroupSprintModal } from "./components/sprint/groupSprintModal";
-import DailyQuote from "./components/quote/dailyQuote";
+import DailyEmotion from "./components/emotioncues/dailyemotion";
 import NotificationsSetup from "./components/notification/notificationSetup";
-import WeeklySchedule from "./components/sprint/weeklyschedule";
 import ContributeSoundscape from "./components/sprint/Contributesoundscape";
-import CommunityProjects from "./components/projects/communityprojects";
+import CommunityLeaderboard from "./components/leaderBoard/communityLeaderboard";
+import ChallengeBlock from "./components/leaderBoard/challengeblock";
 import LastGroupSprintRecap from "./components/sprint/lastgroupsprintrecap";
 import API_URL from "./config/api";
 
@@ -469,20 +469,314 @@ function GuestPrompt({ message, onClose }) {
   );
 }
 
-// ─── Hero ──────────────────────────────────────────────────────
-function HeroImage() {
+// ─── Tiny markdown renderer (no deps) ─────────────────────────
+function renderMarkdownHTML(text) {
+  if (!text) return "";
+  const mdInline = (s) => s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, '<code style="background:rgba(255,255,255,0.12);padding:1px 4px;border-radius:3px;font-size:0.88em">$1</code>');
+  const lines = text.split("\n");
+  const out = [];
+  let inList = false;
+  for (const line of lines) {
+    if (/^#{1,3}\s/.test(line)) {
+      if (inList) { out.push("</ul>"); inList = false; }
+      out.push(`<strong style="display:block;margin-bottom:3px">${mdInline(line.replace(/^#+\s/, ""))}</strong>`);
+    } else if (/^[-*]\s/.test(line)) {
+      if (!inList) { out.push('<ul style="margin:4px 0;padding-left:18px;list-style:disc">'); inList = true; }
+      out.push(`<li style="margin-bottom:2px">${mdInline(line.replace(/^[-*]\s/, ""))}</li>`);
+    } else {
+      if (inList) { out.push("</ul>"); inList = false; }
+      if (line.trim() === "") out.push('<br style="display:block;height:4px">');
+      else out.push(`<span style="display:block">${mdInline(line)}</span>`);
+    }
+  }
+  if (inList) out.push("</ul>");
+  return out.join("");
+}
+
+// ─── Hero Carousel ────────────────────────────────────────────
+function HeroCarousel() {
+  const [events, setEvents] = useState([]);
+  const [slide, setSlide] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const totalSlides = 1 + events.length; // mission slide + one per event
+
+  // Fetch live/upcoming events
+  useEffect(() => {
+    fetch(`${API_URL}/events/active`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const evs = (d?.events || []).slice(0, 3);
+        setEvents(evs);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Auto-advance
+  useEffect(() => {
+    if (totalSlides <= 1) return;
+    const t = setInterval(() => goTo((slide + 1) % totalSlides), 6000);
+    return () => clearInterval(t);
+  }, [slide, totalSlides]);
+
+  function goTo(idx) {
+    if (idx === slide || animating) return;
+    setAnimating(true);
+    setTimeout(() => { setSlide(idx); setAnimating(false); }, 350);
+  }
+
+  const typeLabels = {
+    DAYS_CHALLENGE: "Writing Challenge",
+    WORKSHOP: "Workshop",
+    ANNOUNCEMENT: "Announcement",
+    OTHER: "Community Event",
+  };
+  const typeColors = {
+    DAYS_CHALLENGE: "#a78bfa",
+    WORKSHOP: "#34d399",
+    ANNOUNCEMENT: "#60a5fa",
+    OTHER: "#d4af37",
+  };
+
   return (
-    <div className="relative w-full overflow-hidden" style={{ height: "clamp(280px, 45vw, 520px)" }}>
-      <img src="/Gemini_Generated_Image_d6p43ed6p43ed6p4.png" alt="Writers at Inkwell" className="w-full h-full object-cover block" style={{ objectPosition: "center center" }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(26,35,51,0.88) 0%, rgba(26,35,51,0.2) 50%, transparent 100%)" }} />
-      <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 sm:pb-14 px-6 text-center">
-        <h1 className="font-serif text-white text-3xl sm:text-5xl leading-tight" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.5)" }}>
-          The Coffee Shop<br />for Writers
-        </h1>
-        <p className="text-white/75 text-sm sm:text-base mt-3 max-w-sm leading-relaxed" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
-          Pull up a seat. Put on some rain. Write alongside others who show up just like you do.
-        </p>
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ height: "clamp(300px, 46vw, 540px)" }}
+    >
+      {/* ── Slide 0: Inkwell Mission ── */}
+      <div
+        className="absolute inset-0 transition-opacity duration-500"
+        style={{ opacity: slide === 0 ? 1 : 0, pointerEvents: slide === 0 ? "auto" : "none" }}
+      >
+        {/* Rich dark background matching homepage dark components */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(135deg, #0d1320 0%, #141c2e 35%, #1a2540 65%, #1e2d4a 100%)",
+          }}
+        />
+        {/* Dot grid texture */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
+          }}
+        />
+        {/* Warm glow top-left */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            top: "-80px", left: "-60px",
+            width: "420px", height: "420px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(212,175,55,0.07) 0%, transparent 65%)",
+          }}
+        />
+        {/* Bottom fade to page bg */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+          style={{ background: "linear-gradient(to bottom, transparent, rgba(13,19,32,0.55))" }}
+        />
+        {/* Gold top-border line */}
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px]"
+          style={{ background: "linear-gradient(90deg, transparent 5%, #d4af37 35%, #d4af37 65%, transparent 95%)" }}
+        />
+
+        {/* Content */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+          <p
+            className="font-bold uppercase tracking-[0.25em] mb-4"
+            style={{ fontSize: 10, color: "#d4af37", letterSpacing: "0.28em" }}
+          >
+            A Writing Community
+          </p>
+
+          <h1
+            className="font-serif text-white leading-[1.08] mb-5"
+            style={{
+              fontSize: "clamp(2rem, 5.5vw, 3.6rem)",
+              letterSpacing: "-0.025em",
+              maxWidth: 640,
+              textShadow: "0 2px 24px rgba(0,0,0,0.5)",
+            }}
+          >
+            Write Together.<br />
+            <span style={{ color: "#d4af37" }}>Grow Together.</span>
+          </h1>
+
+          <p
+            className="text-white leading-relaxed mb-8"
+            style={{
+              fontSize: "clamp(0.88rem, 1.8vw, 1.05rem)",
+              maxWidth: 480,
+              opacity: 0.78,
+            }}
+          >
+            Inkwell is where writers trade the isolated journey for a shared one — sprint together, sharpen your craft, and never face a blank page alone again.
+          </p>
+
+          {/* Three pillars */}
+          <div className="flex items-center gap-6 sm:gap-10 flex-wrap justify-center">
+            {[
+              { icon: "✦", label: "Write together" },
+              { icon: "✦", label: "Improve your craft" },
+              { icon: "✦", label: "Finish your draft" },
+            ].map(({ icon, label }) => (
+              <div key={label} className="flex items-center gap-2">
+                <span style={{ color: "#d4af37", fontSize: 8 }}>{icon}</span>
+                <span className="text-white font-medium" style={{ fontSize: 12, opacity: 0.85, letterSpacing: "0.01em" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* ── Event Slides ── */}
+      {events.map((ev, i) => {
+        const idx = i + 1;
+        const now = new Date();
+        const start = new Date(ev.startDate);
+        const end = new Date(ev.endDate);
+        const isLive = now >= start && now <= end;
+        const isUpcoming = now < start;
+        const statusLabel = isLive ? "Happening now" : isUpcoming ? "Coming soon" : "Recently ended";
+        const statusColor = isLive ? "#4ade80" : isUpcoming ? "#a78bfa" : "#9a8c7a";
+        const tagColor = typeColors[ev.type] || "#d4af37";
+        const tagLabel = typeLabels[ev.type] || "Event";
+
+        const formatRange = (s, e) => {
+          const opts = { month: "short", day: "numeric" };
+          return `${new Date(s).toLocaleDateString("en-US", opts)} – ${new Date(e).toLocaleDateString("en-US", opts)}`;
+        };
+
+        return (
+          <div
+            key={ev.id}
+            className="absolute inset-0 transition-opacity duration-500"
+            style={{ opacity: slide === idx ? 1 : 0, pointerEvents: slide === idx ? "auto" : "none" }}
+          >
+            {/* Background */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: ev.type === "DAYS_CHALLENGE"
+                  ? "linear-gradient(135deg, #1a1225 0%, #2d2048 60%, #1e2d4a 100%)"
+                  : ev.type === "WORKSHOP"
+                  ? "linear-gradient(135deg, #0d2018 0%, #1a3a2a 60%, #1e2d4a 100%)"
+                  : "linear-gradient(135deg, #0f1e35 0%, #1a2e50 60%, #1e2d4a 100%)",
+              }}
+            />
+            {ev.bannerUrl && (
+              <div className="absolute inset-0 opacity-15">
+                <img src={ev.bannerUrl} alt="" className="w-full h-full object-cover" />
+              </div>
+            )}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
+                backgroundSize: "26px 26px",
+              }}
+            />
+            <div
+              className="absolute top-0 left-0 right-0 h-[2px]"
+              style={{ background: `linear-gradient(90deg, transparent 5%, ${tagColor} 35%, ${tagColor} 65%, transparent 95%)` }}
+            />
+            <div
+              className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+              style={{ background: "linear-gradient(to bottom, transparent, rgba(10,14,25,0.6))" }}
+            />
+
+            {/* Event content — centered like the mission slide */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+              <div style={{ maxWidth: 640, width: "100%" }}>
+              {/* Status pill */}
+              <div className="flex items-center justify-center gap-2.5 mb-4">
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
+                />
+                <span
+                  className="font-bold uppercase tracking-[0.2em]"
+                  style={{ fontSize: 10, color: tagColor }}
+                >
+                  {tagLabel}
+                </span>
+                <span
+                  className="font-semibold uppercase tracking-widest"
+                  style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}
+                >
+                  · {statusLabel}
+                </span>
+              </div>
+
+              <h2
+                className="font-serif text-white leading-[1.1] mb-4"
+                style={{
+                  fontSize: "clamp(1.8rem, 4.5vw, 3rem)",
+                  letterSpacing: "-0.02em",
+                  textShadow: "0 2px 20px rgba(0,0,0,0.5)",
+                }}
+              >
+                {ev.title}
+              </h2>
+
+              {ev.description && (
+                <div
+                  className="text-white leading-relaxed mb-5 mx-auto"
+                  style={{ fontSize: "clamp(0.82rem, 1.6vw, 0.95rem)", opacity: 0.75, maxWidth: 480, textAlign: "left" }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdownHTML(
+                    ev.description.length > 200 ? ev.description.slice(0, 197) + "…" : ev.description
+                  ) }}
+                />
+              )}
+
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                <span
+                  className="text-white font-medium"
+                  style={{ fontSize: 12, opacity: 0.55 }}
+                >
+                  {formatRange(ev.startDate, ev.endDate)}
+                </span>
+                {ev.daysTarget && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/25" />
+                    <span className="text-white font-medium" style={{ fontSize: 12, opacity: 0.55 }}>
+                      {ev.daysTarget} consecutive days
+                    </span>
+                  </>
+                )}
+              </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ── Dots nav (only if > 1 slide) ── */}
+      {totalSlides > 1 && (
+        <div className="absolute bottom-5 left-0 right-0 flex justify-center gap-2 z-20">
+          {Array.from({ length: totalSlides }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              aria-label={`Slide ${i + 1}`}
+              className="focus:outline-none transition-all"
+              style={{
+                width: i === slide ? 24 : 8,
+                height: 8,
+                borderRadius: 4,
+                background: i === slide ? "#d4af37" : "rgba(255,255,255,0.25)",
+                transition: "all 0.35s ease",
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -794,29 +1088,44 @@ export function CommunitySchedule({ discordInviteLink }) {
 }
 
 // ─── Discord Community Banner ──────────────────────────────────
-// Shown on the homepage to invite guests and members to join
+// Shown to ALL users — guests get signup/login CTAs, members get a reminder
 function DiscordBanner() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
   return (
     <section
-      className="rounded-3xl border border-[#e8e0d0] overflow-hidden mb-12"
-      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.03), 0 8px 24px rgba(45,35,20,0.06)" }}
+      className="rounded-3xl overflow-hidden mb-12"
+      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.05), 0 16px 48px rgba(10,15,30,0.18)" }}
     >
       <div
         className="relative px-6 sm:px-10 py-8 sm:py-10"
-        style={{ background: "linear-gradient(135deg, #1e2235 0%, #2d3748 60%, #3b4a6b 100%)" }}
+        style={{ background: "linear-gradient(135deg, #0d1320 0%, #141c2e 40%, #1a2540 70%, #1e2d4a 100%)" }}
       >
-        {/* Subtle texture lines */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: "repeating-linear-gradient(45deg, #fff 0px, #fff 1px, transparent 1px, transparent 12px)"
-        }} />
+        {/* Gold top line */}
+        <div
+          className="absolute top-0 left-8 right-8 h-px"
+          style={{ background: "linear-gradient(90deg, transparent, #d4af37 40%, #d4af37 60%, transparent)" }}
+        />
+        {/* Dot grid texture */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
 
-        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6">
+        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-10">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-2">Writing community</p>
+            <p className="text-[10px] text-white font-bold tracking-[0.22em] uppercase mb-2" style={{ opacity: 0.45 }}>
+              Join on Discord
+            </p>
             <h2 className="font-serif text-white text-xl sm:text-2xl leading-snug mb-3">
-              Writing is solitary.<br />Accountability doesn't have to be.
+              Writing is solitary.<br />
+              Accountability doesn't have to be.
             </h2>
-            <p className="text-white/60 text-sm leading-relaxed max-w-md">
+            <p className="text-white text-sm leading-relaxed max-w-md" style={{ opacity: 0.72 }}>
               Join writers on Discord who show up every week, share their word counts, cheer each other on, and refuse to give up on their stories.
             </p>
             <ul className="mt-4 space-y-1.5">
@@ -827,19 +1136,18 @@ function DiscordBanner() {
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <div className="w-1 h-1 rounded-full bg-[#d4af37] mt-1.5 flex-shrink-0" />
-                  <span className="text-[12px] text-white/65 leading-relaxed">{item}</span>
+                  <span className="text-white text-[12px] leading-relaxed" style={{ opacity: 0.78 }}>{item}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="flex-shrink-0 flex flex-col items-center gap-3">
-            {/* UPDATE THIS LINK WEEKLY — Discord links expire */}
+          <div className="flex-shrink-0 flex flex-col items-center gap-3 w-full sm:w-auto">
             <a
               href={DISCORD_INVITE_LINK}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2.5 bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold text-sm px-6 py-3 rounded-2xl transition-all"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold text-sm px-7 py-3 rounded-2xl transition-all"
               style={{ boxShadow: "0 4px 16px rgba(88,101,242,0.5)" }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -847,7 +1155,24 @@ function DiscordBanner() {
               </svg>
               Join the community
             </a>
-            <p className="text-[10px] text-white/30 text-center">Free to join · Writers only</p>
+            <p className="text-white text-[10px] text-center" style={{ opacity: 0.35 }}>Free to join · Writers only</p>
+            {!user && (
+              <div className="mt-1 flex flex-col gap-2 w-full">
+                <button
+                  onClick={() => navigate("/signup")}
+                  className="w-full py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-medium rounded-xl transition-all border border-white/10"
+                >
+                  Create a free account
+                </button>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="w-full py-2.5 text-sm transition-colors text-white"
+                  style={{ opacity: 0.4 }}
+                >
+                  Sign in
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -877,10 +1202,10 @@ export default function Homepage() {
       <AppMetaTags title="Inkwell Coffee Shop — Write Together" description="A cosy writing space where writers show up, sprint together and get words on the page." />
       <Header />
       <NotificationsSetup user={user} />
-      <HeroImage />
+      <HeroCarousel />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
-        <section className="mb-10"><DailyQuote /></section>
+        <section className="mb-10"><DailyEmotion /></section>
         <div className="mb-10"><ActiveSprintsBanner onJoinClick={handleBannerJoinClick} /></div>
         <LastGroupSprintRecap /> 
         <section className="mb-12">
@@ -908,87 +1233,19 @@ export default function Homepage() {
           </div>
         </section>
 
-        {/* Weekly schedule — when community sprints happen */}
-        <section className="mb-10"><WeeklySchedule /></section>
-
         {/* Community sprint times + Discord link */}
         <CommunitySchedule discordInviteLink={DISCORD_INVITE_LINK} />
 
-        {/* Community events — fetched from backend — reading & writing challenges */}
-        <CommunityEventsCarousel />
+        {/* 5-day writing challenge — active participants or winners */}
+        <section className="mb-10"><ChallengeBlock /></section>
 
-        {/* Community projects — habit tracking and progress tracking separated */}
-        <section className="mb-12"><CommunityProjects /></section>
+        {/* Community honours board — top critiquers, sprinters, sentence crafters */}
+        <section className="mb-12"><CommunityLeaderboard /></section>
 
         <section className="mb-12"><ContributeSoundscape /></section>
 
-        {!user && (
-          <section
-            className="rounded-3xl border border-[#e8e0d0] overflow-hidden mb-12"
-            style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.03), 0 8px 24px rgba(45,35,20,0.06)" }}
-          >
-            <div
-              className="relative px-6 sm:px-10 py-8 sm:py-10"
-              style={{ background: "linear-gradient(135deg, #1e2235 0%, #2d3748 60%, #3b4a6b 100%)" }}
-            >
-              <div className="absolute inset-0 opacity-[0.03]" style={{
-                backgroundImage: "repeating-linear-gradient(45deg, #fff 0px, #fff 1px, transparent 1px, transparent 12px)"
-              }} />
-              <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-8">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-2">Writing community</p>
-                  <h2 className="font-serif text-white text-xl sm:text-2xl leading-snug mb-3">
-                    Writing is solitary.<br />Accountability doesn't have to be.
-                  </h2>
-                  <p className="text-white/60 text-sm leading-relaxed max-w-md">
-                    Join writers on Discord who show up every week, share their word counts, cheer each other on, and refuse to give up on their stories.
-                  </p>
-                  <ul className="mt-4 space-y-1.5">
-                    {[
-                      "Weekly reading and writing sprints with real writers",
-                      "Daily check-ins to keep your streak alive",
-                      "A place to share wins and stay honest",
-                    ].map((item) => (
-                      <li key={item} className="flex items-start gap-2">
-                        <div className="w-1 h-1 rounded-full bg-[#d4af37] mt-1.5 flex-shrink-0" />
-                        <span className="text-[12px] text-white/65 leading-relaxed">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="flex-shrink-0 flex flex-col items-center gap-3 w-full sm:w-auto">
-                  <a
-                    href={DISCORD_INVITE_LINK}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold text-sm px-7 py-3 rounded-2xl transition-all"
-                    style={{ boxShadow: "0 4px 16px rgba(88,101,242,0.5)" }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
-                    </svg>
-                    Join the community
-                  </a>
-                  <p className="text-[10px] text-white/30 text-center">Free to join · Writers only</p>
-                  <div className="mt-1 flex flex-col gap-2 w-full">
-                    <button
-                      onClick={() => navigate("/signup")}
-                      className="w-full py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-medium rounded-xl transition-all border border-white/10"
-                    >
-                      Create a free account
-                    </button>
-                    <button
-                      onClick={() => navigate("/login")}
-                      className="w-full py-2.5 text-white/40 hover:text-white/60 text-sm transition-colors"
-                    >
-                      Sign in
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
+        {/* Discord community banner — always visible for both guests and logged-in users */}
+        <DiscordBanner />
 
         <p className="text-center text-[10px] text-[#c4bdb4] pt-12 tracking-widest uppercase">
           A quiet space for writers · Inkwell

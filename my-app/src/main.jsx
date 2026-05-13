@@ -20,11 +20,10 @@ import Services from './components/services/services';
 import Blog from './components/blog/blog';
 import BlogPost from './components/blog/blogPost';
 import AdminBlog from './components/blog/adminBlog';
-import AdminQuote from './components/quote/adminquote';
+import EmotionPracticePage from './components/emotioncues/emotionpracticepage';
 import App from './App'
 import SnippetFeed from './components/sprint/snippetfeed';
 import SnippetPage from './components/sprint/snippetpage';
-import AdminSchedule from './components/sprint/adminschedule';
 import AdminSoundscapes from './components/sprint/Adminsoundscapes';
 import Settings from './components/profile/settings';
 import ProjectsPage from './components/projects/projectspage';
@@ -32,6 +31,7 @@ import CreateEditProject from './components/projects/createeditproject';
 import ProjectStats from './components/projects/projectstats';
 import AdminEvents from './components/projects/adminevents';
 import EventPage from './components/projects/eventpage';
+import EventsListPage from './components/projects/eventslistpage';
 import FeedbackHub from './components/feedbackHub/feedbackhub';
 import SubmitFeedback from './components/feedbackHub/submitFeedback';
 import FeedbackPage from './components/feedbackHub/feedbackPage';
@@ -108,12 +108,8 @@ const router = createBrowserRouter([
     element: <AdminBlog />
   },
   {
-    path: "/admin/quote",
-    element: <AdminQuote />
-  },
-  { 
-    path: "/admin/schedule", 
-    element: <AdminSchedule /> 
+    path: "/emotions/practice",
+    element: <EmotionPracticePage />
   },
   {
     path: "/admin/soundscapes",
@@ -142,6 +138,10 @@ const router = createBrowserRouter([
   {
     path: "/events/:eventId",
     element: <EventPage />
+  },
+  {
+    path: "/events",
+    element: <EventsListPage />
   },
   { 
     path: "/feedback", 

@@ -177,26 +177,28 @@ export default function DiscoveryFeed() {
     <div className="min-h-screen bg-ink-cream">
       <Header />
 
-      {/* Hero banner — matches blog page */}
-      <div className="bg-ink-primary relative overflow-hidden">
-        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-ink-gold/10 pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
+      {/* Hero banner — matches new Inkwell brand */}
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0d1320 0%, #141c2e 40%, #1a2540 70%, #1e2d4a 100%)" }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
+        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg, transparent 5%, #d4af37 35%, #d4af37 65%, transparent 95%)" }} />
+        <div className="absolute pointer-events-none" style={{ top: "-80px", right: "-60px", width: "380px", height: "380px", borderRadius: "50%", background: "radial-gradient(circle, rgba(212,175,55,0.07) 0%, transparent 65%)" }} />
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-ink-gold text-xs font-bold uppercase tracking-widest mb-3">Inkwell</p>
+              <p className="text-[10px] font-bold tracking-[0.25em] uppercase mb-3" style={{ color: "#d4af37" }}>Inkwell</p>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif text-white leading-tight mb-4">
                 Discovery
               </h1>
-              <p className="text-white/60 text-base sm:text-lg max-w-xl">
+              <p className="text-white text-base sm:text-lg max-w-xl" style={{ opacity: 0.65 }}>
                 Stories written by our community — find your next favourite read.
               </p>
             </div>
             {user && (
               <Link
                 to="/discovery/submit"
-                className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 bg-ink-gold text-white text-sm font-semibold rounded-xl hover:bg-[#c9a42d] transition-colors shadow-sm"
+                className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors shadow-sm text-[#12181f]"
+                style={{ background: "linear-gradient(135deg, #d4af37 0%, #c09a28 100%)", boxShadow: "0 4px 16px rgba(212,175,55,0.35)" }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

@@ -45,9 +45,17 @@ const CATEGORIES = [
     ],
   },
   {
-    section: "Quotes & Announcements",
+    section: "Craft Learning",
     items: [
-      { key: "quote_new", label: "A new daily quote is published" },
+      { key: "emotion_new", label: "A new daily emotion & cues is published" },
+      { key: "emotion_comment_pinned", label: "Your practice sentence is pinned" },
+      { key: "emotion_comment_liked", label: "Someone liked your practice sentence" },
+    ],
+  },
+  {
+    section: "Announcements",
+    items: [
+      { key: "announcement_new", label: "A new announcement is published" },
     ],
   },
   {
