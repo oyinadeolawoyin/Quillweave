@@ -539,6 +539,17 @@ export default function ProfilePage() {
   const [actionLoading, setActionLoading]   = useState(false);
   const [toast, setToast]                   = useState(null);
 
+  // Block (visitor → profile owner)
+  const [isBlockedByMe, setIsBlockedByMe]     = useState(false);
+  const [blockLoading, setBlockLoading]       = useState(false);
+  const [blockConfirm, setBlockConfirm]       = useState(false);
+
+  // Blocked users list (owner only)
+  const [blockedUsers, setBlockedUsers]               = useState([]);
+  const [blockedUsersLoading, setBlockedUsersLoading] = useState(false);
+  const [unblockTarget, setUnblockTarget]             = useState(null); // user object
+  const [unblockLoading, setUnblockLoading]           = useState(false);
+
   // ── Fetch user ──
   useEffect(() => {
     async function fetchUser() {
@@ -554,6 +565,99 @@ export default function ProfilePage() {
     }
     fetchUser();
   }, [profileUserId]);
+
+  // ── Fetch block status (visitor only) ──
+  useEffect(() => {
+    if (!currentUser || isOwner) return;
+    async function fetchBlockStatus() {
+      try {
+        const res = await fetch(`${API_URL}/users/blocked`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          const blocked = (data.users ?? []).some(u => u.id === profileUserId);
+          setIsBlockedByMe(blocked);
+        }
+      } catch {}
+    }
+    fetchBlockStatus();
+  }, [currentUser, isOwner, profileUserId]);
+
+  // ── Fetch blocked-users list (owner only) ──
+  useEffect(() => {
+    if (!isOwner) return;
+    async function fetchBlockedUsers() {
+      setBlockedUsersLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/users/blocked`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setBlockedUsers(data.users ?? []);
+        }
+      } catch {}
+      setBlockedUsersLoading(false);
+    }
+    fetchBlockedUsers();
+  }, [isOwner]);
+
+  async function handleOwnerUnblock() {
+    if (!unblockTarget) return;
+    setUnblockLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${unblockTarget.id}/block`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || "Failed to unblock.");
+      }
+      setBlockedUsers(prev => prev.filter(u => u.id !== unblockTarget.id));
+      setToast({ type: "success", message: `${unblockTarget.username} has been unblocked.` });
+    } catch (e) {
+      setToast({ type: "error", message: e.message });
+    }
+    setUnblockTarget(null);
+    setUnblockLoading(false);
+  }
+
+  async function handleBlock() {
+    setBlockLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${profileUserId}/block`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || "Failed to block.");
+      }
+      setIsBlockedByMe(true);
+      setBlockConfirm(false);
+      setToast({ type: "success", message: `${profileUser?.username} has been blocked.` });
+    } catch (e) {
+      setToast({ type: "error", message: e.message });
+    }
+    setBlockLoading(false);
+  }
+
+  async function handleUnblock() {
+    setBlockLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${profileUserId}/block`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || "Failed to unblock.");
+      }
+      setIsBlockedByMe(false);
+      setToast({ type: "success", message: `${profileUser?.username} has been unblocked.` });
+    } catch (e) {
+      setToast({ type: "error", message: e.message });
+    }
+    setBlockLoading(false);
+  }
 
   // ── Fetch wallet ──
   useEffect(() => {
@@ -857,6 +961,27 @@ export default function ProfilePage() {
                 Edit profile
               </Link>
             )}
+
+            {/* Block / Unblock button (visitor only, logged in) */}
+            {!isOwner && currentUser && !userLoading && (
+              isBlockedByMe ? (
+                <button
+                  onClick={handleUnblock}
+                  disabled={blockLoading}
+                  className="flex-shrink-0 self-start sm:self-auto px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white/80 hover:bg-white/20 transition-all font-medium backdrop-blur-sm disabled:opacity-50"
+                >
+                  {blockLoading ? "Unblocking…" : "Unblock"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setBlockConfirm(true)}
+                  disabled={blockLoading}
+                  className="flex-shrink-0 self-start sm:self-auto px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white/80 hover:bg-red-500/60 hover:border-red-400/50 transition-all font-medium backdrop-blur-sm disabled:opacity-50"
+                >
+                  Block
+                </button>
+              )
+            )}
           </div>
 
           {/* Stats row
@@ -1107,6 +1232,65 @@ export default function ProfilePage() {
             </Section>
           )}
 
+          {/* ── BLOCKED USERS — owner only ───────────────────────────── */}
+          {isOwner && (blockedUsersLoading || blockedUsers.length > 0) && (
+            <Section
+              title="Blocked Users"
+              badge={!blockedUsersLoading ? blockedUsers.length : undefined}
+              description="These writers cannot leave critiques or paragraph comments on your submissions. Only you can see this list."
+            >
+              {blockedUsersLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-[#e8e0d0]">
+                      <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-7 w-20 ml-auto rounded-lg" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {blockedUsers.map(u => (
+                    <div
+                      key={u.id}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[#e8e0d0] bg-[#faf8f5] hover:border-[#c4b8a8] transition-colors"
+                    >
+                      {/* Avatar */}
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-[#e8e0d0] flex-shrink-0 border border-[#ddd5c8]">
+                        {u.avatar ? (
+                          <img src={u.avatar} alt={u.username} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="font-serif text-sm text-[#9a8c7a]">
+                              {u.username?.[0]?.toUpperCase() ?? "?"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Username link */}
+                      <Link
+                        to={`/profile/${u.id}`}
+                        className="flex-1 min-w-0 text-sm font-medium text-[#2d3748] hover:text-[#1e2a38] truncate transition-colors"
+                      >
+                        {u.username}
+                      </Link>
+
+                      {/* Unblock button */}
+                      <button
+                        onClick={() => setUnblockTarget(u)}
+                        className="flex-shrink-0 px-3 py-1.5 rounded-lg border border-[#e8e0d0] text-xs font-medium text-[#7a6e62] hover:border-[#2d3748] hover:text-[#2d3748] transition-all"
+                      >
+                        Unblock
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+          )}
+
         </div>
       </div>
 
@@ -1158,6 +1342,28 @@ export default function ProfilePage() {
           danger
           onConfirm={confirmDeleteStory}
           onCancel={() => setDeleteStoryTarget(null)}
+        />
+      )}
+
+      {!isOwner && blockConfirm && (
+        <ConfirmModal
+          title={`Block ${profileUser?.username}?`}
+          body={`${profileUser?.username} won't be able to leave critiques or paragraph comments on your submissions, and you won't be able to comment on theirs.`}
+          confirmLabel={blockLoading ? "Blocking…" : "Block"}
+          danger
+          onConfirm={handleBlock}
+          onCancel={() => setBlockConfirm(false)}
+        />
+      )}
+
+      {isOwner && unblockTarget && (
+        <ConfirmModal
+          title={`Unblock ${unblockTarget.username}?`}
+          body={`${unblockTarget.username} will be able to leave critiques and paragraph comments on your submissions again.`}
+          confirmLabel={unblockLoading ? "Unblocking…" : "Unblock"}
+          danger={false}
+          onConfirm={handleOwnerUnblock}
+          onCancel={() => setUnblockTarget(null)}
         />
       )}
     </div>
