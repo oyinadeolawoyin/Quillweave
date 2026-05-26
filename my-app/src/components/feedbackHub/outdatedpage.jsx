@@ -138,15 +138,33 @@ export default function OutdatedPage() {
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [genres, setGenres] = useState([]);
+  const [activeGenre, setActiveGenre] = useState(null);
 
   const LIMIT = 10;
 
-  useEffect(() => { fetchArchive(); }, [page]);
+  useEffect(() => { fetchGenres(); }, []);
+  useEffect(() => { fetchArchive(); }, [page, activeGenre]);
+
+  async function fetchGenres() {
+    try {
+      const res = await fetch(`${API_URL}/feedback/submissions/outdated/genres`, {
+        credentials: "include",
+      });
+      if (res.ok) setGenres(await res.json());
+    } catch (e) {}
+  }
+
+  function selectGenre(genre) {
+    setActiveGenre(prev => prev === genre ? null : genre);
+    setPage(1);
+  }
 
   async function fetchArchive() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, limit: LIMIT });
+      if (activeGenre) params.set("genre", activeGenre);
       const res = await fetch(`${API_URL}/feedback/submissions/outdated?${params}`, {
         credentials: "include",
       });
@@ -205,6 +223,35 @@ export default function OutdatedPage() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+
+        {/* Genre filter tabs */}
+        {genres.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap mb-6">
+            <button
+              onClick={() => selectGenre(null)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                activeGenre === null
+                  ? "bg-[#2d3748] text-white border-[#2d3748]"
+                  : "bg-white text-[#6b5c4a] border-[#e8e0d0] hover:border-[#9a8c7a]"
+              }`}
+            >
+              All
+            </button>
+            {genres.map((g) => (
+              <button
+                key={g}
+                onClick={() => selectGenre(g)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  activeGenre === g
+                    ? "bg-[#2d3748] text-white border-[#2d3748]"
+                    : "bg-white text-[#6b5c4a] border-[#e8e0d0] hover:border-[#9a8c7a]"
+                }`}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Info banner */}
         <div className="bg-[#faf7f2] border border-[#e8e0d0] rounded-xl px-4 py-3 flex items-start gap-3 mb-8">

@@ -76,14 +76,25 @@ function StepBar({ current, steps }) {
 
 // ─── TAG INPUT ───────────────────────────────────────────────────────────────
 
-function TagInput({ tags, onChange, placeholder }) {
+function TagInput({ tags, onChange, placeholder, maxWords = null }) {
   const [input, setInput] = useState("");
+  const [tagError, setTagError] = useState("");
   const inputRef = useRef(null);
+
+  function wordCount(str) {
+    return str.trim().split(/\s+/).filter(Boolean).length;
+  }
 
   function addTag(value) {
     const trimmed = value.trim();
-    if (trimmed && !tags.includes(trimmed) && tags.length < 8) {
+    if (!trimmed) return;
+    if (maxWords !== null && wordCount(trimmed) > maxWords) {
+      setTagError(`Keep it to ${maxWords} words or fewer — be concise!`);
+      return;
+    }
+    if (!tags.includes(trimmed) && tags.length < 8) {
       onChange([...tags, trimmed]);
+      setTagError("");
     }
     setInput("");
   }
@@ -99,37 +110,54 @@ function TagInput({ tags, onChange, placeholder }) {
     }
   }
 
+  function handleChange(e) {
+    setInput(e.target.value);
+    if (tagError) setTagError("");
+  }
+
   return (
-    <div
-      className="min-h-[48px] w-full border border-[#e8e0d0] rounded-xl bg-[#faf7f2] px-3 py-2 flex flex-wrap gap-2 cursor-text focus-within:border-[#2d3748] focus-within:ring-2 focus-within:ring-[#2d3748]/10 transition-all"
-      onClick={() => inputRef.current?.focus()}
-    >
-      {tags.map((tag) => (
-        <span
-          key={tag}
-          className="inline-flex items-center gap-1.5 bg-[#2d3748] text-white text-xs px-3 py-1 rounded-full"
-        >
-          {tag}
-          <button
-            type="button"
-            onClick={() => removeTag(tag)}
-            className="text-[#a8b4c4] hover:text-white transition-colors ml-0.5"
+    <div>
+      <div
+        className={`min-h-[48px] w-full border rounded-xl bg-[#faf7f2] px-3 py-2 flex flex-wrap gap-2 cursor-text transition-all focus-within:ring-2 focus-within:ring-[#2d3748]/10 ${
+          tagError ? "border-[#c0392b] focus-within:border-[#c0392b]" : "border-[#e8e0d0] focus-within:border-[#2d3748]"
+        }`}
+        onClick={() => inputRef.current?.focus()}
+      >
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className="inline-flex items-center gap-1.5 bg-[#2d3748] text-white text-xs px-3 py-1 rounded-full"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </span>
-      ))}
-      <input
-        ref={inputRef}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKey}
-        onBlur={() => input.trim() && addTag(input)}
-        placeholder={tags.length === 0 ? placeholder : ""}
-        className="flex-1 min-w-[140px] bg-transparent text-sm text-[#2d3748] placeholder-[#b8a898] outline-none"
-      />
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeTag(tag)}
+              className="text-[#a8b4c4] hover:text-white transition-colors ml-0.5"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={handleChange}
+          onKeyDown={handleKey}
+          onBlur={() => input.trim() && addTag(input)}
+          placeholder={tags.length === 0 ? placeholder : ""}
+          className="flex-1 min-w-[140px] bg-transparent text-sm text-[#2d3748] placeholder-[#b8a898] outline-none"
+        />
+      </div>
+      {tagError && (
+        <p className="text-xs text-[#c0392b] mt-1.5 flex items-center gap-1">
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          {tagError}
+        </p>
+      )}
     </div>
   );
 }
@@ -250,6 +278,7 @@ export default function SubmitFeedback() {
   const [wallet, setWallet]         = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
+  const [spotlightBlock, setSpotlightBlock] = useState("");
   const [loading, setLoading]       = useState(isEditMode);
   const [customGenre, setCustomGenre] = useState("");
 
@@ -407,7 +436,13 @@ export default function SubmitFeedback() {
         navigate(`/feedback/${data.id}`);
       }
     } catch (e) {
-      setError(e.message);
+      // Spotlight block is a special top-level error — show it as a banner, not a step error
+      if (e.message && e.message.includes('already have a chapter in the spotlight')) {
+        setSpotlightBlock(e.message);
+        setStep(0); // bring user back to start so they see the banner
+      } else {
+        setError(e.message);
+      }
     }
     setSubmitting(false);
   }
@@ -484,6 +519,25 @@ export default function SubmitFeedback() {
             <p className="text-[#8a6c00]">
               Editing will not change your word count tier or cost. Existing feedback remains visible.
             </p>
+          </div>
+        )}
+
+        {/* ── SPOTLIGHT BLOCK BANNER ──────────────────────────────────────── */}
+        {spotlightBlock && !isEditMode && (
+          <div className="flex items-start gap-3 bg-[#fdf4f4] border border-[#e8c4c4] rounded-xl px-4 py-4 mb-6">
+            <svg className="w-5 h-5 text-[#c0392b] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-[#c0392b] mb-1">You already have a chapter in the spotlight</p>
+              <p className="text-sm text-[#7a3030] leading-relaxed">{spotlightBlock}</p>
+              <Link
+                to="/feedback"
+                className="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-[#c0392b] hover:underline"
+              >
+                View the spotlight →
+              </Link>
+            </div>
           </div>
         )}
 
@@ -637,12 +691,13 @@ export default function SubmitFeedback() {
                   Feedback wanted
                 </label>
                 <p className="text-xs text-[#9a8c7a] mb-2">
-                  Tell readers exactly what to focus on. Type a request and press Enter.
+                  Tell readers what to focus on — up to 5 words per tag. Press Enter to add.
                 </p>
                 <TagInput
                   tags={form.feedbackWanted}
                   onChange={(tags) => set("feedbackWanted", tags)}
-                  placeholder="e.g. Is the pacing too slow in act two?"
+                  placeholder="e.g. pacing in act two"
+                  maxWords={5}
                 />
                 {form.feedbackWanted.length === 0 && (
                   <p className="text-xs text-[#b8a898] mt-2">At least one feedback request is required.</p>
