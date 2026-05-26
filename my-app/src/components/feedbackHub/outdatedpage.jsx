@@ -141,7 +141,7 @@ export default function OutdatedPage() {
   const [genres, setGenres] = useState([]);
   const [activeGenre, setActiveGenre] = useState(null);
 
-  const LIMIT = 10;
+  const LIMIT = 9;
 
   useEffect(() => { fetchGenres(); }, []);
   useEffect(() => { fetchArchive(); }, [page, activeGenre]);
