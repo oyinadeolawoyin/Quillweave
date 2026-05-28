@@ -170,69 +170,64 @@ export default function Header() {
               </svg>
             </button>
 
-            {/* 👤 PROFILE (RE-STAYED BESIDE NOTIFICATION, SVG INTACT) */}
+            {/* 👤 PROFILE / AUTH BUTTON (SAFE RENDER) */}
             <div className="relative" ref={profileRef}>
-              <button
-                onClick={() => setProfileOpen(o => !o)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-[#f7f4ee]"
+
+            {user ? (
+              <>
+                {/* LOGGED IN USER */}
+                <button
+                  onClick={() => setProfileOpen(o => !o)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-[#f7f4ee]"
+                >
+                  <div className="w-8 h-8 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
+                    {user?.avatar ? (
+                      <img src={user.avatar} className="w-full h-full object-cover" />
+                    ) : (
+                      user?.username?.charAt(0).toUpperCase() || "U"
+                    )}
+                  </div>
+
+                  <span className="text-sm font-medium text-[#2d3748] hidden lg:block">
+                    {user?.username}
+                  </span>
+                </button>
+
+                {/* DROPDOWN */}
+                {profileOpen && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white border border-[#e5e5e5] rounded-xl shadow-xl overflow-hidden z-50">
+
+                    <Link to={`/profile/${user.id}`} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
+                      Profile
+                    </Link>
+
+                    <Link to="/projects" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
+                      Projects
+                    </Link>
+
+                    <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
+                      Settings
+                    </Link>
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* 🚪 NOT LOGGED IN */
+              <Link
+                to="/login"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-[#2d3748] hover:bg-[#1f2937]"
               >
-                <div className="w-8 h-8 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
-                  {user?.avatar ? (
-                    <img src={user.avatar} className="w-full h-full object-cover" />
-                  ) : (
-                    user?.username?.charAt(0).toUpperCase() || "U"
-                  )}
-                </div>
+                Sign in
+              </Link>
+            )}
 
-                <span className="text-sm font-medium text-[#2d3748] hidden lg:block">
-                  {user?.username}
-                </span>
-              </button>
-
-              {profileOpen && (
-                <div className="absolute right-0 mt-2 w-52 bg-white border border-[#e5e5e5] rounded-xl shadow-xl overflow-hidden z-50">
-
-                  <Link to={`/profile/${user.id}`} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
-                    <svg className="w-4 h-4 text-[#737373]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M5.121 17.804A10.97 10.97 0 0112 15c2.485 0 4.773.82 6.879 2.21M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                    Profile
-                  </Link>
-
-                  <Link to="/projects" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
-                    <svg className="w-4 h-4 text-[#737373]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"
-                      />
-                    </svg>
-                    Projects
-                  </Link>
-
-                  <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
-                    <svg className="w-4 h-4 text-[#737373]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                      />
-                    </svg>
-                    Settings
-                  </Link>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                      />
-                    </svg>
-                    Sign out
-                  </button>
-
-                </div>
-              )}
             </div>
 
           </div>
