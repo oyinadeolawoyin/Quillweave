@@ -144,7 +144,7 @@ const router = createBrowserRouter([
     element: <EventsListPage />
   },
   { 
-    path: "/feedback", 
+    path: "/critique", 
     element: <FeedbackHub /> 
   },
   { 
@@ -168,7 +168,7 @@ const router = createBrowserRouter([
     element: <UserFeedbackSubmissions /> 
   },
   { 
-    path: "/discovery", 
+    path: "/stories", 
     element: <DiscoveryFeed /> 
   },
   { 
