@@ -134,7 +134,7 @@ export default function Header() {
           {/* RIGHT */}
           <div className="flex items-center gap-3">
 
-            {/* 🔔 NOTIFICATION (UNCHANGED) */}
+            {/* 🔔 NOTIFICATION (UNCHANGED SVG) */}
             <Link
               to="/notifications"
               className="relative p-2 rounded-lg text-[#737373] hover:text-[#2d3748] hover:bg-[#f7f4ee]"
@@ -155,7 +155,22 @@ export default function Header() {
               )}
             </Link>
 
-            {/* PROFILE (SVG ICONS RESTORED) */}
+            {/* 🟰 MOBILE HAMBURGER (ONLY MOBILE) */}
+            <button
+              className="sm:hidden p-2 rounded-lg hover:bg-[#f7f4ee]"
+              onClick={() => setMobileOpen(o => !o)}
+            >
+              <svg className="w-6 h-6 text-[#2d3748]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d={mobileOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+                />
+              </svg>
+            </button>
+
+            {/* 👤 PROFILE (RE-STAYED BESIDE NOTIFICATION, SVG INTACT) */}
             <div className="relative" ref={profileRef}>
               <button
                 onClick={() => setProfileOpen(o => !o)}
@@ -177,7 +192,6 @@ export default function Header() {
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-52 bg-white border border-[#e5e5e5] rounded-xl shadow-xl overflow-hidden z-50">
 
-                  {/* Profile */}
                   <Link to={`/profile/${user.id}`} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
                     <svg className="w-4 h-4 text-[#737373]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -187,7 +201,6 @@ export default function Header() {
                     Profile
                   </Link>
 
-                  {/* Projects */}
                   <Link to="/projects" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
                     <svg className="w-4 h-4 text-[#737373]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -197,7 +210,6 @@ export default function Header() {
                     Projects
                   </Link>
 
-                  {/* Settings */}
                   <Link to="/settings" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-[#fafaf9]">
                     <svg className="w-4 h-4 text-[#737373]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -207,7 +219,6 @@ export default function Header() {
                     Settings
                   </Link>
 
-                  {/* Sign out */}
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50"
@@ -227,6 +238,34 @@ export default function Header() {
           </div>
         </div>
       </div>
+
+      {/* 📱 MOBILE MENU (NAV ONLY, NO PROFILE DUPLICATION) */}
+      {mobileOpen && (
+        <div className="sm:hidden border-t border-[#e5e5e5] bg-white px-4 py-3 space-y-2">
+
+          {navItems.map(({ to, label }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`block px-3 py-2 rounded-lg text-sm ${
+                isActive(to)
+                  ? "bg-[#f7f4ee] text-[#2d3748]"
+                  : "text-[#737373]"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+
+          <div className="pt-2">
+            <EventsDropdown
+              open={eventsDropdownOpen}
+              setOpen={setEventsDropdownOpen}
+              activeEvents={activeEvents}
+            />
+          </div>
+        </div>
+      )}
     </header>
   );
 }
