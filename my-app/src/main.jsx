@@ -16,11 +16,11 @@ import Notification from './components/notification/notification';
 import UserFeedbackSubmissions from './components/profile/profile';
 import NotFound from './components/NotFound';
 import About from './components/about/about';
-import Services from './components/services/services';
 import Blog from './components/blog/blog';
 import BlogPost from './components/blog/blogPost';
 import AdminBlog from './components/blog/adminBlog';
 import EmotionPracticePage from './components/emotioncues/emotionpracticepage';
+import ThesaurusPage from './components/emotioncues/ThesaurusPage';
 import App from './App'
 import SnippetFeed from './components/sprint/snippetfeed';
 import SnippetPage from './components/sprint/snippetpage';
@@ -91,10 +91,10 @@ const router = createBrowserRouter([
     path: "/about",
     element: <About />
   },
-  // {
-  //   path: "/services",
-  //   element: <Services />
-  // },
+  {
+    path: "/thesaurus",
+    element: <ThesaurusPage />
+  },
   {
     path: "/blog",
     element: <Blog />
