@@ -307,7 +307,7 @@ export default function AdminDiscovery() {
               <p className="text-white/60 text-sm">Review and approve community story submissions.</p>
             </div>
             <Link
-              to="/discovery"
+              to="/stories"
               className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2.5 text-sm text-white/70 hover:text-white border border-white/20 rounded-xl transition-colors hover:bg-white/10"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

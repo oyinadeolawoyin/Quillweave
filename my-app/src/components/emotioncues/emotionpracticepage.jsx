@@ -85,9 +85,8 @@ function TadaOverlay({ visible, onDone }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <p className="font-serif text-2xl text-white font-bold mb-1">+1 Point Earned</p>
+          <p className="font-serif text-2xl text-white font-bold mb-1">Sentence posted!</p>
           <p className="text-white/50 text-sm">Your sentence is now in the community.</p>
-          <p className="text-[#d4af37] text-xs font-bold tracking-widest uppercase mt-3">Posting balance +1</p>
         </div>
       </div>
       <style>{`
@@ -316,7 +315,7 @@ export default function EmotionPracticePage() {
   // ── Loading ───────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="min-h-screen" style={{ background: "#0f1422" }}>
+      <div className="min-h-screen" style={{ background: "#1a1a2e" }}>
         <Header />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="space-y-3 text-center animate-pulse">
@@ -330,7 +329,7 @@ export default function EmotionPracticePage() {
 
   if (!entry) {
     return (
-      <div className="min-h-screen" style={{ background: "#0f1422" }}>
+      <div className="min-h-screen" style={{ background: "#1a1a2e" }}>
         <Header />
         <div className="flex items-center justify-center min-h-[60vh] px-4">
           <div className="text-center">
@@ -364,7 +363,7 @@ export default function EmotionPracticePage() {
   const allCues = entry.cues ?? [];
 
   return (
-    <div className="min-h-screen" style={{ background: "#0f1422" }}>
+    <div className="min-h-screen" style={{ background: "#1a1a2e" }}>
       <TadaOverlay visible={showTada} onDone={() => setShowTada(false)} />
       <Header />
 
@@ -372,7 +371,7 @@ export default function EmotionPracticePage() {
       <div
         className="relative overflow-hidden"
         style={{
-          background: "linear-gradient(160deg, #141c30 0%, #1a2540 50%, #1e2d4a 100%)",
+          background: "linear-gradient(160deg, #1a1a2e 0%, #1e2240 50%, #1a2d4a 100%)",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
         }}
       >
@@ -512,7 +511,7 @@ export default function EmotionPracticePage() {
               }}
             >
               <p className="font-serif text-xl text-white mb-1">Ready to practise?</p>
-              <p className="text-white/40 text-sm mb-6">Sign in to write your sentence and earn a posting point.</p>
+              <p className="text-white/40 text-sm mb-6">Sign in to write your sentence and join the community.</p>
               <button
                 onClick={() => navigate("/login")}
                 className="px-8 py-3 rounded-2xl text-sm font-bold transition-all active:scale-95"
@@ -570,7 +569,7 @@ export default function EmotionPracticePage() {
             <div
               className="rounded-3xl overflow-hidden"
               style={{
-                background: "linear-gradient(160deg, #16203a 0%, #1a2540 100%)",
+                background: "linear-gradient(160deg, #1a1a2e 0%, #1e2240 100%)",
                 border: "1px solid rgba(212,175,55,0.25)",
                 boxShadow: "0 0 0 1px rgba(212,175,55,0.05), 0 12px 40px rgba(0,0,0,0.3)",
               }}
@@ -709,9 +708,6 @@ export default function EmotionPracticePage() {
           </div>
         )}
 
-        <p className="text-center text-[10px] text-white/60 pt-4 tracking-widest uppercase pb-8">
-          A quiet space for writers · Inkwell
-        </p>
       </main>
 
       <style>{`

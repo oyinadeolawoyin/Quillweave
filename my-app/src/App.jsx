@@ -1,1260 +1,904 @@
+// src/components/Homepage.jsx
+// Layout mirrors Critique Circle proportions:
+//   - Top: profile/stats bar (logged-in) or guest hero
+//   - Two columns: Left (wider) | Right (narrower)
+//     LEFT:  DailyEmotion → LastGroupSprintRecap → AccountabilitySection
+//     RIGHT: MySubmissions → SpotlightList → EventsSection
+
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./components/auth/authContext";
-import Header from "./components/profile/header";
-import { AppMetaTags } from "./components/utilis/metatags";
-import { StartGroupSprintModal, JoinGroupSprintModal } from "./components/sprint/groupSprintModal";
-import DailyEmotion from "./components/emotioncues/dailyemotion";
-import NotificationsSetup from "./components/notification/notificationSetup";
-import ContributeSoundscape from "./components/sprint/Contributesoundscape";
-import CommunityLeaderboard from "./components/leaderBoard/communityLeaderboard";
-import ChallengeBlock from "./components/leaderBoard/challengeblock";
-import LastGroupSprintRecap from "./components/sprint/lastgroupsprintrecap";
 import API_URL from "./config/api";
+import Header from "./components/profile/header";
+import DailyEmotion from "./components/emotioncues/dailyemotion";
+import { StartGroupSprintModal } from "./components/sprint/groupSprintModal";
+import LastGroupSprintRecap from "./components/sprint/lastgroupsprintrecap";
 
-// ─── UPDATE THIS WEEKLY ────────────────────────────────────────
-// Discord invite links expire. Replace this value each week.
-const DISCORD_INVITE_LINK = "https://discord.gg/TntmfbkxB";
-// ──────────────────────────────────────────────────────────────
+// ─── Update weekly ────────────────────────────────────────────────────────────
+const DISCORD_INVITE = "https://discord.gg/TntmfbkxB";
 
-function formatTimeAgo(dateStr) {
-  if (!dateStr) return "";
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+// ─── Constants ────────────────────────────────────────────────────────────────
+const TIER_META = {
+  Bronze:   { color: "#b8622a", bg: "#fdf3e8" },
+  Silver:   { color: "#6b7280", bg: "#f3f4f6" },
+  Gold:     { color: "#b8860b", bg: "#fdf9ed" },
+  Platinum: { color: "#1a5fb4", bg: "#e8f0fb" },
+  Diamond:  { color: "#c0392b", bg: "#fdf1f0" },
+};
+
+const TIER_COSTS = [
+  { tier: "TIER_1000", label: "≤ 1,000 words", pts: 10 },
+  { tier: "TIER_2000", label: "≤ 2,000 words", pts: 20 },
+  { tier: "TIER_3000", label: "≤ 3,000 words", pts: 30 },
+  { tier: "TIER_4000", label: "≤ 4,000 words", pts: 40 },
+  { tier: "TIER_5000", label: "≤ 5,000 words", pts: 50 },
+];
+
+const TIER_WORD_LABELS = {
+  TIER_1000: "≤ 1,000 words",
+  TIER_2000: "≤ 2,000 words",
+  TIER_3000: "≤ 3,000 words",
+  TIER_4000: "≤ 4,000 words",
+  TIER_5000: "≤ 5,000 words",
+};
+
+const EVENT_TYPE_LABELS = {
+  DAYS_CHALLENGE: "Writing Challenge",
+  WORKSHOP:       "Workshop",
+  ANNOUNCEMENT:   "Announcement",
+  OTHER:          "Community Event",
+};
+const EVENT_TYPE_COLORS = {
+  DAYS_CHALLENGE: "#1a5fb4",
+  WORKSHOP:       "#059669",
+  ANNOUNCEMENT:   "#d4af37",
+  OTHER:          "#b8860b",
+};
+
+function spotlightDays(sub) {
+  const since = sub.updatedAt ?? sub.createdAt;
+  return since ? (Date.now() - new Date(since).getTime()) / (1000 * 60 * 60 * 24) : 0;
 }
-function daysUntil(dateStr) {
-  if (!dateStr) return null;
-  return Math.max(0, Math.ceil((new Date(dateStr) - Date.now()) / (1000 * 60 * 60 * 24)));
+
+// ─── Skeleton pulse line ──────────────────────────────────────────────────────
+function Bone({ w = "w-full", h = "h-3" }) {
+  return <div className={`${h} ${w} bg-[#ece8e1] rounded animate-pulse`} />;
 }
-function fmt(n) { return (n ?? 0).toLocaleString(); }
 
-// ─── Color constants ──────────────────────────────────────────
-const OVERALL_BLUE    = "#2563eb";
-const TODAY_ORANGE    = "#ea580c";
-const TODAY_TRACK     = "#ffedd5";
-const SESSION_PURPLE  = "#7c3aed";
-const STREAK_GOLD     = "#d4af37";
-const DONE_GREEN      = "#16a34a";
-
-function overallColor(pct) { return pct >= 100 ? DONE_GREEN : OVERALL_BLUE; }
-
-// ─── Arc Progress ─────────────────────────────────────────────
-function ArcProgress({ percent = 0, size = 80, color, trackColor = "#ede9e3", strokeW = 7, children }) {
-  const r = (size - strokeW) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (Math.min(percent, 100) / 100) * circ;
+// ─── Critique progress (3 segments) ──────────────────────────────────────────
+function CritBar({ count, max = 3 }) {
   return (
-    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={trackColor} strokeWidth={strokeW} />
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={strokeW}
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1), stroke 0.5s ease" }} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-1">{children}</div>
-    </div>
-  );
-}
-
-function CheckMark({ color = DONE_GREEN }) {
-  return (
-    <svg width="18" height="18" fill="none" stroke={color} viewBox="0 0 24 24" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
-// ─── Today Goal Arc Row ───────────────────────────────────────
-function TodayArcRow({ todayCount = 0, dailyTarget = 0, label = "words" }) {
-  const pct = dailyTarget > 0 ? Math.min(Math.round((todayCount / dailyTarget) * 100), 100) : 0;
-  const done = pct >= 100;
-  const started = todayCount > 0;
-  const remaining = Math.max(0, dailyTarget - todayCount);
-  const arcColor = done ? DONE_GREEN : TODAY_ORANGE;
-  const arcTrack = done ? "#dcfce7" : TODAY_TRACK;
-
-  return (
-    <div className="flex items-center gap-4">
-      <ArcProgress percent={pct} size={72} color={arcColor} trackColor={arcTrack} strokeW={7}>
-        {done
-          ? <CheckMark />
-          : <>
-              <span className="font-serif font-bold leading-none text-[#2d3748]" style={{ fontSize: 14 }}>{fmt(todayCount)}</span>
-              <span className="text-[#9a8c7a] leading-none mt-0.5" style={{ fontSize: 8 }}>of {fmt(dailyTarget)}</span>
-            </>}
-      </ArcProgress>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: arcColor }}>{label}</p>
-        {done
-          ? <p className="text-sm font-semibold text-[#2d3748]">Goal done</p>
-          : started
-          ? <>
-              <p className="text-sm font-semibold text-[#2d3748]">{fmt(remaining)} to go</p>
-              <p className="text-[11px] text-[#9a8c7a] mt-0.5">{pct}% of today's goal</p>
-            </>
-          : <>
-              <p className="text-sm font-semibold text-[#2d3748]">Start writing</p>
-              <p className="text-[11px] text-[#9a8c7a] mt-0.5">{fmt(dailyTarget)} {label} goal</p>
-            </>}
+    <div className="flex items-center gap-1.5">
+      <div className="flex gap-0.5 flex-1">
+        {Array.from({ length: max }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 h-1.5 rounded-sm"
+            style={{ background: i < count ? "#1a1a2e" : "#e2ddd6" }}
+          />
+        ))}
       </div>
+      <span className="text-[10px] text-[#9a8c7a] tabular-nums">{count}/{max}</span>
     </div>
   );
 }
 
-// ─── Session Arc Row ──────────────────────────────────────────
-function SessionArcRow({ current = 0, target = 0, period = "WEEKLY", sessionsToday = 0 }) {
-  const pct = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0;
-  const done = pct >= 100;
-  const remaining = Math.max(0, target - current);
-  const arcColor = done ? DONE_GREEN : current > 0 ? SESSION_PURPLE : "#9a8c7a";
-  const arcTrack = done ? "#dcfce7" : current > 0 ? "#ede9d8" : "#ede9e3";
-  const periodLabel = period === "WEEKLY" ? "this week" : "this month";
+// ─── STATUS PILL ─────────────────────────────────────────────────────────────
+function StatusPill({ status }) {
+  const cfg = {
+    SPOTLIGHT: { label: "Spotlight", color: "#b8860b", bg: "#fdf9ed", border: "#f0d98a" },
+    QUEUE:     { label: "Queue",     color: "#1a5fb4", bg: "#e8f0fb", border: "#b5d4f4" },
+    ARCHIVE:   { label: "Archive",   color: "#9a8c7a", bg: "#f4f1ec", border: "#e2ddd6" },
+  }[status] ?? { label: status, color: "#9a8c7a", bg: "#f4f1ec", border: "#e2ddd6" };
 
   return (
-    <div className="flex items-center gap-4">
-      <ArcProgress percent={pct} size={72} color={arcColor} trackColor={arcTrack} strokeW={7}>
-        {done
-          ? <CheckMark color={DONE_GREEN} />
-          : <>
-              <span className="font-serif font-bold leading-none text-[#2d3748]" style={{ fontSize: 14 }}>{current}</span>
-              <span className="text-[#9a8c7a] leading-none mt-0.5" style={{ fontSize: 8 }}>of {target}</span>
-            </>}
-      </ArcProgress>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: arcColor }}>
-          Sessions · {period.toLowerCase()}
-        </p>
-        {done
-          ? <p className="text-sm font-semibold text-[#2d3748]">Period goal complete</p>
-          : remaining > 0
-          ? <>
-              <p className="text-sm font-semibold text-[#2d3748]">{remaining} session{remaining !== 1 ? "s" : ""} to go</p>
-              <p className="text-[11px] text-[#9a8c7a] mt-0.5">{current} logged {periodLabel}</p>
-            </>
-          : <>
-              <p className="text-sm font-semibold text-[#2d3748]">No sessions yet</p>
-              <p className="text-[11px] text-[#9a8c7a] mt-0.5">Goal: {target} sessions {periodLabel}</p>
-            </>}
-        {sessionsToday > 0 && (
-          <p className="text-[11px] mt-0.5 font-semibold" style={{ color: SESSION_PURPLE }}>{sessionsToday} today</p>
-        )}
-      </div>
-    </div>
+    <span
+      className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+      style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
+    >
+      {cfg.label}
+    </span>
   );
 }
 
-// ─── Overall Arc Row (blue) ───────────────────────────────────
-function OverallArcRow({ percent, label, line1, line2, color }) {
-  const arcColor = color ?? overallColor(percent);
+// ─── SECTION HEADER ──────────────────────────────────────────────────────────
+function SectionTitle({ children }) {
   return (
-    <div className="flex items-center gap-4">
-      <ArcProgress percent={percent} size={72} color={arcColor} trackColor={percent >= 100 ? "#dcfce7" : "#ede9e3"} strokeW={7}>
-        {percent >= 100
-          ? <CheckMark color={DONE_GREEN} />
-          : <span className="font-serif font-bold text-[#2d3748]" style={{ fontSize: 14 }}>{percent}%</span>}
-      </ArcProgress>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: arcColor }}>{label}</p>
-        <p className="text-sm font-semibold text-[#2d3748]">{line1}</p>
-        {line2 && <p className="text-[11px] text-[#9a8c7a] mt-0.5">{line2}</p>}
-      </div>
-    </div>
+    <h2
+      className="font-serif text-[#1a1a2e] text-base font-semibold uppercase tracking-wider mb-3 pb-2 border-b border-[#e8e0d0] pl-3"
+      style={{ letterSpacing: "0.06em", borderLeft: "3px solid #d4af37" }}
+    >
+      {children}
+    </h2>
   );
 }
 
-// ─── Alarm Clock ──────────────────────────────────────────────
-function AlarmClockSprint({ onClick }) {
-  const [tick, setTick] = useState(false);
-  useEffect(() => {
-    const t = setInterval(() => setTick(p => !p), 900);
-    return () => clearInterval(t);
-  }, []);
+// ═════════════════════════════════════════════════════════════════════════════
+// TOP PROFILE BAR — mirrors Critique Circle's profile header exactly
+// Large avatar left, name + role below, stats row inline right
+// ═════════════════════════════════════════════════════════════════════════════
+function ProfileBar({ user, wallet }) {
+  if (!user) return null;
+
+  const tier   = wallet?.tier;
+  const meta   = TIER_META[tier?.name] ?? TIER_META.Bronze;
+  const bal    = wallet?.postingBalance ?? 0;
+  const rep    = wallet?.reputation ?? 0;
+  const given  = wallet?.critiqueCount ?? 0;
+  const active = wallet?.activeChapterCount ?? 0;
+
+  const joinDate = user.createdAt
+    ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+    : null;
+
   return (
-    <button onClick={onClick} className="group flex flex-col items-center gap-3 focus:outline-none" aria-label="Start a sprint">
-      <div className="relative">
-        <div className="absolute -top-2.5 left-1/2 flex gap-2.5"
-          style={{ transform: `translateX(-50%) rotate(${tick ? -10 : 10}deg)`, transition: "transform 0.45s ease" }}>
-          <div className="w-2 h-2 bg-[#d4af37] rounded-full" />
-          <div className="w-2 h-2 bg-[#d4af37] rounded-full" />
-        </div>
-        <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full border-[3.5px] border-[#2d3748] bg-[#fffdf8] flex items-center justify-center"
-          style={{
-            boxShadow: tick
-              ? "0 0 0 0 rgba(212,175,55,0), 0 6px 20px rgba(45,55,72,0.15)"
-              : "0 0 0 8px rgba(212,175,55,0.13), 0 6px 20px rgba(45,55,72,0.2)",
-            transition: "box-shadow 0.9s ease"
-          }}>
-          {[...Array(12)].map((_, i) => (
-            <div key={i} className="absolute" style={{
-              width: i % 3 === 0 ? 2.5 : 1.5, height: i % 3 === 0 ? 9 : 5,
-              background: i % 3 === 0 ? "#2d3748" : "#c4bcb0", borderRadius: 1,
-              top: "6%", left: "50%",
-              transformOrigin: `50% ${0.94 * 64}px`,
-              transform: `translateX(-50%) rotate(${i * 30}deg)`,
-            }} />
-          ))}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="absolute w-[2px] h-7 bg-[#2d3748] rounded-full origin-bottom" style={{ bottom: "50%", left: "calc(50% - 1px)", transform: "rotate(-30deg)" }} />
-            <div className="absolute w-[1.5px] h-[33px] bg-[#2d3748] rounded-full origin-bottom" style={{ bottom: "50%", left: "calc(50% - 0.75px)", transform: "rotate(60deg)" }} />
-            <div className="absolute w-2.5 h-2.5 bg-[#d4af37] rounded-full z-10" />
+    <div className="bg-white border-b-2 border-[#d4af37]/30" style={{ borderTop: "3px solid #d4af37" }}>
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5">
+        {/* ── Row: avatar + name block + stats ── */}
+        <div className="flex items-start gap-5">
+
+          {/* Large avatar — gold ring */}
+          <div
+            className="w-20 h-20 rounded-md flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-bold text-2xl ring-2 ring-[#d4af37]/60"
+            style={{ backgroundColor: "#1a1a2e" }}
+          >
+            {user.avatar
+              ? <img src={user.avatar} alt={user.username} className="w-full h-full object-cover" />
+              : <span>{user.username?.charAt(0).toUpperCase()}</span>}
           </div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="mt-7 text-center">
-              <p className="text-[8px] text-[#9a8c7a] uppercase tracking-widest">tap to</p>
-              <p className="font-serif font-bold text-[#2d3748] text-[13px] leading-tight">Start Sprint</p>
+
+          {/* Name block + stats */}
+          <div className="flex-1 min-w-0">
+            {/* Name row */}
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <span className="font-serif text-[#1a1a2e] text-xl font-bold leading-tight">{user.username}</span>
+              {tier && (
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                  style={{ color: meta.color, background: meta.bg, borderColor: meta.color + "40" }}
+                >
+                  {tier.name}
+                </span>
+              )}
+            </div>
+
+            {/* Username + join date — same line as CC's "oyinade olawoyin · Basic membership" */}
+            <p className="text-[12px] text-[#9a8c7a] mb-3">
+              {user.email ?? "writer"}
+              {joinDate && <span className="mx-1.5">·</span>}
+              {joinDate && <span>Joined {joinDate}</span>}
+            </p>
+
+            {/* Stats row with icons */}
+            <div className="flex items-center gap-5 flex-wrap">
+              {/* Points — gold */}
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                </svg>
+                <span className="text-[13px] font-bold text-[#1a1a2e]">{bal}</span>
+                <span className="text-[11px] text-[#9a8c7a]">Points</span>
+              </div>
+              {/* Reputation — blue */}
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a5fb4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+                </svg>
+                <span className="text-[13px] font-bold text-[#1a1a2e]">{rep}</span>
+                <span className="text-[11px] text-[#9a8c7a]">Reputation</span>
+              </div>
+              {/* Critiques given — message square */}
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9a8c7a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span className="text-[13px] font-bold text-[#1a1a2e]">{given}</span>
+                <span className="text-[11px] text-[#9a8c7a]">Critiques given</span>
+              </div>
+              {/* Active chapters — book open */}
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9a8c7a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                </svg>
+                <span className="text-[13px] font-bold text-[#1a1a2e]">{active}</span>
+                <span className="text-[11px] text-[#9a8c7a]">Active chapters</span>
+              </div>
             </div>
           </div>
         </div>
-        <div className="flex justify-between px-5 -mt-0.5">
-          <div className="w-3.5 h-2 bg-[#2d3748] rounded-b-full" />
-          <div className="w-3.5 h-2 bg-[#2d3748] rounded-b-full" />
-        </div>
       </div>
-      <p className="text-[11px] text-[#9a8c7a] text-center leading-relaxed">Focused session<br/>to hit your goal</p>
-    </button>
+    </div>
   );
 }
 
-// ─── Inline Project Stats ─────────────────────────────────────
-function RecentProjectCardInline() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+// ═════════════════════════════════════════════════════════════════════════════
+// GUEST HERO
+// ═════════════════════════════════════════════════════════════════════════════
+function GuestHero() {
   const navigate = useNavigate();
+  return (
+    <div className="bg-[#1a1a2e] mb-0">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8 flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-10">
+        <div className="flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-2">Quillweave</p>          <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">
+            Write more. Together.
+          </h1>
+          <p className="text-white/55 text-sm leading-relaxed max-w-md">
+            Sprint alongside writers, get feedback on your chapters, and show up every week until the draft is done.
+          </p>
+        </div>
+        <div className="flex gap-3 flex-shrink-0">
+          <button
+            onClick={() => navigate("/signup")}
+            className="px-5 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-lg hover:bg-[#c9a42d] transition-all"
+          >
+            Get started free
+          </button>
+          <button
+            onClick={() => navigate("/login")}
+            className="px-5 py-2.5 border border-white/20 text-white/70 text-sm font-medium rounded-lg hover:border-white/40 transition-all"
+          >
+            Sign in
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RIGHT — MY SUBMISSIONS  (top-right, mirrors CC's "My stories" section)
+// ═════════════════════════════════════════════════════════════════════════════
+function MySubmissions({ user, wallet }) {
+  const [subs, setSubs]       = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/projects/recentProject`, { credentials: "include" })
+    if (!user) { setLoading(false); return; }
+    fetch(`${API_URL}/feedback/submissions/mine?limit=6`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
-      .then(d => setData(d || null))
+      .then(d => setSubs(d?.items ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  const costs     = wallet?.TIER_COSTS ?? {};
+  const bal       = wallet?.postingBalance ?? 0;
+  const surcharge = wallet?.MULTI_CHAPTER_SURCHARGE ?? 2;
+  const active    = wallet?.activeChapterCount ?? 0;
+  const isFree    = !!(wallet?.freePostAvailable);
+  const cheapest  = Math.min(...Object.values(costs).map(Number), Infinity) + active * surcharge;
+  const canPost   = isFree || (Object.keys(costs).length > 0 && bal >= cheapest);
+
+  return (
+    <div className="bg-white border border-[#e8e0d0] rounded-xl p-5 mb-5">
+      <SectionTitle>My submissions</SectionTitle>
+
+      {/* ── Guest: cost table + sign-up ── */}
+      {!user && (
+        <>
+          <p className="text-sm text-[#6b5c4a] mb-3">
+            Critique a chapter to earn points, then use those points to post your own work.
+          </p>
+          <div className="border border-[#e8e0d0] rounded-lg overflow-hidden mb-4 text-sm">
+            <div className="grid grid-cols-2 bg-[#1a1a2e] px-3 py-2 border-b border-[#e8e0d0] text-[10px] font-semibold text-white/70 uppercase tracking-wide">
+              <span>Chapter length</span>
+              <span className="text-right">Cost to post</span>
+            </div>
+            {TIER_COSTS.map(({ tier, label, pts }) => (
+              <div key={tier} className="grid grid-cols-2 px-3 py-2 border-b border-[#f0ebe3] last:border-0 text-sm">
+                <span className="text-[#4a3f35] text-[12px]">{label}</span>
+                <span className="text-right font-semibold text-[#1a1a2e] text-[12px]">{pts} pts</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/signup" className="flex-1 text-center py-2 bg-[#d4af37] text-[#1a1a2e] text-xs font-bold rounded-lg hover:bg-[#c9a42d] transition-all">
+              Get started — it's free
+            </Link>
+            <Link to="/critique" className="flex-1 text-center py-2 border border-[#1a1a2e] text-[#1a1a2e] text-xs font-semibold rounded-lg hover:bg-[#1a1a2e] hover:text-white transition-all">
+              Browse chapters
+            </Link>
+          </div>
+        </>
+      )}
+
+      {user && loading && (
+        <div className="space-y-3">
+          {[1, 2].map(i => (
+            <div key={i} className="space-y-2 py-2 border-b border-[#f4f1ec] last:border-0">
+              <Bone w="w-2/3" h="h-3" />
+              <Bone w="w-1/2" h="h-2.5" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {user && !loading && subs.length === 0 && (
+        <>
+          <p className="text-xs text-[#6b5c4a] mb-3">
+            {canPost
+              ? "You have enough points to submit a chapter."
+              : `You need ${cheapest} pts to post. Critique a chapter to earn points.`}
+          </p>
+          <Link to="/critique/submit" className="block text-center py-2 bg-[#d4af37] text-[#1a1a2e] text-xs font-bold rounded-lg hover:bg-[#c9a42d] transition-all">
+            Submit a chapter
+          </Link>
+        </>
+      )}
+
+      {user && !loading && subs.length > 0 && (
+        <>
+          {/* Submission list — tight rows matching CC's "Stories to Crit" density */}
+          <div className="divide-y divide-[#f4f1ec]">
+            {subs.map(sub => {
+              const critiqueCount = sub.critiqueCount ?? sub._count?.responses ?? 0;
+              const commentCount  = sub._count?.paragraphComments ?? 0;
+              return (
+                <div key={sub.id} className="py-2.5 first:pt-0 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <Link
+                        to={`/critique/${sub.id}`}
+                        className="font-semibold text-[13px] text-[#1a1a2e] hover:text-[#b8860b] transition-colors leading-snug truncate"
+                      >
+                        {sub.title}
+                      </Link>
+                      <StatusPill status={sub.status} />
+                    </div>
+                    <p className="text-[11px] text-[#9a8c7a]">
+                      {sub.genre}
+                      <span className="mx-1">·</span>
+                      {TIER_WORD_LABELS[sub.wordCountTier]}
+                      {commentCount > 0 && <><span className="mx-1">·</span>{commentCount} comment{commentCount !== 1 ? "s" : ""}</>}
+                    </p>
+                    {sub.status !== "ARCHIVE" ? <CritBar count={critiqueCount} /> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 pt-2.5 border-t border-[#f4f1ec] flex items-center justify-between">
+            <Link to={`/profile/${user?.id}`} className="text-[11px] text-[#1a5fb4] hover:underline font-semibold">
+              View all my submissions
+            </Link>
+            <Link
+              to="/critique/submit"
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded transition-all ${
+                canPost ? "bg-[#d4af37] text-[#1a1a2e] hover:bg-[#c9a42d]" : "text-[#9a8c7a] border border-[#e8e0d0]"
+              }`}
+            >
+              {isFree ? "Free post" : canPost ? "Submit chapter" : `Need ${cheapest} pts`}
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RIGHT — SPOTLIGHT LIST  (mirrors CC's "Stories to Crit" list exactly)
+// ═════════════════════════════════════════════════════════════════════════════
+function SpotlightList() {
+  const [spotlight, setSpotlight] = useState([]);
+  const [loading, setLoading]     = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_URL}/feedback/submissions/spotlight`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setSpotlight(Array.isArray(d) ? d : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <div className="animate-pulse space-y-3 w-full">
-      <div className="h-4 bg-[#e8e0d0] rounded w-1/2" />
-      <div className="h-16 bg-[#e8e0d0] rounded-2xl" />
-      <div className="h-3 bg-[#e8e0d0] rounded w-2/3" />
-    </div>
-  );
-
-  if (!data?.project) {
-    return (
-      <div className="flex flex-col items-center justify-center text-center gap-4 py-2 w-full">
-        <div>
-          <p className="font-serif text-[17px] text-[#2d3748] mb-1">What are you writing?</p>
-          <p className="text-xs text-[#9a8c7a] leading-relaxed max-w-[220px] mx-auto">Add a project to get a clear daily writing goal and watch your progress grow.</p>
-        </div>
-        <button onClick={() => navigate("/projects/create")}
-          className="relative inline-flex items-center gap-2 px-5 py-2.5 bg-[#2d3748] text-white text-sm font-medium rounded-2xl hover:bg-[#3d4f64] transition-all">
-          Add your project
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#d4af37] rounded-full animate-ping" />
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#d4af37] rounded-full" />
-        </button>
-      </div>
-    );
-  }
-
-  const { project, trackerSummary, todayTotals } = data;
-  const wc = trackerSummary?.wordCount;
-  const ch = trackerSummary?.chapters;
-  const sc = trackerSummary?.scenes;
-  const ss = trackerSummary?.sessions;
-  const daysLeft = daysUntil(project.deadline);
-  const hasDaysTarget = !!project.consecutiveDaysTarget;
-  const currentStreak = project.currentStreak ?? 0;
-  const daysTarget    = project.consecutiveDaysTarget ?? 0;
-
-  const hasTodayGoals = wc?.dailyTarget || ch?.dailyTarget || sc?.dailyTarget || ss || hasDaysTarget;
-  const hasOverall    = wc || ch || sc || ss || hasDaysTarget;
-
   return (
-    <div className="w-full space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] text-[#9a8c7a] uppercase tracking-widest font-semibold mb-0.5">Writing now</p>
-          <h3 className="font-serif text-lg text-[#2d3748] leading-snug truncate">{project.title}</h3>
-          {project.genre && <p className="text-[11px] text-[#9a8c7a]">{project.genre}</p>}
-        </div>
-        <button onClick={() => navigate(`/projects/${project.id}`)}
-          className="text-[11px] text-[#2563eb] hover:text-[#1d4ed8] font-semibold transition-colors whitespace-nowrap flex-shrink-0 mt-1 underline-offset-2 hover:underline">
-          Full stats
-        </button>
-      </div>
-
-      {hasTodayGoals && (
+    <div className="bg-white border border-[#e8e0d0] rounded-xl overflow-hidden mb-5">
+      <div className="bg-[#1a1a2e] px-5 py-3 flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-[#9a8c7a] uppercase tracking-widest font-semibold mb-4">Today's goal</p>
-          <div className="flex flex-col gap-4">
-            {wc?.dailyTarget && (
-              <TodayArcRow todayCount={todayTotals?.wordsToday || 0} dailyTarget={wc.dailyTarget} label="words" />
-            )}
-            {ch?.dailyTarget && (
-              <TodayArcRow todayCount={todayTotals?.chaptersToday || 0} dailyTarget={ch.dailyTarget} label="chapters" />
-            )}
-            {sc?.dailyTarget && (
-              <TodayArcRow todayCount={todayTotals?.scenesToday || 0} dailyTarget={sc.dailyTarget} label="scenes" />
-            )}
-            {ss && (
-              <SessionArcRow
-                current={ss.current}
-                target={ss.target}
-                period={ss.period}
-                sessionsToday={todayTotals?.sessionsToday || 0}
-              />
-            )}
-          </div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Community</p>
+          <h2 className="font-serif text-white text-base font-bold">In the Spotlight</h2>
         </div>
-      )}
-
-      {hasOverall && (
-        <div>
-          <p className="text-[10px] text-[#9a8c7a] uppercase tracking-widest font-semibold mb-4">Overall progress</p>
-          <div className="flex flex-col gap-4">
-            {wc && (
-              <OverallArcRow
-                percent={wc.percent}
-                label="Words"
-                line1={`${fmt(wc.current)} written`}
-                line2={`${fmt(wc.remaining)} to go`}
-              />
-            )}
-            {ch && (
-              <OverallArcRow
-                percent={ch.percent}
-                label="Chapters"
-                line1={`${ch.current} of ${ch.target} done`}
-                line2={`${ch.remaining} left`}
-              />
-            )}
-            {sc && (
-              <OverallArcRow
-                percent={sc.percent}
-                label="Scenes"
-                line1={`${sc.current} of ${sc.target} done`}
-                line2={`${sc.remaining} left`}
-              />
-            )}
-            {hasDaysTarget && (
-              <OverallArcRow
-                percent={daysTarget > 0 ? Math.min(Math.round((currentStreak / daysTarget) * 100), 100) : 0}
-                label="Day Streak"
-                line1={`${currentStreak} / ${daysTarget} days`}
-                line2={`${Math.max(0, daysTarget - currentStreak)} to go`}
-                color={STREAK_GOLD}
-              />
-            )}
-            {daysLeft !== null && (
-              <div className="flex items-center gap-4">
-                <div className="flex-shrink-0 w-[72px] flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="font-serif font-bold leading-none text-[#2d3748]" style={{ fontSize: 22 }}>
-                      {daysLeft === 0 ? "Due!" : daysLeft}
-                    </p>
-                    {daysLeft > 0 && <p className="text-[9px] text-[#9a8c7a] uppercase tracking-wider mt-0.5">days left</p>}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: daysLeft === 0 ? "#ef4444" : daysLeft <= 7 ? "#c47d1e" : "#9a8c7a" }}>
-                    Deadline
-                  </p>
-                  <p className="text-sm font-semibold text-[#2d3748]">
-                    {daysLeft === 0 ? "Past due" : `${daysLeft} days left`}
-                  </p>
-                  {project.deadline && (
-                    <p className="text-[11px] text-[#9a8c7a] mt-0.5">
-                      {new Date(project.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Active Sprints Banner ─────────────────────────────────────
-function ActiveSprintsBanner({ onJoinClick }) {
-  const [sprints, setSprints] = useState([]);
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    fetch(`${API_URL}/sprint/activeGroupSprints?limit=5`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setSprints(d?.groupSprints || []))
-      .catch(() => {});
-  }, []);
-
-  if (!sprints.length) return null;
-
-  function handleJoinClick(sprint) {
-    if (!user) { onJoinClick?.(null); return; }
-    const alreadyJoined = sprint.sprints?.some(
-      (s) => Number(s.userId) === Number(user.id) && s.isActive !== false
-    );
-    if (alreadyJoined) { navigate(`/group-sprint/${sprint.id}`); return; }
-    onJoinClick?.(sprint);
-  }
-
-  return (
-    <div className="bg-[#2d3748] rounded-2xl px-4 sm:px-5 py-4">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d4af37] opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#d4af37]" />
-        </span>
-        <p className="text-[11px] text-white/60 font-semibold uppercase tracking-widest">Sprints happening now</p>
+        {!loading && (
+          <span className="text-[10px] font-bold text-[#d4af37]">{spotlight.length}/6</span>
+        )}
       </div>
-      <div className="space-y-2">
-        {sprints.slice(0, 3).map(sprint => {
-          const alreadyJoined = user && sprint.sprints?.some(
-            (s) => Number(s.userId) === Number(user.id) && s.isActive !== false
-          );
-          const typeLabel = sprint.sprintType === "READING" ? "Reading" : "Writing";
-          const writerCount = sprint._count?.sprints || 1;
-          return (
-            <div key={sprint.id}
-              className="flex items-center justify-between bg-white/[0.07] hover:bg-white/[0.12] rounded-xl px-3.5 py-2.5 cursor-pointer transition-all"
-              onClick={() => handleJoinClick(sprint)}>
-              <div className="min-w-0 flex-1 mr-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm text-white font-medium truncate">@{sprint.user?.username}'s sprint</p>
-                  <span className="text-[10px] text-white/40 bg-white/10 px-1.5 py-0.5 rounded-full flex-shrink-0">{typeLabel}</span>
-                </div>
-                <p className="text-[11px] text-white/45 mt-0.5">
-                  {writerCount} writer{writerCount !== 1 ? "s" : ""} · {sprint.duration} min
-                </p>
-              </div>
-              <span className={`text-xs border px-2.5 py-1 rounded-full transition-all flex-shrink-0 ${
-                alreadyJoined
-                  ? "text-emerald-400 border-emerald-400/30"
-                  : "text-[#d4af37] border-[#d4af37]/30 hover:bg-[#d4af37]/10"
-              }`}>
-                {alreadyJoined ? "Continue" : "Join"}
-              </span>
+      <div className="p-5">
+      <p className="text-[11px] text-[#9a8c7a] mb-3">
+        3 critiques to graduate · works over 10 days earn critics +2 pts
+      </p>
+
+      {loading && (
+        <div className="space-y-3">
+          {[1,2,3].map(i => (
+            <div key={i} className="pb-3 border-b border-[#f4f1ec] last:border-0 space-y-1.5">
+              <Bone w="w-2/3" h="h-3" />
+              <Bone w="w-1/2" h="h-2.5" />
             </div>
-          );
-        })}
+          ))}
+        </div>
+      )}
+
+      {!loading && spotlight.length === 0 && (
+        <div className="py-4 text-center">
+          <p className="text-xs text-[#9a8c7a] mb-1">No chapters in the spotlight yet.</p>
+          <Link to="/critique/submit" className="text-xs text-[#1a5fb4] hover:underline font-semibold">
+            Be the first to submit
+          </Link>
+        </div>
+      )}
+
+      {!loading && spotlight.length > 0 && (
+        <div className="divide-y divide-[#f4f1ec]">
+          {spotlight.map(sub => {
+            const author     = sub.user;
+            const responses  = sub.critiqueCount ?? sub._count?.responses ?? 0;
+            const comments   = sub._count?.paragraphComments ?? 0;
+            const days       = spotlightDays(sub);
+            const isLongStay = days > 10;
+
+            return (
+              <div key={sub.id} className="py-2.5 first:pt-0 flex items-center gap-2">
+                {/* Gray clap icon */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" aria-hidden="true">
+                  <path d="M9 11L7 9l1.5-1.5 2 2M9 11l4.5-4.5L15 8l-4.5 4.5M9 11l-3 3a4 4 0 0 0 6 5.3L17 14a1.5 1.5 0 0 0-2.1-2.1l-1.4 1.4"/>
+                  <path d="M12.5 6.5L14 5l1.5 1.5-1.5 1.5M14 5l1.5-1.5L17 5l-1.5 1.5"/>
+                </svg>
+
+                {/* Text block */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                    <Link
+                      to={`/critique/${sub.id}`}
+                      className="font-semibold text-[13px] text-[#1a1a2e] hover:text-[#b8860b] transition-colors leading-snug truncate"
+                    >
+                      {sub.title}
+                    </Link>
+                    {isLongStay && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border"
+                        style={{ color: "#b8860b", background: "#fdf9ed", borderColor: "#f0d98a" }}>
+                        +2 pts
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#9a8c7a]">
+                    <span className="font-medium uppercase tracking-wide text-[10px] text-[#2d3748]">{sub.genre}</span>
+                    <span className="mx-1">·</span>
+                    {TIER_WORD_LABELS[sub.wordCountTier]}
+                    <span className="mx-1">·</span>
+                    by{" "}
+                    <Link to={`/profile/${author?.id}`} className="text-[#1a5fb4] hover:underline">
+                      {author?.username}
+                    </Link>
+                    {comments > 0 && <><span className="mx-1">·</span>{comments} comment{comments !== 1 ? "s" : ""}</>}
+                  </p>
+                </div>
+
+                {/* Critique button — exact CC "Crit Story" style */}
+                <Link
+                  to={`/critique/${sub.id}`}
+                  className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 border border-[#1a1a2e] text-[#1a1a2e] rounded hover:bg-[#1a1a2e] hover:text-white transition-all whitespace-nowrap"
+                >
+                  Critique
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-3 pt-2.5 border-t border-[#f4f1ec] flex items-center justify-between">
+        <Link to="/critique" className="text-[11px] text-[#1a5fb4] hover:underline font-semibold">
+          Browse all chapters
+        </Link>
+        <Link to="/critique/queue" className="text-[11px] text-[#1a5fb4] hover:underline font-semibold">
+          View queue
+        </Link>
+      </div>
       </div>
     </div>
   );
 }
 
-// ─── Guest Prompt ──────────────────────────────────────────────
-function GuestPrompt({ message, onClose }) {
-  const navigate = useNavigate();
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2d3748]/50 backdrop-blur-sm">
-      <div className="bg-[#fffdf8] rounded-3xl shadow-2xl w-full max-w-sm p-7 sm:p-8 text-center border border-[#e8e0d0]">
-        <div className="w-14 h-14 bg-[#fdf3d8] rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-6 h-6 text-[#b8962e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-        </div>
-        <h3 className="font-serif text-[#2d3748] text-xl mb-2">Join Inkwell first</h3>
-        <p className="text-sm text-[#6b5c4a] mb-6 leading-relaxed">{message}</p>
-        <div className="flex flex-col gap-2.5">
-          <button onClick={() => navigate("/signup")} className="w-full py-3 bg-[#2d3748] text-white text-sm font-medium rounded-2xl hover:bg-[#3d4f64] transition-all">Create a free account</button>
-          <button onClick={() => navigate("/login")} className="w-full py-3 border border-[#e8e0d0] text-[#4a4a4a] text-sm font-medium rounded-2xl hover:border-[#2d3748] transition-all bg-white">Sign in</button>
-        </div>
-        <button onClick={onClose} className="mt-4 text-xs text-[#9a8c7a] hover:text-[#6b5c4a] transition-colors">Maybe later</button>
-      </div>
-    </div>
-  );
-}
+// ═════════════════════════════════════════════════════════════════════════════
+// RIGHT — EVENTS
+// ═════════════════════════════════════════════════════════════════════════════
+function EventsSection() {
+  const [events,      setEvents]      = useState([]);
+  const [lastWinners, setLastWinners] = useState(null); // { eventTitle, eventId, winners }
+  const [loading,     setLoading]     = useState(true);
 
-// ─── Tiny markdown renderer (no deps) ─────────────────────────
-function renderMarkdownHTML(text) {
-  if (!text) return "";
-  const mdInline = (s) => s
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, '<code style="background:rgba(255,255,255,0.12);padding:1px 4px;border-radius:3px;font-size:0.88em">$1</code>');
-  const lines = text.split("\n");
-  const out = [];
-  let inList = false;
-  for (const line of lines) {
-    if (/^#{1,3}\s/.test(line)) {
-      if (inList) { out.push("</ul>"); inList = false; }
-      out.push(`<strong style="display:block;margin-bottom:3px">${mdInline(line.replace(/^#+\s/, ""))}</strong>`);
-    } else if (/^[-*]\s/.test(line)) {
-      if (!inList) { out.push('<ul style="margin:4px 0;padding-left:18px;list-style:disc">'); inList = true; }
-      out.push(`<li style="margin-bottom:2px">${mdInline(line.replace(/^[-*]\s/, ""))}</li>`);
-    } else {
-      if (inList) { out.push("</ul>"); inList = false; }
-      if (line.trim() === "") out.push('<br style="display:block;height:4px">');
-      else out.push(`<span style="display:block">${mdInline(line)}</span>`);
-    }
-  }
-  if (inList) out.push("</ul>");
-  return out.join("");
-}
-
-// ─── Hero Carousel ────────────────────────────────────────────
-function HeroCarousel() {
-  const [events, setEvents] = useState([]);
-  const [slide, setSlide] = useState(0);
-  const [animating, setAnimating] = useState(false);
-  const totalSlides = 1 + events.length; // mission slide + one per event
-
-  // Fetch live/upcoming events
   useEffect(() => {
-    fetch(`${API_URL}/events/active`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const evs = (d?.events || []).slice(0, 3);
-        setEvents(evs);
-      })
-      .catch(() => {});
+    async function load() {
+      try {
+        const res  = await fetch(`${API_URL}/events/active`);
+        const data = res.ok ? await res.json() : null;
+        const active = (data?.events ?? []).slice(0, 5);
+        setEvents(active);
+
+        // If no active events, fetch all events and get winners from the most recent ended one
+        if (active.length === 0) {
+          try {
+            const allRes  = await fetch(`${API_URL}/events/admin/all`);
+            if (allRes.ok) {
+              const allData  = await allRes.json();
+              const ended    = (allData?.events ?? [])
+                .filter(e => e.type === "DAYS_CHALLENGE" && !e.isActive)
+                .sort((a, b) => new Date(b.endDate) - new Date(a.endDate));
+              if (ended.length > 0) {
+                const wRes = await fetch(`${API_URL}/events/${ended[0].id}/winners`);
+                if (wRes.ok) {
+                  const wData = await wRes.json();
+                  if (wData?.winners?.length > 0) {
+                    setLastWinners({ eventId: ended[0].id, eventTitle: wData.eventTitle, winners: wData.winners.slice(0, 3) });
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+      finally { setLoading(false); }
+    }
+    load();
   }, []);
 
-  // Auto-advance
-  useEffect(() => {
-    if (totalSlides <= 1) return;
-    const t = setInterval(() => goTo((slide + 1) % totalSlides), 6000);
-    return () => clearInterval(t);
-  }, [slide, totalSlides]);
-
-  function goTo(idx) {
-    if (idx === slide || animating) return;
-    setAnimating(true);
-    setTimeout(() => { setSlide(idx); setAnimating(false); }, 350);
-  }
-
-  const typeLabels = {
-    DAYS_CHALLENGE: "Writing Challenge",
-    WORKSHOP: "Workshop",
-    ANNOUNCEMENT: "Announcement",
-    OTHER: "Community Event",
-  };
-  const typeColors = {
-    DAYS_CHALLENGE: "#a78bfa",
-    WORKSHOP: "#34d399",
-    ANNOUNCEMENT: "#60a5fa",
-    OTHER: "#d4af37",
-  };
+  const ROLE_EMOJI = { IRON_PEN: "⚔️", CHAMPION: "🏆", STREAK_KEEPER: "🔥" };
 
   return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ height: "clamp(300px, 46vw, 540px)" }}
-    >
-      {/* ── Slide 0: Inkwell Mission ── */}
-      <div
-        className="absolute inset-0 transition-opacity duration-500"
-        style={{ opacity: slide === 0 ? 1 : 0, pointerEvents: slide === 0 ? "auto" : "none" }}
-      >
-        {/* Rich dark background matching homepage dark components */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: "linear-gradient(135deg, #0d1320 0%, #141c2e 35%, #1a2540 65%, #1e2d4a 100%)",
-          }}
-        />
-        {/* Dot grid texture */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)",
-            backgroundSize: "26px 26px",
-          }}
-        />
-        {/* Warm glow top-left */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            top: "-80px", left: "-60px",
-            width: "420px", height: "420px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(212,175,55,0.07) 0%, transparent 65%)",
-          }}
-        />
-        {/* Bottom fade to page bg */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-          style={{ background: "linear-gradient(to bottom, transparent, rgba(13,19,32,0.55))" }}
-        />
-        {/* Gold top-border line */}
-        <div
-          className="absolute top-0 left-0 right-0 h-[2px]"
-          style={{ background: "linear-gradient(90deg, transparent 5%, #d4af37 35%, #d4af37 65%, transparent 95%)" }}
-        />
+    <div className="bg-white border border-[#e8e0d0] rounded-xl overflow-hidden">
+      <div className="bg-[#d4af37] px-5 py-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[#1a1a2e]/70 mb-0.5">
+          {!loading && events.length === 0 && lastWinners ? "Last challenge" : "Active now"}
+        </p>
+        <h2 className="font-serif text-[#1a1a2e] text-base font-bold">Community events</h2>
+      </div>
+      <div className="p-5">
 
-        {/* Content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-          <p
-            className="font-bold uppercase tracking-[0.25em] mb-4"
-            style={{ fontSize: 10, color: "#d4af37", letterSpacing: "0.28em" }}
+      {loading && (
+        <div className="space-y-3">
+          {[1,2].map(i => <Bone key={i} w="w-full" h="h-4" />)}
+        </div>
+      )}
+
+      {/* ── No active events + last winners ── */}
+      {!loading && events.length === 0 && lastWinners && (
+        <div>
+          <Link
+            to={`/events/${lastWinners.eventId}`}
+            className="block text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors mb-2 truncate"
           >
-            A Writing Community
+            {lastWinners.eventTitle}
+          </Link>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-2">
+            Hall of fame
           </p>
-
-          <h1
-            className="font-serif text-white leading-[1.08] mb-5"
-            style={{
-              fontSize: "clamp(2rem, 5.5vw, 3.6rem)",
-              letterSpacing: "-0.025em",
-              maxWidth: 640,
-              textShadow: "0 2px 24px rgba(0,0,0,0.5)",
-            }}
-          >
-            Write Together.<br />
-            <span style={{ color: "#d4af37" }}>Grow Together.</span>
-          </h1>
-
-          <p
-            className="text-white leading-relaxed mb-8"
-            style={{
-              fontSize: "clamp(0.88rem, 1.8vw, 1.05rem)",
-              maxWidth: 480,
-              opacity: 0.78,
-            }}
-          >
-            Inkwell is where writers trade the isolated journey for a shared one — sprint together, sharpen your craft, and never face a blank page alone again.
-          </p>
-
-          {/* Three pillars */}
-          <div className="flex items-center gap-6 sm:gap-10 flex-wrap justify-center">
-            {[
-              { icon: "✦", label: "Write together" },
-              { icon: "✦", label: "Improve your craft" },
-              { icon: "✦", label: "Finish your draft" },
-            ].map(({ icon, label }) => (
-              <div key={label} className="flex items-center gap-2">
-                <span style={{ color: "#d4af37", fontSize: 8 }}>{icon}</span>
-                <span className="text-white font-medium" style={{ fontSize: 12, opacity: 0.85, letterSpacing: "0.01em" }}>{label}</span>
+          <div className="space-y-2">
+            {lastWinners.winners.map((w, i) => (
+              <div key={w.userId ?? i} className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-[#faf7f2] border border-[#e8e0d0]">
+                {w.avatar ? (
+                  <img src={w.avatar} alt={w.username} className="w-6 h-6 rounded-full object-cover flex-shrink-0 border border-[#e8e0d0]" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-[#1a1a2e] flex items-center justify-center flex-shrink-0">
+                    <span className="text-[9px] font-bold text-[#d4af37]">{(w.username || "?").charAt(0).toUpperCase()}</span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-semibold text-[#1a1a2e] truncate">@{w.username}</p>
+                  <p className="text-[10px] text-[#9a8c7a] truncate">{w.projectTitle}</p>
+                </div>
+                <span className="text-sm flex-shrink-0" title={w.challengeRole}>
+                  {ROLE_EMOJI[w.challengeRole] ?? "🔥"}
+                </span>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Event Slides ── */}
-      {events.map((ev, i) => {
-        const idx = i + 1;
-        const now = new Date();
-        const start = new Date(ev.startDate);
-        const end = new Date(ev.endDate);
-        const isLive = now >= start && now <= end;
-        const isUpcoming = now < start;
-        const statusLabel = isLive ? "Happening now" : isUpcoming ? "Coming soon" : "Recently ended";
-        const statusColor = isLive ? "#4ade80" : isUpcoming ? "#a78bfa" : "#9a8c7a";
-        const tagColor = typeColors[ev.type] || "#d4af37";
-        const tagLabel = typeLabels[ev.type] || "Event";
-
-        const formatRange = (s, e) => {
-          const opts = { month: "short", day: "numeric" };
-          return `${new Date(s).toLocaleDateString("en-US", opts)} – ${new Date(e).toLocaleDateString("en-US", opts)}`;
-        };
-
-        return (
-          <div
-            key={ev.id}
-            className="absolute inset-0 transition-opacity duration-500"
-            style={{ opacity: slide === idx ? 1 : 0, pointerEvents: slide === idx ? "auto" : "none" }}
-          >
-            {/* Background */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background: ev.type === "DAYS_CHALLENGE"
-                  ? "linear-gradient(135deg, #1a1225 0%, #2d2048 60%, #1e2d4a 100%)"
-                  : ev.type === "WORKSHOP"
-                  ? "linear-gradient(135deg, #0d2018 0%, #1a3a2a 60%, #1e2d4a 100%)"
-                  : "linear-gradient(135deg, #0f1e35 0%, #1a2e50 60%, #1e2d4a 100%)",
-              }}
-            />
-            {ev.bannerUrl && (
-              <div className="absolute inset-0 opacity-15">
-                <img src={ev.bannerUrl} alt="" className="w-full h-full object-cover" />
-              </div>
-            )}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
-                backgroundSize: "26px 26px",
-              }}
-            />
-            <div
-              className="absolute top-0 left-0 right-0 h-[2px]"
-              style={{ background: `linear-gradient(90deg, transparent 5%, ${tagColor} 35%, ${tagColor} 65%, transparent 95%)` }}
-            />
-            <div
-              className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-              style={{ background: "linear-gradient(to bottom, transparent, rgba(10,14,25,0.6))" }}
-            />
-
-            {/* Event content — centered like the mission slide */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-              <div style={{ maxWidth: 640, width: "100%" }}>
-              {/* Status pill */}
-              <div className="flex items-center justify-center gap-2.5 mb-4">
-                <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
-                />
-                <span
-                  className="font-bold uppercase tracking-[0.2em]"
-                  style={{ fontSize: 10, color: tagColor }}
-                >
-                  {tagLabel}
-                </span>
-                <span
-                  className="font-semibold uppercase tracking-widest"
-                  style={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }}
-                >
-                  · {statusLabel}
-                </span>
-              </div>
-
-              <h2
-                className="font-serif text-white leading-[1.1] mb-4"
-                style={{
-                  fontSize: "clamp(1.8rem, 4.5vw, 3rem)",
-                  letterSpacing: "-0.02em",
-                  textShadow: "0 2px 20px rgba(0,0,0,0.5)",
-                }}
-              >
-                {ev.title}
-              </h2>
-
-              {ev.description && (
-                <div
-                  className="text-white leading-relaxed mb-5 mx-auto"
-                  style={{ fontSize: "clamp(0.82rem, 1.6vw, 0.95rem)", opacity: 0.75, maxWidth: 480, textAlign: "left" }}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdownHTML(
-                    ev.description.length > 200 ? ev.description.slice(0, 197) + "…" : ev.description
-                  ) }}
-                />
-              )}
-
-              <div className="flex items-center justify-center gap-3 flex-wrap">
-                <span
-                  className="text-white font-medium"
-                  style={{ fontSize: 12, opacity: 0.55 }}
-                >
-                  {formatRange(ev.startDate, ev.endDate)}
-                </span>
-                {ev.daysTarget && (
-                  <>
-                    <span className="w-1 h-1 rounded-full bg-white/25" />
-                    <span className="text-white font-medium" style={{ fontSize: 12, opacity: 0.55 }}>
-                      {ev.daysTarget} consecutive days
-                    </span>
-                  </>
-                )}
-              </div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* ── Dots nav (only if > 1 slide) ── */}
-      {totalSlides > 1 && (
-        <div className="absolute bottom-5 left-0 right-0 flex justify-center gap-2 z-20">
-          {Array.from({ length: totalSlides }).map((_, i) => (
-            <button
-              key={i}
-              onClick={() => goTo(i)}
-              aria-label={`Slide ${i + 1}`}
-              className="focus:outline-none transition-all"
-              style={{
-                width: i === slide ? 24 : 8,
-                height: 8,
-                borderRadius: 4,
-                background: i === slide ? "#d4af37" : "rgba(255,255,255,0.25)",
-                transition: "all 0.35s ease",
-              }}
-            />
-          ))}
+      {/* ── No active events, no past winners ── */}
+      {!loading && events.length === 0 && !lastWinners && (
+        <div className="bg-[#faf7f2] border border-[#e8e0d0] rounded px-3 py-2.5 text-[12px] text-[#9a8c7a]">
+          No active challenges right now. Check back soon.
         </div>
       )}
+
+      {/* ── Active events list ── */}
+      {!loading && events.length > 0 && (
+        <div className="divide-y divide-[#f4f1ec]">
+          {events.map(ev => {
+            const tagColor = EVENT_TYPE_COLORS[ev.type] ?? "#b8860b";
+            const tagLabel = EVENT_TYPE_LABELS[ev.type] ?? "Event";
+            const now      = new Date();
+            const end      = new Date(ev.endDate);
+            const daysLeft = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
+
+            return (
+              <div key={ev.id} className="py-2.5 first:pt-0 flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <Link
+                    to={`/events/${ev.id}`}
+                    className="text-[13px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
+                  >
+                    {ev.title}
+                  </Link>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: tagColor }}>{tagLabel}</span>
+                    <span className="text-[10px] text-[#9a8c7a]">·</span>
+                    <span className="text-[10px] text-[#9a8c7a]">
+                      {daysLeft === 0 ? "Ends today" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}
+                    </span>
+                  </div>
+                </div>
+                <Link
+                  to={`/events/${ev.id}`}
+                  className="flex-shrink-0 text-[11px] font-semibold px-2 py-1 border border-[#1a1a2e] text-[#1a1a2e] rounded hover:bg-[#1a1a2e] hover:text-white transition-all"
+                >
+                  View
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-3 pt-2.5 border-t border-[#f4f1ec]">
+        <Link to="/events" className="text-[11px] text-[#1a5fb4] hover:underline font-semibold">All events</Link>
+      </div>
+      </div>
     </div>
   );
 }
 
-// ─── Community Events Carousel (fetches from backend) ──────────
-// Converts a PlatformEvent into display metadata
-function eventToCarouselItem(ev) {
-  const typeStyles = {
-    DAYS_CHALLENGE: {
-      tagColor: "#a78bfa",
-      bg: "linear-gradient(135deg, #1a1225 0%, #2d2048 60%, #2d3748 100%)",
-    },
-    WORKSHOP: {
-      tagColor: "#34d399",
-      bg: "linear-gradient(135deg, #0d2018 0%, #1a3a2a 50%, #2d3748 100%)",
-    },
-    ANNOUNCEMENT: {
-      tagColor: "#60a5fa",
-      bg: "linear-gradient(135deg, #0f1e35 0%, #1a2e50 50%, #2d3748 100%)",
-    },
-    OTHER: {
-      tagColor: "#d4af37",
-      bg: "linear-gradient(135deg, #1a2218 0%, #1e3a2e 50%, #2d3748 100%)",
-    },
-  };
+// ═════════════════════════════════════════════════════════════════════════════
+// LEFT — ALARM CLOCK SPRINT STARTER  (replaces plain "Start a sprint" button)
+// ═════════════════════════════════════════════════════════════════════════════
+function AlarmClockSprintCard({ onStartSprint }) {
+  return (
+    <div className="flex flex-col items-center py-6 px-4">
+      {/* Alarm clock SVG — warm parchment style */}
+      <button
+        onClick={onStartSprint}
+        className="group relative flex flex-col items-center gap-0 focus:outline-none"
+        aria-label="Tap to start sprint"
+      >
+        <svg
+          width="120" height="120" viewBox="0 0 120 120"
+          className="mb-3 transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
+          aria-hidden="true"
+        >
+          {/* Alarm feet */}
+          <ellipse cx="38" cy="108" rx="8" ry="5" fill="#d4af37" opacity="0.85" />
+          <ellipse cx="82" cy="108" rx="8" ry="5" fill="#d4af37" opacity="0.85" />
+          {/* Clock body */}
+          <circle cx="60" cy="60" r="46" fill="#fffdf7" stroke="#d4af37" strokeWidth="3" />
+          <circle cx="60" cy="60" r="40" fill="#fffdf7" stroke="#e8e0d0" strokeWidth="1" />
+          {/* Bell bumps */}
+          <circle cx="60" cy="16" r="7" fill="#d4af37" />
+          {/* Tick marks */}
+          {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg, i) => {
+            const r1 = i % 3 === 0 ? 30 : 33;
+            const r2 = 36;
+            const rad = (deg - 90) * Math.PI / 180;
+            return (
+              <line
+                key={deg}
+                x1={60 + r1 * Math.cos(rad)}
+                y1={60 + r1 * Math.sin(rad)}
+                x2={60 + r2 * Math.cos(rad)}
+                y2={60 + r2 * Math.sin(rad)}
+                stroke="#c8b89a"
+                strokeWidth={i % 3 === 0 ? 2 : 1}
+              />
+            );
+          })}
+          {/* Hour hand — pointing ~10 o'clock */}
+          <line x1="60" y1="60" x2="44" y2="38" stroke="#1a1a2e" strokeWidth="3.5" strokeLinecap="round" />
+          {/* Minute hand — pointing ~12 */}
+          <line x1="60" y1="60" x2="60" y2="30" stroke="#1a1a2e" strokeWidth="2.5" strokeLinecap="round" />
+          {/* Center dot */}
+          <circle cx="60" cy="60" r="3" fill="#d4af37" />
+          {/* "TAP TO" label inside clock */}
+          <text x="60" y="55" textAnchor="middle" fontSize="7" fill="#9a8c7a" fontFamily="serif" letterSpacing="1">TAP TO</text>
+        </svg>
 
-  const typeLabels = {
-    DAYS_CHALLENGE: "Writing Challenge",
-    WORKSHOP:       "Workshop",
-    ANNOUNCEMENT:   "Announcement",
-    OTHER:          "Community Event",
-  };
-
-  const style = typeStyles[ev.type] || typeStyles.OTHER;
-  const now   = new Date();
-  const start = new Date(ev.startDate);
-  const end   = new Date(ev.endDate);
-
-  const isLive    = now >= start && now <= end;
-  const isUpcoming = now < start;
-  const status      = isLive ? "Happening now" : isUpcoming ? "Coming soon" : "Ended";
-  const statusColor = isLive ? "#4ade80" : isUpcoming ? "#a78bfa" : "#9a8c7a";
-
-  const formatDateRange = (s, e) => {
-    const opts = { month: "short", day: "numeric" };
-    const sStr = new Date(s).toLocaleDateString("en-US", opts);
-    const eStr = new Date(e).toLocaleDateString("en-US", opts);
-    return `${sStr} – ${eStr}`;
-  };
-
-  return {
-    id:          ev.id,
-    tag:         typeLabels[ev.type] || "Event",
-    tagColor:    style.tagColor,
-    title:       ev.title,
-    dates:       formatDateRange(ev.startDate, ev.endDate),
-    schedule:    ev.daysTarget ? `${ev.daysTarget} consecutive days` : "Check Discord for schedule",
-    status,
-    statusColor,
-    description: ev.description,
-    bg:          style.bg,
-    bannerUrl:   ev.bannerUrl || null,
-  };
+        <span className="font-serif text-[#1a1a2e] text-lg font-bold leading-tight">Start Sprint</span>
+        <span className="text-[11px] text-[#9a8c7a] mt-1">Focused session to hit your goal</span>
+      </button>
+    </div>
+  );
 }
 
-function CommunityEventsCarousel() {
-  const [events, setEvents]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [active, setActive]   = useState(0);
-  const [paused, setPaused]   = useState(false);
+// ═════════════════════════════════════════════════════════════════════════════
+// LEFT — ACTIVE SPRINT BANNER (shown when there's a live sprint)
+// ═════════════════════════════════════════════════════════════════════════════
+function ActiveSprintBanner() {
+  const [activeSprints, setActiveSprints] = useState([]);
+  const [loading, setLoading]             = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/events/active`)
+    fetch(`${API_URL}/sprint/activeGroupSprints`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const items = (d?.events || []).map(eventToCarouselItem);
-        setEvents(items);
-      })
+      .then(d => setActiveSprints(d?.groupSprints ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (paused || events.length <= 1) return;
-    const t = setInterval(() => setActive(i => (i + 1) % events.length), 6000);
-    return () => clearInterval(t);
-  }, [paused, events.length]);
-
-  // Nothing to show
-  if (!loading && events.length === 0) return null;
-
-  const ev = events[active] || null;
+  if (loading || activeSprints.length === 0) return null;
 
   return (
-    <section className="mb-12">
-      <SectionLabel>Community events</SectionLabel>
-      {loading ? (
-        <div className="rounded-3xl overflow-hidden animate-pulse" style={{ minHeight: 200, background: "#2d3748" }}>
-          <div className="px-8 py-10 space-y-4">
-            <div className="h-3 bg-white/10 rounded w-1/4" />
-            <div className="h-8 bg-white/10 rounded w-1/2" />
-            <div className="h-4 bg-white/10 rounded w-3/4" />
-            <div className="h-4 bg-white/10 rounded w-2/3" />
-          </div>
-        </div>
-      ) : ev && (
-        <div
-          className="relative rounded-3xl overflow-hidden cursor-pointer"
-          style={{ background: ev.bg, transition: "background 0.7s ease", minHeight: 200 }}
-          onClick={() => setPaused(p => !p)}
-          title={paused ? "Click to resume" : "Click to pause"}
+    <div className="mb-4">
+      {activeSprints.map(sprint => (
+        <Link
+          key={sprint.id}
+          to={`/group-sprint/${sprint.id}`}
+          className="flex items-center gap-3 bg-[#fffdf0] border border-[#d4af37] rounded-lg px-4 py-3 mb-2 hover:bg-[#fff9e0] transition-colors"
         >
-          {/* Banner image overlay */}
-          {ev.bannerUrl && (
-            <div className="absolute inset-0 opacity-20">
-              <img src={ev.bannerUrl} alt="" className="w-full h-full object-cover" />
-            </div>
-          )}
-          {/* Texture */}
-          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 1px,transparent 14px)" }} />
-
-          <div className="relative px-6 sm:px-10 py-8 sm:py-10 flex flex-col sm:flex-row gap-6 sm:gap-10 items-start sm:items-center">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2.5 mb-3">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: ev.statusColor, boxShadow: `0 0 7px ${ev.statusColor}` }} />
-                <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: ev.tagColor }}>{ev.tag}</span>
-                <span className="text-[10px] text-white/40 font-semibold uppercase tracking-widest">{ev.status}</span>
-              </div>
-              <h3 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">{ev.title}</h3>
-              <p className="text-white/65 text-sm leading-relaxed max-w-lg mb-4">{ev.description}</p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-[12px] text-white/45">{ev.dates}</span>
-                <span className="w-1 h-1 rounded-full bg-white/25 flex-shrink-0" />
-                <span className="text-[12px] text-white/45">{ev.schedule}</span>
-              </div>
-            </div>
-
-            {events.length > 1 && (
-              <div className="flex-shrink-0 flex flex-col items-center gap-4">
-                <div className="flex items-center gap-2">
-                  {events.map((e, i) => (
-                    <button
-                      key={e.id}
-                      onClick={(evt) => { evt.stopPropagation(); setActive(i); setPaused(true); }}
-                      aria-label={`Go to event ${i + 1}`}
-                      className="focus:outline-none transition-all"
-                      style={{
-                        width: i === active ? 22 : 8,
-                        height: 8,
-                        borderRadius: 4,
-                        background: i === active ? ev.tagColor : "rgba(255,255,255,0.2)",
-                        transition: "all 0.35s ease",
-                      }}
-                    />
-                  ))}
-                </div>
-                <p className="text-[10px] text-white/25 uppercase tracking-widest">
-                  {paused ? "Paused — click to resume" : "Click card to pause"}
-                </p>
-              </div>
-            )}
+          {/* Pulsing live dot */}
+          <span className="relative flex-shrink-0">
+            <span className="absolute inline-flex h-3 w-3 rounded-full bg-[#d4af37] opacity-75 animate-ping" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#d4af37]" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-bold text-[#1a1a2e] leading-tight">
+              Sprint live now · {sprint.duration} min ·{" "}
+              {sprint._count?.sprints ?? 0} writer{(sprint._count?.sprints ?? 0) !== 1 ? "s" : ""} inside
+            </p>
+            <p className="text-[10px] text-[#9a8c7a]">hosted by @{sprint.user?.username}</p>
           </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function SectionLabel({ children }) {
-  return (
-    <div className="flex items-center gap-3 mb-5">
-      <div className="h-px flex-1 bg-[#e8e0d0]" />
-      <p className="text-[10px] text-[#9a8c7a] uppercase tracking-widest font-semibold">{children}</p>
-      <div className="h-px flex-1 bg-[#e8e0d0]" />
+          <span className="text-[11px] font-semibold text-[#d4af37] whitespace-nowrap">Join →</span>
+        </Link>
+      ))}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-// UPDATED CommunitySchedule — shows 4pm UTC + user's local time
-// Replace the existing CommunitySchedule function in App.jsx
-// ─────────────────────────────────────────────────────────────────
-
-// Helper: build a display string like "4:00 PM UTC  ·  5:00 PM WAT"
-function buildTimeLabel(utcHour24) {
-  // UTC label
-  const pad = (n) => String(n).padStart(2, "0");
-  const utcAmPm = utcHour24 >= 12 ? "PM" : "AM";
-  const utcH = utcHour24 % 12 || 12;
-  const utcLabel = `${utcH}:00 ${utcAmPm} UTC`;
-
-  // Local label
-  const now = new Date();
-  const localDate = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour24)
-  );
-  const localLabel = localDate.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-
-  if (localLabel === utcLabel) return utcLabel;
-  return `${utcLabel}  ·  ${localLabel}`;
-}
-
-const COMMUNITY_SCHEDULE_DATA = [
-  { day: "Wednesday", utcHour: 16, label: "Reading Sprint",     note: "Read Story Genius together to improve your craft" },
-  { day: "Friday",    utcHour: 16, label: "Writing Sprint",     note: "Come together and write using the Inkwell quiet sprint room" },
-  { day: "Saturday",  utcHour: 16, label: "Feedback Session",   note: "Share your work and give thoughtful feedback to fellow writers" },
-];
-
-export function CommunitySchedule({ discordInviteLink }) {
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const today = days[new Date().getDay()];
-
+// ═════════════════════════════════════════════════════════════════════════════
+// LEFT — ACCOUNTABILITY / SPRINT SECTION
+// ═════════════════════════════════════════════════════════════════════════════
+function AccountabilitySection({ user, onStartSprint }) {
   return (
-    <section
-      className="rounded-3xl border border-[#e8e0d0] overflow-hidden mb-12"
-      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.03), 0 10px 30px rgba(45,35,20,0.06)" }}
-    >
-      {/* Header */}
-      <div className="bg-[#2d3748] px-6 sm:px-8 py-5">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-[10px] text-white/50 uppercase tracking-widest font-semibold mb-1">
-              Weekly sessions
-            </p>
-            <h2 className="font-serif text-white text-lg leading-snug">When we write together</h2>
-          </div>
-          <a
-            href={discordInviteLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-shrink-0 inline-flex items-center gap-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-[12px] font-semibold px-4 py-2 rounded-xl transition-all"
-            style={{ boxShadow: "0 2px 8px rgba(88,101,242,0.4)" }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
-            </svg>
-            Join Discord
-          </a>
-        </div>
+    <div className="bg-white border border-[#e8e0d0] rounded-xl p-6">
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#e8e0d0]">
+        <h2
+          className="font-serif text-[#1a1a2e] text-base font-semibold uppercase tracking-wider pl-3"
+          style={{ letterSpacing: "0.06em", borderLeft: "3px solid #d4af37" }}
+        >
+          Community Sprints
+        </h2>
+        <Link
+          to="/accountability"
+          className="text-[11px] font-semibold text-[#9a8c7a] hover:text-[#d4af37] transition-colors flex items-center gap-1 whitespace-nowrap"
+        >
+          How our sprint sessions work
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </Link>
       </div>
 
-      {/* Schedule rows */}
-      <div className="bg-white divide-y divide-[#f0ebe3]">
-        {COMMUNITY_SCHEDULE_DATA.map((session) => {
-          const isToday = session.day === today;
-          const timeLabel = buildTimeLabel(session.utcHour);
+      {/* Last group sprint recap */}
+      <LastGroupSprintRecap />
 
-          return (
-            <div
-              key={session.day}
-              className="flex items-center gap-4 px-6 sm:px-8 py-4 transition-colors"
-              style={{ background: isToday ? "#fffdf8" : "transparent" }}
-            >
-              {/* Day */}
-              <div className="flex-shrink-0 w-28">
-                <p className="text-[11px] font-semibold text-[#2d3748]">{session.day}</p>
-                {isToday && (
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#be185d]">
-                    Today
-                  </span>
-                )}
-              </div>
+      {/* Active sprint banner — between recap and start clock */}
+      <ActiveSprintBanner />
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-[#2d3748] leading-tight">
-                  {session.label}
-                </p>
-                <p className="text-[11px] text-[#9a8c7a] mt-0.5">{session.note}</p>
-                {/* Time — UTC + local side by side */}
-                <p className="text-[10px] text-[#b8a898] mt-1 font-medium tracking-wide">
-                  {timeLabel}
-                </p>
-              </div>
+      {/* Alarm clock — tap to start */}
+      <AlarmClockSprintCard onStartSprint={onStartSprint} />
 
-              {/* Today pulse */}
-              {isToday && (
-                <div className="flex-shrink-0">
-                  <span className="inline-block w-2 h-2 rounded-full bg-[#be185d] animate-pulse" />
-                </div>
-              )}
-            </div>
-          );
-        })}
+      {/* Discord link */}
+      <div className="mt-3 pt-3 border-t border-[#f0ebe3] flex items-center justify-center">
+        <a
+          href={DISCORD_INVITE}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-[12px] text-[#5865f2] hover:underline font-semibold"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#5865f2" aria-hidden="true">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+          </svg>
+          Join writers on Discord
+        </a>
       </div>
-
-      {/* Footer */}
-      <div className="bg-[#faf7f2] border-t border-[#e8e0d0] px-6 sm:px-8 py-5">
-        <p className="text-[12px] text-[#6b5c4a] leading-relaxed text-center max-w-md mx-auto">
-          All sessions are held in our Discord server. Writers gather, sprint together, and hold each other accountable in real time.
-        </p>
-        <div className="mt-3 flex justify-center">
-          <a
-            href={discordInviteLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[11px] font-semibold text-[#5865f2] hover:text-[#4752c4] transition-colors underline underline-offset-2"
-          >
-            Meet the writers — join Discord
-          </a>
-        </div>
-      </div>
-    </section>
+    </div>
   );
 }
 
-// ─── Discord Community Banner ──────────────────────────────────
-// Shown to ALL users — guests get signup/login CTAs, members get a reminder
-function DiscordBanner() {
-  const { user } = useAuth();
+// ═════════════════════════════════════════════════════════════════════════════
+// GUEST PROMPT MODAL
+// ═════════════════════════════════════════════════════════════════════════════
+function GuestModal({ onClose }) {
   const navigate = useNavigate();
-
   return (
-    <section
-      className="rounded-3xl overflow-hidden mb-12"
-      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.05), 0 16px 48px rgba(10,15,30,0.18)" }}
-    >
-      <div
-        className="relative px-6 sm:px-10 py-8 sm:py-10"
-        style={{ background: "linear-gradient(135deg, #0d1320 0%, #141c2e 40%, #1a2540 70%, #1e2d4a 100%)" }}
-      >
-        {/* Gold top line */}
-        <div
-          className="absolute top-0 left-8 right-8 h-px"
-          style={{ background: "linear-gradient(90deg, transparent, #d4af37 40%, #d4af37 60%, transparent)" }}
-        />
-        {/* Dot grid texture */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
-            backgroundSize: "24px 24px",
-          }}
-        />
-
-        <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-10">
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-white font-bold tracking-[0.22em] uppercase mb-2" style={{ opacity: 0.45 }}>
-              Join on Discord
-            </p>
-            <h2 className="font-serif text-white text-xl sm:text-2xl leading-snug mb-3">
-              Writing is solitary.<br />
-              Accountability doesn't have to be.
-            </h2>
-            <p className="text-white text-sm leading-relaxed max-w-md" style={{ opacity: 0.72 }}>
-              Join writers on Discord who show up every week, share their word counts, cheer each other on, and refuse to give up on their stories.
-            </p>
-            <ul className="mt-4 space-y-1.5">
-              {[
-                "Weekly group sprints with real writers",
-                "Daily check-ins to keep your streak alive",
-                "A place to share wins and stay honest",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <div className="w-1 h-1 rounded-full bg-[#d4af37] mt-1.5 flex-shrink-0" />
-                  <span className="text-white text-[12px] leading-relaxed" style={{ opacity: 0.78 }}>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="flex-shrink-0 flex flex-col items-center gap-3 w-full sm:w-auto">
-            <a
-              href={DISCORD_INVITE_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-[#5865f2] hover:bg-[#4752c4] text-white font-semibold text-sm px-7 py-3 rounded-2xl transition-all"
-              style={{ boxShadow: "0 4px 16px rgba(88,101,242,0.5)" }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
-              </svg>
-              Join the community
-            </a>
-            <p className="text-white text-[10px] text-center" style={{ opacity: 0.35 }}>Free to join · Writers only</p>
-            {!user && (
-              <div className="mt-1 flex flex-col gap-2 w-full">
-                <button
-                  onClick={() => navigate("/signup")}
-                  className="w-full py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-medium rounded-xl transition-all border border-white/10"
-                >
-                  Create a free account
-                </button>
-                <button
-                  onClick={() => navigate("/login")}
-                  className="w-full py-2.5 text-sm transition-colors text-white"
-                  style={{ opacity: 0.4 }}
-                >
-                  Sign in
-                </button>
-              </div>
-            )}
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-7 text-center border border-[#e8e0d0]">
+        <h3 className="font-serif text-[#1a1a2e] text-lg mb-2">Join Quillweave first</h3>
+        <p className="text-sm text-[#6b5c4a] mb-5 leading-relaxed">
+          Sign up to start a solo sprint or sprint with other writers.
+        </p>
+        <div className="flex flex-col gap-2">
+          <button onClick={() => navigate("/signup")} className="w-full py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-lg hover:bg-[#c9a42d] transition-all">
+            Create a free account
+          </button>
+          <button onClick={() => navigate("/login")} className="w-full py-2.5 border border-[#1a1a2e] text-[#1a1a2e] text-sm font-semibold rounded-lg hover:bg-[#1a1a2e] hover:text-white transition-all">
+            Sign in
+          </button>
         </div>
+        <button onClick={onClose} className="mt-4 text-xs text-[#9a8c7a] hover:text-[#6b5c4a]">
+          Maybe later
+        </button>
       </div>
-    </section>
+    </div>
   );
 }
 
-// ─── Main ──────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN
+// ═════════════════════════════════════════════════════════════════════════════
 export default function Homepage() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const [showStartModal, setShowStartModal] = useState(false);
-  const [showJoinModal, setShowJoinModal] = useState(false);
-  const [guestMessage, setGuestMessage] = useState(null);
+  const { user }                    = useAuth();
+  const navigate                    = useNavigate();
+  const [wallet, setWallet]         = useState(null);
+  const [showSprint, setShowSprint] = useState(false);
+  const [showGuest, setShowGuest]   = useState(false);
 
-  function handleStartClick() {
-    if (!user) { setGuestMessage("Sign up to start a sprint — solo or with others."); return; }
-    setShowStartModal(true);
-  }
-  function handleBannerJoinClick() {
-    if (!user) { setGuestMessage("Sign up to join a sprint with other writers."); return; }
-    setShowJoinModal(true);
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${API_URL}/feedback/points/me`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setWallet(d))
+      .catch(() => {});
+  }, [user]);
+
+  function handleStartSprint() {
+    if (!user) { setShowGuest(true); return; }
+    setShowSprint(true);
   }
 
   return (
-    <div className="min-h-screen bg-[#faf7f2]">
-      <AppMetaTags title="Inkwell Coffee Shop — Write Together" description="A cosy writing space where writers show up, sprint together and get words on the page." />
+    <div className="min-h-screen bg-[#f5f3ef]">
       <Header />
-      <NotificationsSetup user={user} />
-      <HeroCarousel />
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
-        <section className="mb-10"><DailyEmotion /></section>
-        <div className="mb-10"><ActiveSprintsBanner onJoinClick={handleBannerJoinClick} /></div>
-        <LastGroupSprintRecap /> 
-        <section className="mb-12">
-          <SectionLabel>Your writing desk</SectionLabel>
-          <div className="bg-white rounded-3xl border border-[#e8e0d0] overflow-hidden"
-            style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.03), 0 10px 30px rgba(45,35,20,0.07)" }}>
-            <div className="flex flex-col sm:flex-row min-h-0">
-              <div className="sm:w-56 flex-shrink-0 flex flex-col items-center justify-center gap-0 px-6 sm:px-8 py-8 sm:py-9 bg-[#faf7f2] border-b sm:border-b-0 sm:border-r border-[#e8e0d0]">
-                <AlarmClockSprint onClick={handleStartClick} />
-              </div>
-              <div className="flex-1 px-5 py-7 sm:px-8 sm:py-8 min-w-0 overflow-hidden">
-                {user
-                  ? <RecentProjectCardInline />
-                  : (
-                    <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-4">
-                      <p className="font-serif text-lg text-[#2d3748]">Ready to write?</p>
-                      <p className="text-sm text-[#9a8c7a] leading-relaxed max-w-xs">Sign up to track your project, get a daily word goal, and never lose momentum again.</p>
-                      <button onClick={() => navigate("/signup")} className="px-6 py-3 bg-[#2d3748] text-white text-sm font-medium rounded-2xl hover:bg-[#3d4f64] transition-all">
-                        Start writing with Inkwell
-                      </button>
-                    </div>
-                  )}
-              </div>
+      {/* Profile bar or guest hero */}
+      {user ? <ProfileBar user={user} wallet={wallet} /> : <GuestHero />}
+
+      {/* Two-column layout
+          Left: ~58% (longer content)
+          Right: ~42% (shorter sidebar-like)
+          matches CC's left-heavier split */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 pt-7 pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-6 items-start">
+
+          {/* ── LEFT COLUMN ── wider, longer content */}
+          <div>
+            {/* DailyEmotion — full width, not shrinking */}
+            <div className="mb-6">
+              <DailyEmotion />
             </div>
+
+            {/* Accountability + sprints */}
+            <AccountabilitySection user={user} onStartSprint={handleStartSprint} />
           </div>
-        </section>
 
-        {/* Community sprint times + Discord link */}
-        <CommunitySchedule discordInviteLink={DISCORD_INVITE_LINK} />
+          {/* ── RIGHT COLUMN ── narrower sidebar */}
+          <div>
+            <MySubmissions user={user} wallet={wallet} />
+            <SpotlightList />
+            <EventsSection />
+          </div>
 
-        {/* 5-day writing challenge — active participants or winners */}
-        <section className="mb-10"><ChallengeBlock /></section>
+        </div>
+      </div>
 
-        {/* Community honours board — top critiquers, sprinters, sentence crafters */}
-        <section className="mb-12"><CommunityLeaderboard /></section>
-
-        <section className="mb-12"><ContributeSoundscape /></section>
-
-        {/* Discord community banner — always visible for both guests and logged-in users */}
-        <DiscordBanner />
-
-        <p className="text-center text-[10px] text-[#c4bdb4] pt-12 tracking-widest uppercase">
-          A quiet space for writers · Inkwell
-        </p>
-      </main>
-
-      <StartGroupSprintModal isOpen={showStartModal} onClose={() => setShowStartModal(false)} onCreated={(s) => navigate(`/group-sprint/${s.id}`)} />
-      {showJoinModal && <JoinGroupSprintModal onClose={() => setShowJoinModal(false)} />}
-      {guestMessage && <GuestPrompt message={guestMessage} onClose={() => setGuestMessage(null)} />}
+      {showSprint && (
+        <StartGroupSprintModal
+          isOpen={showSprint}
+          onClose={() => setShowSprint(false)}
+          onCreated={s => navigate(`/group-sprint/${s.id}`)}
+        />
+      )}
+      {showGuest && <GuestModal onClose={() => setShowGuest(false)} />}
     </div>
   );
 }

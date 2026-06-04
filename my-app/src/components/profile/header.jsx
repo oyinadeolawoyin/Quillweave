@@ -26,6 +26,13 @@ const SettingsIcon = () => (
   </svg>
 );
 
+const DraftsIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/>
+    <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+);
+
 const SignOutIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
@@ -112,11 +119,12 @@ export default function Header() {
   }
 
   const navItems = [
-    { to: "/snippets",  label: "Community" },
     { to: "/critique",  label: "Critique"  },
-    { to: "/thesaurus", label: "Thesaurus" },
     { to: "/stories",   label: "Stories"   },
-    { to: "/blog",      label: "Blog"      },
+    { to: "/snippets",  label: "Community" },
+    
+    // { to: "/thesaurus", label: "Thesaurus" },
+    // { to: "/blog",      label: "Blog"      },
   ];
 
   function isActive(to) {
@@ -265,6 +273,14 @@ export default function Header() {
                         >
                           <span className="text-[#737373]"><ProjectsIcon /></span>
                           Projects
+                        </Link>
+
+                        <Link
+                          to="/drafts"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#4a4a4a] hover:bg-[#fafaf9] transition-colors"
+                        >
+                          <span className="text-[#737373]"><DraftsIcon /></span>
+                          Drafts
                         </Link>
 
                         <Link

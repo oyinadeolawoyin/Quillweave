@@ -37,201 +37,249 @@ function WalletStrip({ wallet }) {
   const meta = TIER_META[tier?.name] ?? TIER_META.Bronze;
   const costs = wallet.TIER_COSTS ?? {};
   const bal = wallet.postingBalance ?? 0;
-
+  const activeChapterCount = wallet.activeChapterCount ?? 0;
+  const surcharge = wallet.MULTI_CHAPTER_SURCHARGE ?? 2;
   const isFreeEligible = !!(wallet?.freePostAvailable);
-  const canPost = isFreeEligible || Object.entries(costs).some(([, cost]) => bal >= cost);
+  const cheapestTierWithSurcharge = Math.min(...Object.values(costs)) + (activeChapterCount * surcharge);
+  const canPost = isFreeEligible || bal >= cheapestTierWithSurcharge;
   const maxTier = Object.entries(costs)
-    .filter(([, cost]) => bal >= cost)
+    .filter(([, cost]) => bal >= cost + (activeChapterCount * surcharge))
     .sort((a, b) => b[1] - a[1])[0];
 
   return (
-    <div className="bg-white border border-[#e8e0d0] rounded-2xl shadow-soft px-5 py-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-8">
+    <div className="bg-white border border-[#e8e0d0] rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-8">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-sm"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
           style={{ backgroundColor: meta.color }}
         >
           {tier?.gem ?? "B"}
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-0.5">Your rank</p>
-          <p className="text-sm font-semibold text-ink-primary">
-            {tier?.name ?? "Bronze"} · <span className="font-normal text-[#6b5c4a]">Rep {wallet.reputation}</span>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-0.5">Rank</p>
+          <p className="text-sm font-semibold text-[#1a1a2e]">
+            {tier?.name ?? "Bronze"} <span className="font-normal text-[#9a8c7a]">· Rep {wallet.reputation}</span>
           </p>
         </div>
       </div>
 
-      <div className="hidden sm:block w-px h-10 bg-[#e8e0d0]" />
+      <div className="hidden sm:block w-px h-8 bg-[#e8e0d0]" />
 
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="w-10 h-10 rounded-xl bg-[#fdf9ed] border border-[#f0d98a] flex items-center justify-center flex-shrink-0">
-          <span className="text-sm font-bold text-ink-gold">{bal}</span>
+        <div className="w-8 h-8 rounded-lg bg-[#fffdf0] border border-[#d4af37]/40 flex items-center justify-center flex-shrink-0">
+          <span className="text-sm font-bold text-[#b8860b]">{bal}</span>
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-0.5">Posting balance</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-0.5">Balance</p>
           <p className="text-sm text-[#2d3748]">
-            {isFreeEligible
-              ? <span className="text-ink-gold font-semibold">Free post available</span>
-              : canPost
-              ? `Can post up to ${TIER_LABELS[maxTier[0]]}`
-              : "Read a chapter to earn points"}
+            {isFreeEligible ? (
+              <span className="text-[#b8860b] font-semibold">Free post available</span>
+            ) : canPost ? (
+              <>Can post up to {TIER_LABELS[maxTier?.[0]]}</>
+            ) : (
+              "Critique to earn posting points"
+            )}
           </p>
         </div>
       </div>
 
       <Link
-        to="/feedback/submit"
-        className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+        to="/critique/submit"
+        className={`flex-shrink-0 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
           canPost
-            ? "bg-ink-primary text-white hover:opacity-90 shadow-sm"
+            ? "bg-[#1a1a2e] text-white hover:bg-[#2d3748]"
             : "bg-[#f4f1ec] text-[#b8a898] cursor-not-allowed pointer-events-none"
         }`}
       >
-        Submit a chapter
+        Submit chapter
       </Link>
     </div>
   );
 }
 
-// ─── CRITIQUE PROGRESS BAR ────────────────────────────────────────────────────
+// ─── CRITIQUE PROGRESS ────────────────────────────────────────────────────────
 
 function CritiqueProgress({ count, max = 3 }) {
-  const pct = Math.min((count / max) * 100, 100);
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1 bg-[#f0ebe3] rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full bg-ink-primary transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
+      <div className="flex gap-1 flex-1">
+        {Array.from({ length: max }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 h-1 rounded-full transition-all duration-300"
+            style={{ background: i < count ? "#1a1a2e" : "#e8e0d0" }}
+          />
+        ))}
       </div>
-      <span className="text-[11px] text-[#9a8c7a] tabular-nums flex-shrink-0">
-        {count}/{max} critiques
+      <span className="text-[10px] text-[#9a8c7a] tabular-nums flex-shrink-0">
+        {count}/{max}
       </span>
     </div>
   );
 }
 
-// ─── SUBMISSION CARD ──────────────────────────────────────────────────────────
+// ─── ROW SKELETON ─────────────────────────────────────────────────────────────
 
-function SubmissionCard({ sub }) {
+function RowSkeleton() {
+  return (
+    <div className="bg-white border border-[#e8e0d0] rounded-xl p-4 flex gap-4 animate-pulse">
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex gap-2">
+          <div className="h-4 w-14 bg-[#f4f1ec] rounded-full" />
+          <div className="h-4 w-20 bg-[#f4f1ec] rounded-full" />
+        </div>
+        <div className="h-5 w-2/3 bg-[#f4f1ec] rounded" />
+        <div className="h-3 w-full bg-[#f4f1ec] rounded" />
+        <div className="h-2 w-48 bg-[#f4f1ec] rounded-full mt-2" />
+      </div>
+      {/* Bigger skeleton avatar */}
+      <div className="flex flex-col items-center gap-1 flex-shrink-0 w-16">
+        <div className="w-12 h-12 rounded-full bg-[#f4f1ec]" />
+        <div className="h-2.5 w-14 bg-[#f4f1ec] rounded" />
+        <div className="h-2 w-10 bg-[#f4f1ec] rounded" />
+      </div>
+    </div>
+  );
+}
+
+// ─── SPOTLIGHT ROW ────────────────────────────────────────────────────────────
+
+function SpotlightRow({ sub }) {
   const author = sub.user;
   const responses = sub.critiqueCount ?? sub._count?.responses ?? 0;
   const comments = sub._count?.paragraphComments ?? 0;
+  // reputation lives on feedbackPoints (joined via userSelect in feedbackService)
+  const reputation = author?.feedbackPoints?.reputation ?? null;
 
   return (
     <Link
-      to={`/feedback/${sub.id}`}
-      className="group block bg-white border border-[#e8e0d0] rounded-2xl p-5 hover:border-ink-primary hover:shadow-[0_4px_20px_rgba(45,55,72,0.08)] transition-all duration-200"
+      to={`/critique/${sub.id}`}
+      className="group relative flex items-start gap-5 bg-white border border-[#e8e0d0] rounded-xl px-5 py-4 hover:border-[#1a1a2e] hover:shadow-[0_4px_20px_rgba(26,26,46,0.08)] transition-all duration-200"
     >
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <span className="text-[11px] font-bold text-ink-primary bg-ink-primary/5 px-2.5 py-0.5 rounded-full">
-          {sub.genre}
-        </span>
-        <span className="text-[11px] text-[#9a8c7a] bg-[#faf7f2] border border-[#e8e0d0] px-2.5 py-0.5 rounded-full">
-          {TIER_LABELS[sub.wordCountTier]}
-        </span>
-        <span className="text-[11px] text-[#9a8c7a] bg-[#faf7f2] border border-[#e8e0d0] px-2.5 py-0.5 rounded-full ml-auto">
-          {DRAFT_LABELS[sub.draftStage]}
-        </span>
-      </div>
+      {/* Long-stay bonus badge */}
+      {sub.isLongStay && (
+        <div className="absolute top-3.5 right-20 bg-[#fffdf0] border border-[#d4af37]/50 text-[#b8860b] text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wide">
+          +2 pts
+        </div>
+      )}
 
-      <h3 className="font-serif text-ink-primary text-lg leading-snug mb-2 group-hover:text-ink-gold transition-colors line-clamp-2">
-        {sub.title}
-      </h3>
-
-      <p className="text-sm text-[#6b5c4a] leading-relaxed mb-4 line-clamp-2">
-        {sub.summary}
-      </p>
-
-      {sub.feedbackWanted?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {sub.feedbackWanted.slice(0, 3).map((tag, i) => (
-            <span key={i} className="text-[11px] text-[#6558d4] bg-[#f2f0fd] px-2.5 py-0.5 rounded-full">
+      {/* Main content */}
+      <div className="flex-1 min-w-0">
+        {/* Tags */}
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-white bg-[#1a1a2e] px-2.5 py-0.5 rounded-full">
+            {sub.genre}
+          </span>
+          <span className="text-[10px] text-[#9a8c7a] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
+            {TIER_LABELS[sub.wordCountTier]}
+          </span>
+          <span className="text-[10px] text-[#9a8c7a] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
+            {DRAFT_LABELS[sub.draftStage]}
+          </span>
+          {sub.feedbackWanted?.slice(0, 2).map((tag, i) => (
+            <span key={i} className="text-[10px] text-[#6558d4] bg-[#f2f0fd] px-2 py-0.5 rounded-full">
               {tag}
             </span>
           ))}
-          {sub.feedbackWanted.length > 3 && (
-            <span className="text-[11px] text-[#9a8c7a] px-2 py-0.5">
-              +{sub.feedbackWanted.length - 3} more
-            </span>
+          {sub.feedbackWanted?.length > 2 && (
+            <span className="text-[10px] text-[#9a8c7a]">+{sub.feedbackWanted.length - 2}</span>
           )}
         </div>
-      )}
 
-      {sub.contentWarnings?.length > 0 && (
-        <div className="flex gap-1.5 mb-4 flex-wrap">
-          {sub.contentWarnings.map((w, i) => (
-            <span key={i} className="text-[10px] text-[#c0392b] bg-[#fdf1f0] px-2 py-0.5 rounded-full border border-[#f5c6c3]">
-              {w}
-            </span>
-          ))}
-        </div>
-      )}
+        {/* Title */}
+        <h3 className="font-serif text-[#1a1a2e] text-[1rem] leading-snug mb-1.5 group-hover:text-[#b8860b] transition-colors line-clamp-1">
+          {sub.title}
+        </h3>
 
-      <div className="mb-3">
-        <CritiqueProgress count={responses} max={3} />
-      </div>
+        {/* Summary */}
+        <p className="text-[13px] text-[#6b5c4a] leading-relaxed line-clamp-2 mb-3">
+          {sub.summary}
+        </p>
 
-      <div className="pt-3 border-t border-[#f0ebe3]">
-        {/* Author row */}
-        <Link to={`/profile/${author?.id}`} className="flex items-center gap-2 mb-3 hover:opacity-80 transition-opacity">
-          <div className="w-7 h-7 rounded-full bg-ink-primary flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 overflow-hidden">
-            {author?.avatar
-              ? <img src={author.avatar} alt={author.username} className="w-full h-full object-cover" />
-              : <span>{author?.username?.charAt(0).toUpperCase() ?? "?"}</span>
-            }
-          </div>
-          <span className="text-sm text-ink-primary font-medium">{author?.username}</span>
-          {author?.feedbackPoints?.reputation != null && (
-            <span className="text-xs text-[#9a8c7a]">Rep {author.feedbackPoints.reputation}</span>
-          )}
-        </Link>
-        {/* Stats row */}
+        {/* Progress + comments */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-[#9a8c7a]">
-            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z" />
-            </svg>
-            <span className="text-xs font-semibold text-ink-primary">{responses}</span>
-            <span className="text-xs">{responses === 1 ? "critique" : "critiques"}</span>
+          <div className="w-32">
+            <CritiqueProgress count={responses} max={3} />
           </div>
-          <span className="w-1 h-1 rounded-full bg-[#e8e0d0] flex-shrink-0" />
-          <div className="flex items-center gap-1.5 text-[#9a8c7a]">
-            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center gap-1 text-[#b8a898]">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
             </svg>
-            <span className="text-xs font-semibold text-ink-primary">{comments}</span>
-            <span className="text-xs">comments</span>
+            <span className="text-[11px]">{comments}</span>
           </div>
         </div>
       </div>
+
+      {/* Author avatar — right side (bigger, with reputation) */}
+      <Link
+        to={`/profile/${author?.id}`}
+        onClick={(e) => e.stopPropagation()}
+        className="flex flex-col items-center gap-1 flex-shrink-0 hover:opacity-75 transition-opacity"
+      >
+        {/* Avatar: w-12 h-12 (was w-10 h-10) */}
+        <div className="w-12 h-12 rounded-full bg-[#1a1a2e] flex items-center justify-center text-white text-sm font-semibold overflow-hidden ring-2 ring-[#e8e0d0] group-hover:ring-[#d4af37] transition-all">
+          {author?.avatar
+            ? <img src={author.avatar} alt={author.username} className="w-full h-full object-cover" />
+            : <span>{author?.username?.charAt(0).toUpperCase() ?? "?"}</span>
+          }
+        </div>
+        <span className="text-[10px] text-[#9a8c7a] font-medium text-center leading-tight max-w-[56px] truncate">
+          {author?.username}
+        </span>
+        {reputation !== null && (
+          <span className="text-[9px] text-[#b8a898] tabular-nums leading-none">
+            {reputation} rep
+          </span>
+        )}
+      </Link>
     </Link>
   );
 }
 
-// ─── SKELETON ─────────────────────────────────────────────────────────────────
+// ─── GENRE DROPDOWN ───────────────────────────────────────────────────────────
 
-function CardSkeleton() {
+function GenreDropdown({ genres, activeGenre, onSelect }) {
+  const [open, setOpen] = useState(false);
+  if (!genres.length) return null;
+
   return (
-    <div className="bg-white border border-[#e8e0d0] rounded-2xl p-5 animate-pulse">
-      <div className="flex gap-2 mb-3">
-        <div className="h-5 w-16 bg-[#f4f1ec] rounded-full" />
-        <div className="h-5 w-24 bg-[#f4f1ec] rounded-full" />
-      </div>
-      <div className="h-6 w-3/4 bg-[#f4f1ec] rounded-lg mb-2" />
-      <div className="h-4 w-full bg-[#f4f1ec] rounded mb-1" />
-      <div className="h-4 w-2/3 bg-[#f4f1ec] rounded mb-4" />
-      <div className="flex gap-1.5 mb-4">
-        <div className="h-4 w-20 bg-[#f4f1ec] rounded-full" />
-        <div className="h-4 w-28 bg-[#f4f1ec] rounded-full" />
-      </div>
-      <div className="flex justify-between pt-3 border-t border-[#f0ebe3]">
-        <div className="h-4 w-24 bg-[#f4f1ec] rounded" />
-        <div className="h-4 w-20 bg-[#f4f1ec] rounded" />
-      </div>
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[12px] font-semibold border border-[#e8e0d0] bg-white text-[#6b5c4a] hover:border-[#1a1a2e] transition-all"
+      >
+        <svg className="w-3.5 h-3.5 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 8h12M9 12h6" />
+        </svg>
+        {activeGenre ?? "All genres"}
+        <svg className={`w-3 h-3 text-[#9a8c7a] transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-20 bg-white border border-[#e8e0d0] rounded-xl shadow-[0_8px_24px_rgba(26,26,46,0.1)] py-1.5 min-w-[160px]">
+          <button
+            onClick={() => { onSelect(null); setOpen(false); }}
+            className={`w-full text-left px-4 py-2 text-[12px] font-semibold transition-colors ${
+              activeGenre === null ? "text-[#1a1a2e] bg-[#f4f1ec]" : "text-[#6b5c4a] hover:bg-[#faf8f5]"
+            }`}
+          >
+            All genres
+          </button>
+          {genres.map((g) => (
+            <button
+              key={g}
+              onClick={() => { onSelect(g); setOpen(false); }}
+              className={`w-full text-left px-4 py-2 text-[12px] font-semibold transition-colors ${
+                activeGenre === g ? "text-[#1a1a2e] bg-[#f4f1ec]" : "text-[#6b5c4a] hover:bg-[#faf8f5]"
+              }`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -240,19 +288,28 @@ function CardSkeleton() {
 
 export default function FeedbackHub() {
   const { user } = useAuth();
-  const [spotlight, setSpotlight] = useState([]);
-  const [wallet, setWallet] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [spotlight, setSpotlight]         = useState([]);
+  const [wallet, setWallet]               = useState(null);
+  const [loading, setLoading]             = useState(true);
+  const [spotlightGenres, setSpotlightGenres] = useState([]);
+  const [queueGenres, setQueueGenres]     = useState([]);
+  const [archiveGenres, setArchiveGenres] = useState([]);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
-  useEffect(() => { fetchSpotlight(); }, []);
-  useEffect(() => { if (user) fetchWallet(); }, [user]);
+  const canPost =
+    wallet?.freePostAvailable ||
+    (wallet?.postingBalance ?? 0) >=
+      Math.min(...Object.values(wallet?.TIER_COSTS ?? { t: 1 })) +
+      (wallet?.activeChapterCount ?? 0) * (wallet?.MULTI_CHAPTER_SURCHARGE ?? 2);
 
-  async function fetchWallet() {
-    try {
-      const res = await fetch(`${API_URL}/feedback/points/me`, { credentials: "include" });
-      if (res.ok) setWallet(await res.json());
-    } catch (e) {}
-  }
+  useEffect(() => {
+    Promise.all([
+      fetchSpotlight(),
+      user ? fetchWallet() : Promise.resolve(),
+      fetchQueueGenres(),
+      fetchArchiveGenres(),
+    ]);
+  }, [user]);
 
   async function fetchSpotlight() {
     setLoading(true);
@@ -260,58 +317,80 @@ export default function FeedbackHub() {
       const res = await fetch(`${API_URL}/feedback/submissions/spotlight`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
-        setSpotlight(data);
+        const items = Array.isArray(data) ? data : data.items ?? [];
+        setSpotlight(items);
+        setSpotlightGenres([...new Set(items.map((s) => s.genre).filter(Boolean))]);
       }
     } catch (e) {}
     setLoading(false);
   }
 
-  const wallet_costs = wallet?.TIER_COSTS ?? {};
-  const bal = wallet?.postingBalance ?? 0;
-  const isFreeEligible = !!(wallet?.freePostAvailable);
-  const canPost = isFreeEligible || Object.entries(wallet_costs).some(([, cost]) => bal >= cost);
+  async function fetchWallet() {
+    try {
+      const res = await fetch(`${API_URL}/feedback/wallet`, { credentials: "include" });
+      if (res.ok) setWallet(await res.json());
+    } catch (e) {}
+  }
+
+  async function fetchQueueGenres() {
+    try {
+      const res = await fetch(`${API_URL}/feedback/submissions/queue/genres`, { credentials: "include" });
+      if (res.ok) setQueueGenres(await res.json());
+    } catch (e) {}
+  }
+
+  async function fetchArchiveGenres() {
+    try {
+      const res = await fetch(`${API_URL}/feedback/submissions/outdated/genres`, { credentials: "include" });
+      if (res.ok) setArchiveGenres(await res.json());
+    } catch (e) {}
+  }
 
   return (
-    <div className="min-h-screen bg-ink-cream">
+    <div className="min-h-screen bg-[#f5f3ef]">
       <Header />
 
-      {/* Hero banner */}
-      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0d1320 0%, #141c2e 40%, #1a2540 70%, #1e2d4a 100%)" }}>
-        {/* Dot grid texture */}
-        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
-        {/* Gold top line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg, transparent 5%, #d4af37 35%, #d4af37 65%, transparent 95%)" }} />
-        {/* Warm glow */}
-        <div className="absolute pointer-events-none" style={{ top: "-80px", right: "-60px", width: "380px", height: "380px", borderRadius: "50%", background: "radial-gradient(circle, rgba(212,175,55,0.07) 0%, transparent 65%)" }} />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative">
-          <p className="text-[10px] font-bold tracking-[0.25em] uppercase mb-3" style={{ color: "#d4af37" }}>Inkwell</p>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif text-white leading-tight mb-4">
-            Feedback Hub
-          </h1>
-          <p className="text-white text-base sm:text-lg max-w-xl" style={{ opacity: 0.65 }}>
-            Read a chapter, leave a critique, earn points to post your own work.
-          </p>
+      {/* ── Hero — compact, dark, accountability-style ── */}
+      <div className="bg-[#1a1a2e] border-b border-white/10 relative overflow-hidden">
+        {/* Gold shimmer bar at very top */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent opacity-60" />
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#d4af37] mb-1.5">Feedback Hub</p>
+              <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-1.5">
+                Feedback Spotlight
+              </h1>
+              <p className="text-white/50 text-sm leading-relaxed max-w-md">
+                Six chapters in the spotlight at a time. Critique one to earn points — and get yours read in return.
+              </p>
+            </div>
+            {user && (
+              <button
+                onClick={() => setShowHowItWorks((v) => !v)}
+                className="text-[11px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0 underline underline-offset-2"
+              >
+                How it works
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
 
-        {/* How it works — shown to guests */}
-        {!wallet && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+        {/* How it works — collapsible */}
+        {showHowItWorks && (
+          <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
-              { step: "1", title: "Read", desc: "Open any chapter below and read it fully." },
-              { step: "2", title: "Critique", desc: "Leave ratings, general feedback, and paragraph comments." },
-              { step: "3", title: "Post", desc: "Use the points you earned to post your own chapter." },
+              { n: "01", title: "Critique to earn", desc: "Every critique earns you points based on chapter length." },
+              { n: "02", title: "Spend to post", desc: "Use your points to post your chapter into the spotlight." },
+              { n: "03", title: "Receive feedback", desc: "Your chapter collects critiques until it reaches 3." },
             ].map((s) => (
-              <div key={s.step} className="bg-white border border-[#e8e0d0] rounded-2xl p-5 shadow-soft">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-xl bg-ink-primary flex items-center justify-center text-white text-xs font-bold">
-                    {s.step}
-                  </div>
-                </div>
-                <p className="font-semibold text-ink-primary text-sm mb-1">{s.title}</p>
-                <p className="text-xs text-[#9a8c7a] leading-relaxed">{s.desc}</p>
+              <div key={s.n} className="bg-white border border-[#e8e0d0] rounded-xl p-4">
+                <p className="text-[10px] font-bold text-[#d4af37] tracking-widest mb-2">{s.n}</p>
+                <p className="font-semibold text-[#1a1a2e] text-sm mb-1">{s.title}</p>
+                <p className="text-[12px] text-[#9a8c7a] leading-relaxed">{s.desc}</p>
               </div>
             ))}
           </div>
@@ -322,103 +401,140 @@ export default function FeedbackHub() {
 
         {/* Guest CTA */}
         {!user && (
-          <div className="bg-ink-primary text-white rounded-2xl px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 shadow-soft relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-ink-gold/10 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="bg-[#1a1a2e] text-white rounded-xl px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 relative overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none opacity-10"
+              style={{ backgroundImage: "radial-gradient(circle, rgba(212,175,55,0.3) 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
             <div className="relative">
-              <p className="font-serif text-xl mb-1">Ready to get feedback on your writing?</p>
-              <p className="text-sm text-white/60">Sign in to read, critique, and post chapters.</p>
+              <p className="font-serif text-lg mb-1">Ready to get feedback on your writing?</p>
+              <p className="text-sm text-white/50">Sign in to read, critique, and post chapters.</p>
             </div>
             <Link
               to="/signup"
-              className="relative flex-shrink-0 bg-ink-gold text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#c9a42d] transition-colors shadow-sm"
+              className="relative flex-shrink-0 bg-[#d4af37] text-[#1a1a2e] px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#c9a42d] transition-colors"
             >
               Get started
             </Link>
           </div>
         )}
 
-        {/* ── Spotlight section header — no action button ──────────────────── */}
-        <div className="flex items-center gap-4 mb-3">
-          <h2 className="text-sm font-bold text-ink-gray uppercase tracking-widest whitespace-nowrap">
-            In the Spotlight
-          </h2>
-          <div className="flex-1 h-px bg-[#e8e0d0]" />
+        {/* Spotlight header */}
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <div className="flex items-center gap-3">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a8c7a]">
+              In the Spotlight
+            </h2>
+            <span className="text-[10px] text-[#b8a898]">{spotlight.length}/6</span>
+          </div>
+          {!loading && spotlightGenres.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {spotlightGenres.map((g) => (
+                <span key={g} className="text-[10px] font-semibold text-[#1a1a2e] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-
-        <p className="text-sm text-[#9a8c7a] mb-6">
-          Six chapters at a time. Once a chapter receives 3 critiques, it moves out and a new one takes its place.
+        <p className="text-[12px] text-[#9a8c7a] mb-5">
+          Chapters in spotlight over 10 days earn critics a <span className="font-semibold text-[#b8860b]">+2 bonus</span>.
         </p>
 
-        {/* Spotlight grid */}
+        {/* Spotlight list */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
+          <div className="space-y-2.5">
+            {Array.from({ length: 6 }).map((_, i) => <RowSkeleton key={i} />)}
           </div>
         ) : spotlight.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="w-16 h-16 rounded-2xl bg-ink-primary/5 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-7 h-7 text-[#b8a898]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <p className="font-serif text-ink-primary text-lg mb-1">Nothing here yet</p>
+          <div className="text-center py-20 bg-white border border-[#e8e0d0] rounded-xl">
+            <p className="font-serif text-[#1a1a2e] text-base mb-1">Nothing here yet</p>
             <p className="text-sm text-[#9a8c7a]">Be the first to post a chapter for feedback.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-2.5">
             {spotlight.map((sub) => (
-              <SubmissionCard key={sub.id} sub={sub} />
+              <SpotlightRow key={sub.id} sub={sub} />
             ))}
           </div>
         )}
 
-        {/* Queue notice if fewer than 6 */}
+        {/* Open slot notice */}
         {!loading && spotlight.length > 0 && spotlight.length < 6 && (
-          <div className="mt-6 flex items-center gap-3 bg-[#faf7f2] border border-[#e8e0d0] rounded-xl px-4 py-3">
-            <div className="w-2 h-2 rounded-full bg-ink-gold flex-shrink-0" />
-            <p className="text-sm text-[#6b5c4a]">
+          <div className="mt-4 flex items-center gap-3 bg-[#fffdf0] border border-[#d4af37]/40 rounded-xl px-4 py-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#d4af37] flex-shrink-0" />
+            <p className="text-[12px] text-[#6b5c4a]">
               {6 - spotlight.length} spotlight {6 - spotlight.length === 1 ? "slot is" : "slots are"} open.{" "}
               {user && canPost ? (
-                <Link to="/feedback/submit" className="text-ink-primary font-semibold hover:underline">
-                  Submit your chapter
-                </Link>
+                <Link to="/critique/submit" className="text-[#1a1a2e] font-semibold hover:underline">Submit your chapter</Link>
               ) : user ? (
                 "Critique a chapter to earn posting points."
               ) : (
-                <Link to="/signup" className="text-ink-primary font-semibold hover:underline">Sign in</Link>
+                <Link to="/signup" className="text-[#1a1a2e] font-semibold hover:underline">Sign in</Link>
               )}{" "}
               to fill one.
             </p>
           </div>
         )}
 
-        {/* ── Outdated section ─────────────────────────────────────────────── */}
-        <div className="mt-16 pt-10 border-t border-[#e8e0d0]">
-          <div className="flex items-center gap-4 mb-3">
-            <h2 className="text-sm font-bold text-ink-gray uppercase tracking-widest whitespace-nowrap">
-              Outdated
-            </h2>
-            <div className="flex-1 h-px bg-[#e8e0d0]" />
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <p className="text-sm text-[#9a8c7a] max-w-lg">
-              Chapters that have received 3 critiques and moved out of the spotlight. You can still read and comment — half the critique points apply here.
-            </p>
-            <Link
-              to="/feedback/outdated"
-              className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-white border border-[#e8e0d0] text-ink-primary hover:border-ink-primary hover:shadow-[0_2px_12px_rgba(45,55,72,0.08)] transition-all"
-            >
-              View outdated chapters
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        {/* Queue + Archive nav */}
+        <div className="mt-12 pt-8 border-t border-[#e8e0d0] grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Link
+            to="/critique/queue"
+            className="group flex items-start gap-4 bg-white border border-[#e8e0d0] rounded-xl p-5 hover:border-[#1a1a2e] hover:shadow-[0_4px_16px_rgba(26,26,46,0.07)] transition-all duration-200"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#1a1a2e] flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 10h16M4 14h10" />
               </svg>
-            </Link>
-          </div>
-        </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[#1a1a2e] text-sm mb-1">Queue</p>
+              <p className="text-[12px] text-[#9a8c7a] leading-relaxed mb-2">
+                Chapters waiting for a spotlight slot. Earn base-tier points for critiquing.
+              </p>
+              {queueGenres.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {queueGenres.slice(0, 5).map((g) => (
+                    <span key={g} className="text-[10px] font-semibold text-[#1a1a2e] bg-[#f4f1ec] px-2 py-0.5 rounded-full">{g}</span>
+                  ))}
+                  {queueGenres.length > 5 && <span className="text-[10px] text-[#9a8c7a] px-1">{queueGenres.length - 5} more</span>}
+                </div>
+              )}
+            </div>
+            <svg className="w-4 h-4 text-[#b8a898] flex-shrink-0 mt-0.5 group-hover:text-[#1a1a2e] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
 
-      </main>
+          <Link
+            to="/critique/archive"
+            className="group flex items-start gap-4 bg-white border border-[#e8e0d0] rounded-xl p-5 hover:border-[#b8a898] hover:shadow-[0_4px_16px_rgba(26,26,46,0.07)] transition-all duration-200"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#f4f1ec] flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                  d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[#1a1a2e] text-sm mb-1">Archive</p>
+              <p className="text-[12px] text-[#9a8c7a] leading-relaxed mb-2">
+                Chapters with 3+ critiques. Still open — half points apply.
+              </p>
+              {archiveGenres.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {archiveGenres.slice(0, 5).map((g) => (
+                    <span key={g} className="text-[10px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] px-2 py-0.5 rounded-full">{g}</span>
+                  ))}
+                  {archiveGenres.length > 5 && <span className="text-[10px] text-[#9a8c7a] px-1">{archiveGenres.length - 5} more</span>}
+                </div>
+              )}
+            </div>
+            <svg className="w-4 h-4 text-[#b8a898] flex-shrink-0 mt-0.5 group-hover:text-[#9a8c7a] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

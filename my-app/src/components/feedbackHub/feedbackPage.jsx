@@ -987,19 +987,54 @@ export default function FeedbackPage() {
     setLoading(false);
   }
 
-  const paragraphs = (submission?.content ?? "")
-    .replace(/\r\n/g, "\n")
-    .replace(/([^\n])\n([^\n])/g, "$1\n\n$2")
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+  // Parse content into paragraphs — handles both HTML (from WriteEditor) and plain text
+  const rawContent = submission?.content ?? "";
+  const isHtmlContent = /<[a-z][\s\S]*>/i.test(rawContent);
+
+  const paragraphs = (() => {
+    if (isHtmlContent) {
+      // Strip the hidden editor-styles marker div, then split on block-level tags
+      const cleaned = rawContent.replace(/<div[^>]*data-editor-styles[^>]*><\/div>/gi, "");
+      // Parse into a temporary DOM to extract paragraph-level blocks
+      const tmp = document.createElement("div");
+      tmp.innerHTML = cleaned;
+      const blocks = [];
+      tmp.childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const t = node.textContent.trim();
+          if (t) blocks.push({ html: false, text: t });
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          // Preserve <hr data-divider> as a visual section break (no text content)
+          if (node.tagName === "HR") {
+            blocks.push({ divider: true, text: "" });
+            return;
+          }
+          // Skip empty whitespace / <br>-only spacer nodes
+          const text = (node.innerText || node.textContent || "").trim();
+          if (!text) return;
+          const html = node.outerHTML;
+          blocks.push({ html: true, content: html, text });
+        }
+      });
+      return blocks.filter(b => b.divider || b.text.trim());
+    }
+    // Plain text fallback
+    return rawContent
+      .replace(/\r\n/g, "\n")
+      .replace(/([^\n])\n([^\n])/g, "$1\n\n$2")
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map(p => ({ html: false, text: p }));
+  })();
 
   function getParaComments(index) {
     return comments.filter((c) => c.paragraphIndex === index);
   }
 
   function openSidebar(index) {
-    const preview = paragraphs[index]?.slice(0, 80) ?? "";
+    const para = paragraphs[index];
+    const preview = (para?.text ?? (para ?? "")).slice(0, 80) ?? "";
     setActivePara({ index, preview });
     setSidebarOpen(true);
   }
@@ -1104,10 +1139,10 @@ export default function FeedbackPage() {
   }
 
   const isAuthor    = user?.id === submission?.userId;
-  // Archived (isOutdated) posts still accept critiques at half points.
-  // Only manually-closed (isOpen=false AND NOT isOutdated) posts block new critiques.
-  const isAcceptingCritiques = submission?.isOpen || submission?.isOutdated;
-  const canCritique = user && !isAuthor && !hasResponded && isAcceptingCritiques;
+  // ARCHIVE submissions still accept critiques (at half points).
+  // isDraft submissions are hidden — they should never be reachable, but guard anyway.
+  const isAcceptingCritiques = submission?.status === "SPOTLIGHT" || submission?.status === "QUEUE" || submission?.status === "ARCHIVE";
+  const canCritique = user && !isAuthor && !hasResponded && isAcceptingCritiques && !submission?.isDraft;
 
   if (loading) {
     return (
@@ -1134,7 +1169,7 @@ export default function FeedbackPage() {
 
         {/* Back */}
         <Link
-          to="/feedback"
+          to="/critique"
           className="inline-flex items-center gap-1.5 text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors mb-8"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1161,12 +1196,7 @@ export default function FeedbackPage() {
                 <span className="text-[11px] text-[#9a8c7a] border border-[#e8e0d0] px-2.5 py-0.5 rounded-full">
                   {DRAFT_LABELS[submission.draftStage]}
                 </span>
-                {!submission.isOpen && !submission.isOutdated && (
-                  <span className="text-[11px] text-[#c0392b] bg-[#fdf1f0] border border-[#f5c6c3] px-2.5 py-0.5 rounded-full">
-                    Closed
-                  </span>
-                )}
-                {submission.isOutdated && (
+                {submission.status === "ARCHIVE" && (
                   <span className="text-[11px] text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2.5 py-0.5 rounded-full">
                     Archive · half points
                   </span>
@@ -1230,6 +1260,15 @@ export default function FeedbackPage() {
                   const paraComments = getParaComments(i);
                   const isActive     = sidebarOpen && activePara?.index === i;
 
+                  // Dividers are visual only — no click, no paragraph label, no comment dot
+                  if (para.divider) {
+                    return (
+                      <div key={i} ref={(el) => (paragraphRefs.current[i] = el)} className="my-6" aria-hidden="true">
+                        <hr style={{ border: "none", borderTop: "2px solid #c9b090", width: "40%", margin: "0 auto", display: "block" }} />
+                      </div>
+                    );
+                  }
+
                   return (
                     <div
                       key={i}
@@ -1249,9 +1288,16 @@ export default function FeedbackPage() {
                       }`}>
                         P {i + 1}
                       </span>
-                      <p className="font-[Georgia,serif] text-[#2d3748] text-[15.5px] leading-[1.95] tracking-[0.01em]">
-                        {renderMarkdown(para)}
-                      </p>
+                      {para.html ? (
+                        <div
+                          className="text-[#2d3748] text-[15.5px] leading-[1.95] tracking-[0.01em] prose-inkwell"
+                          dangerouslySetInnerHTML={{ __html: para.content }}
+                        />
+                      ) : (
+                        <p className="font-[Georgia,serif] text-[#2d3748] text-[15.5px] leading-[1.95] tracking-[0.01em]">
+                          {renderMarkdown(para.text)}
+                        </p>
+                      )}
                       {paraComments.length > 0 && (
                         <span className="absolute -right-1 top-1 bg-[#2d3748] text-white text-[9px] font-bold min-w-[18px] px-1 h-[18px] rounded-full flex items-center justify-center">
                           {paraComments.length}
@@ -1326,10 +1372,10 @@ export default function FeedbackPage() {
                 </div>
               )}
 
-              {/* Submission closed — only for manually closed, non-outdated posts */}
-              {user && !isAuthor && !submission.isOpen && !submission.isOutdated && !hasResponded && (
+              {/* Submission is a draft — should not normally be reachable */}
+              {user && !isAuthor && submission.isDraft && (
                 <div className="bg-[#faf7f2] border border-[#e8e0d0] rounded-2xl px-5 py-4 text-sm text-[#9a8c7a]">
-                  This submission is closed and no longer accepting critiques.
+                  This submission is no longer accepting critiques.
                 </div>
               )}
             </div>
@@ -1378,4 +1424,27 @@ export default function FeedbackPage() {
       </main>
     </div>
   );
+}
+
+// ── Inline styles for rich HTML content rendered from WriteEditor ────────────
+const proseInkwellStyle = `
+  .prose-inkwell { font-family: 'Georgia', 'Times New Roman', serif; }
+  .prose-inkwell p { margin: 0 0 0.75em; }
+  .prose-inkwell b, .prose-inkwell strong { font-weight: 700; }
+  .prose-inkwell i, .prose-inkwell em { font-style: italic; }
+  .prose-inkwell u { text-decoration: underline; }
+  .prose-inkwell ul { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+  .prose-inkwell ol { list-style: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+  .prose-inkwell li { margin: 0.2rem 0; }
+  .prose-inkwell hr[data-divider] { border:none;border-top:2px solid #c9b090;margin:1.5em auto;width:40%;display:block; }
+`;
+
+if (typeof document !== "undefined") {
+  const styleId = "prose-inkwell-styles";
+  if (!document.getElementById(styleId)) {
+    const el = document.createElement("style");
+    el.id = styleId;
+    el.textContent = proseInkwellStyle;
+    document.head.appendChild(el);
+  }
 }

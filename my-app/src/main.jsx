@@ -22,6 +22,7 @@ import AdminBlog from './components/blog/adminBlog';
 import EmotionPracticePage from './components/emotioncues/emotionpracticepage';
 import ThesaurusPage from './components/emotioncues/ThesaurusPage';
 import App from './App'
+import AccountabilityPage from './components/sprint/accountabilitypage';
 import SnippetFeed from './components/sprint/snippetfeed';
 import SnippetPage from './components/sprint/snippetpage';
 import AdminSoundscapes from './components/sprint/Adminsoundscapes';
@@ -35,11 +36,14 @@ import EventsListPage from './components/projects/eventslistpage';
 import FeedbackHub from './components/feedbackHub/feedbackhub';
 import SubmitFeedback from './components/feedbackHub/submitFeedback';
 import FeedbackPage from './components/feedbackHub/feedbackPage';
-import OutdatedPage from './components/feedbackHub/outdatedpage';
+import ArchivePage from './components/feedbackHub/archivePage';
+import QueuePage from './components/feedbackHub/queuePage';
 import DiscoveryFeed from './components/discovery/discoveryfeed';
 import DiscoveryStoryPage from './components/discovery/discoverystorypage';
 import SubmitDiscoveryStory from './components/discovery/submitdiscoverystory';
 import AdminDiscovery from './components/discovery/admindiscovery';
+import DraftsPage from './components/drafts/draftspage';
+import WritePage from './components/drafts/writePage';
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
@@ -115,6 +119,10 @@ const router = createBrowserRouter([
     path: "/admin/soundscapes",
     element: <AdminSoundscapes />
   },
+  {
+    path: "/accountability",
+    element: <AccountabilityPage />
+  },
   { 
     path: "/projects",             
     element: <ProjectsPage /> 
@@ -148,20 +156,24 @@ const router = createBrowserRouter([
     element: <FeedbackHub /> 
   },
   { 
-    path: "/feedback/submit", 
+    path: "/critique/submit", 
     element: <SubmitFeedback /> 
   },
   { 
-    path: "/feedback/:id/edit",     
+    path: "/critique/:id/edit",     
     element: <SubmitFeedback /> 
   },
   { 
-    path: "/feedback/:id",     
+    path: "/critique/:id",     
     element: <FeedbackPage /> 
   },
   {
-    path: "/feedback/outdated",
-    element: <OutdatedPage />
+    path: "/critique/archive",
+    element: <ArchivePage />
+  },
+  {
+    path: "/critique/queue",
+    element: <QueuePage />
   },
   { 
     path: "/profile/:userId",     
@@ -180,12 +192,24 @@ const router = createBrowserRouter([
     element: <SubmitDiscoveryStory /> 
   },
   { 
-    path: "/discovery/:storyId", 
+    path: "/stories/:storyId", 
     element: <DiscoveryStoryPage /> 
   },
   { 
-    path: "/admin/discovery", 
+    path: "/admin/stories", 
     element: <AdminDiscovery /> 
+  },
+  { 
+    path: "/drafts", 
+    element: <DraftsPage /> 
+  },
+  { 
+    path: "/write",          
+    element: <WritePage />
+  },
+  { 
+    path: "/write/:draftId",          
+    element: <WritePage />
   },
   {
     path: "*",

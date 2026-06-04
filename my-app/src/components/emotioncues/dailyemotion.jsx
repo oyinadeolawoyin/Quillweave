@@ -92,7 +92,7 @@ export default function DailyEmotion() {
   // ── Loading skeleton ────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="rounded-3xl overflow-hidden animate-pulse" style={{ background: "#1a2033", minHeight: 240 }}>
+      <div className="rounded-3xl overflow-hidden animate-pulse" style={{ background: "#1a1a2e", minHeight: 240 }}>
         <div className="px-7 pt-7 pb-6">
           <div className="h-3 bg-white/10 rounded w-1/4 mb-4" />
           <div className="h-9 bg-white/10 rounded w-1/2 mb-6" />
@@ -106,7 +106,7 @@ export default function DailyEmotion() {
 
   if (!entry) {
     return (
-      <div className="rounded-3xl px-7 py-10 text-center" style={{ background: "#1a2033" }}>
+      <div className="rounded-3xl px-7 py-10 text-center" style={{ background: "#1a1a2e" }}>
         <p className="text-white/40 text-sm italic">Today's emotion cue will appear here shortly.</p>
       </div>
     );
@@ -129,7 +129,7 @@ export default function DailyEmotion() {
     <div
       className="relative rounded-3xl overflow-hidden"
       style={{
-        background: "linear-gradient(140deg, #141c2e 0%, #1a2540 55%, #1e2d4a 100%)",
+        background: "linear-gradient(140deg, #1a1a2e 0%, #1e2240 55%, #1a2d4a 100%)",
         boxShadow:  "0 2px 4px rgba(0,0,0,0.08), 0 24px 64px rgba(10,15,30,0.28)",
       }}
     >

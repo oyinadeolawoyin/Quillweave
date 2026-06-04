@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import Header from "./header";
@@ -134,14 +134,93 @@ function WalletCard({ wallet, isOwner }) {
   );
 }
 
+// ─── SUBMISSION ACTION DROPDOWN ───────────────────────────────────────────────
+
+function SubmissionActions({ sub, onDelete, onMoveToDraft }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        className="p-1.5 rounded-lg hover:bg-[#f4f1ec] text-[#9a8c7a] hover:text-[#2d3748] transition-colors"
+        title="More actions"
+      >
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1 w-44 bg-white border border-[#e8e0d0] rounded-xl shadow-xl overflow-hidden z-20">
+          <div className="py-1">
+            <Link
+              to={`/critique/${sub.id}/edit`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-[#4a4a4a] hover:bg-[#f7f4ee] transition-colors"
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit
+            </Link>
+
+            {!sub.isDraft && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setOpen(false); onMoveToDraft(sub); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[#4a4a4a] hover:bg-[#f7f4ee] transition-colors"
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Move to draft
+              </button>
+            )}
+
+            <div className="h-px bg-[#f0ebe3] my-1" />
+
+            <button
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(sub); }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+              </svg>
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SUBMISSION ROW ───────────────────────────────────────────────────────────
 
-function SubmissionRow({ sub, isOwner, onDelete, onClose, onReopen }) {
+function SubmissionRow({ sub, isOwner, onDelete, onMoveToDraft }) {
+  const navigate = useNavigate();
   const responses = sub._count?.responses ?? 0;
   const comments = sub._count?.paragraphComments ?? 0;
 
   return (
-    <div className="group bg-white border border-[#e8e0d0] rounded-2xl p-4 sm:p-5 transition-all hover:border-[#c4b8a8] hover:shadow-sm">
+    <div
+      className="group bg-white border border-[#e8e0d0] rounded-2xl p-4 sm:p-5 transition-all hover:border-[#c4b8a8] hover:shadow-sm cursor-pointer"
+      onClick={() => navigate(`/critique/${sub.id}`)}
+    >
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <span className="text-[11px] font-semibold text-[#2d3748] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
           {sub.genre}
@@ -159,73 +238,36 @@ function SubmissionRow({ sub, isOwner, onDelete, onClose, onReopen }) {
         )}
         <span
           className={`ml-auto text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
-            sub.isOpen
+            sub.status === "SPOTLIGHT"
               ? "text-[#166534] bg-[#f0fdf4] border border-[#bbf7d0]"
-              : "text-[#9a8c7a] bg-[#f4f1ec] border border-[#e0d8cc]"
+              : sub.status === "ARCHIVE"
+              ? "text-[#9a8c7a] bg-[#f4f1ec] border border-[#e0d8cc]"
+              : "text-[#2d3748] bg-[#f4f1ec] border border-[#e0d8cc]"
           }`}
         >
-          {sub.isOpen ? "Open" : "Closed"}
+          {sub.status === "SPOTLIGHT" ? "Spotlight" : sub.status === "ARCHIVE" ? "Archive" : "Queue"}
         </span>
+        {isOwner && (
+          <SubmissionActions
+            sub={sub}
+            onDelete={onDelete}
+            onMoveToDraft={onMoveToDraft}
+          />
+        )}
       </div>
 
-      <Link
-        to={`/feedback/${sub.id}`}
-        className="block font-serif text-[#1e2a38] text-base leading-snug mb-1.5 hover:text-[#2d3748] transition-colors line-clamp-1"
-      >
+      <p className="font-serif text-[#1e2a38] text-base leading-snug mb-1.5 line-clamp-1">
         {sub.title}
-      </Link>
+      </p>
 
       <p className="text-xs text-[#9a8c7a] leading-relaxed mb-4 line-clamp-2">{sub.summary}</p>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#f0ebe3]">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[#b0a090]">
-          <span>{responses} {responses === 1 ? "critique" : "critiques"}</span>
-          <span className="w-1 h-1 rounded-full bg-[#e0d8cc] inline-block" />
-          <span>{comments} comments</span>
-          <span className="w-1 h-1 rounded-full bg-[#e0d8cc] inline-block" />
-          <span>{timeAgo(sub.createdAt)}</span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to={`/feedback/${sub.id}`}
-            className="px-3 py-1.5 rounded-lg border border-[#e8e0d0] text-xs text-[#6b5c4a] hover:border-[#2d3748] hover:text-[#2d3748] transition-all font-medium"
-          >
-            View
-          </Link>
-          {isOwner && (
-            <Link
-              to={`/feedback/${sub.id}/edit`}
-              className="px-3 py-1.5 rounded-lg border border-[#c4bef0] text-xs text-[#5248a8] bg-[#f2f0fc] hover:bg-[#eae7fa] transition-all font-medium"
-            >
-              Edit
-            </Link>
-          )}
-          {isOwner && sub.isOpen && (
-            <button
-              onClick={() => onClose(sub)}
-              className="px-3 py-1.5 rounded-lg border border-[#e8c97a] text-xs text-[#8a6c00] bg-[#fdfbea] hover:bg-[#faf5d0] transition-all font-medium"
-            >
-              Close
-            </button>
-          )}
-          {isOwner && !sub.isOpen && (
-            <button
-              onClick={() => onReopen(sub)}
-              className="px-3 py-1.5 rounded-lg border border-[#bbf7d0] text-xs text-[#166534] bg-[#f0fdf4] hover:bg-[#dcfce7] transition-all font-medium"
-            >
-              Reopen
-            </button>
-          )}
-          {isOwner && (
-            <button
-              onClick={() => onDelete(sub)}
-              className="px-3 py-1.5 rounded-lg border border-[#f5c6c3] text-xs text-[#c0392b] bg-[#fdf1f0] hover:bg-[#fbe8e6] transition-all font-medium"
-            >
-              Delete
-            </button>
-          )}
-        </div>
+      <div className="flex items-center gap-2 text-xs text-[#b0a090] pt-3 border-t border-[#f0ebe3]">
+        <span>{responses} {responses === 1 ? "critique" : "critiques"}</span>
+        <span className="w-1 h-1 rounded-full bg-[#e0d8cc] inline-block" />
+        <span>{comments} comments</span>
+        <span className="w-1 h-1 rounded-full bg-[#e0d8cc] inline-block" />
+        <span>{timeAgo(sub.createdAt)}</span>
       </div>
     </div>
   );
@@ -290,7 +332,7 @@ function DiscoveryCard({ story, isOwner, onDeleteStory }) {
           {isOwner && (
             <div className="flex items-center gap-1.5">
               <Link
-                to={`/discovery/${story.id}/edit`}
+                to={`/stories/${story.id}/edit`}
                 className="px-2.5 py-1 rounded-lg border border-[#c4bef0] text-[11px] text-[#5248a8] bg-[#f2f0fc] hover:bg-[#eae7fa] transition-all font-medium"
               >
                 Edit
@@ -336,7 +378,7 @@ function CritiqueRow({ response }) {
 
       {response.submission?.title && (
         <Link
-          to={`/feedback/${response.submission.id}#critique-${response.id}`}
+          to={`/critique/${response.submission.id}#critique-${response.id}`}
           className="block font-serif text-[#1e2a38] text-sm leading-snug mb-1.5 hover:text-[#2d3748] transition-colors line-clamp-1"
         >
           On: {response.submission.title}
@@ -402,35 +444,6 @@ function SnippetCard({ snippet }) {
   );
 }
 
-// ─── SECTION WRAPPER ──────────────────────────────────────────────────────────
-
-function Section({ title, action, badge, description, children }) {
-  return (
-    <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden">
-      {/* Section header */}
-      <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[#f0ebe3] bg-[#faf8f5]">
-        <div className="flex items-center gap-3">
-          <h2 className="font-serif text-lg text-[#1e2a38]">{title}</h2>
-          {badge != null && (
-            <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full tabular-nums">
-              {badge}
-            </span>
-          )}
-        </div>
-        {action}
-      </div>
-      {description && (
-        <p className="text-sm text-[#9a8c7a] leading-relaxed px-5 sm:px-6 pt-4 pb-0">
-          {description}
-        </p>
-      )}
-      <div className="p-4 sm:p-5">
-        {children}
-      </div>
-    </div>
-  );
-}
-
 // ─── EMPTY STATE ─────────────────────────────────────────────────────────────
 
 function EmptyState({ message, cta, ctaTo }) {
@@ -480,13 +493,40 @@ function Pagination({ page, totalPages, onChange }) {
   );
 }
 
-// ─── STAT PILL ────────────────────────────────────────────────────────────────
+// ─── TAB NAV ──────────────────────────────────────────────────────────────────
 
-function StatPill({ label, value }) {
+const TAB_DEFS = (isOwner, username) => [
+  { id: "submissions", label: "Submissions" },
+  { id: "critiques",   label: "Critiques Given" },
+  { id: "snippets",    label: "Snippets" },
+  { id: "stories",     label: "Stories" },
+  ...(isOwner ? [{ id: "standing", label: "Feedback Standing" }] : [{ id: "standing", label: "Standing" }]),
+  ...(isOwner ? [{ id: "blocked",  label: "Blocked Users" }] : []),
+];
+
+function TabNav({ tabs, active, onChange }) {
   return (
-    <div className="flex flex-col items-center px-5 py-3 bg-white/10 rounded-xl border border-white/20 min-w-[80px]">
-      <span className="text-xl font-serif font-bold text-white tabular-nums">{value}</span>
-      <span className="text-[11px] text-white/70 mt-0.5 uppercase tracking-wider">{label}</span>
+    /* Scrollable on small screens, horizontal flex on large */
+    <div className="border-b border-[#e8e0d0] bg-white sticky top-[4.5rem] z-30 shadow-sm">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="flex gap-0 overflow-x-auto scrollbar-hide -mb-px">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => onChange(tab.id)}
+              className={`
+                flex-shrink-0 px-4 sm:px-5 py-3.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+                ${active === tab.id
+                  ? "border-[#2d3748] text-[#1e2a38]"
+                  : "border-transparent text-[#9a8c7a] hover:text-[#2d3748] hover:border-[#c4b8a8]"
+                }
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -496,9 +536,12 @@ function StatPill({ label, value }) {
 export default function ProfilePage() {
   const { user: currentUser } = useAuth();
   const { userId } = useParams();
+  const navigate = useNavigate();
 
   const profileUserId = Number(userId);
   const isOwner = currentUser && currentUser.id === profileUserId;
+
+  const [activeTab, setActiveTab] = useState("submissions");
 
   // ── State ──
   const [profileUser, setProfileUser]     = useState(null);
@@ -512,7 +555,7 @@ export default function ProfilePage() {
   const [subPage, setSubPage]                 = useState(1);
   const [subTotalPages, setSubTotalPages]     = useState(1);
 
-  // Critiques given (submissions this user has responded to)
+  // Critiques given
   const [critiquesGiven, setCritiquesGiven]         = useState([]);
   const [critiqueLoading, setCritiqueLoading]       = useState(true);
   const [critiquePage, setCritiquePage]             = useState(1);
@@ -533,13 +576,12 @@ export default function ProfilePage() {
 
   // Modal / feedback
   const [deleteTarget, setDeleteTarget]           = useState(null);
-  const [closeTarget, setCloseTarget]             = useState(null);
-  const [reopenTarget, setReopenTarget]           = useState(null);
+  const [moveToDraftTarget, setMoveToDraftTarget] = useState(null);
   const [deleteStoryTarget, setDeleteStoryTarget] = useState(null);
   const [actionLoading, setActionLoading]   = useState(false);
   const [toast, setToast]                   = useState(null);
 
-  // Block (visitor → profile owner)
+  // Block
   const [isBlockedByMe, setIsBlockedByMe]     = useState(false);
   const [blockLoading, setBlockLoading]       = useState(false);
   const [blockConfirm, setBlockConfirm]       = useState(false);
@@ -547,7 +589,7 @@ export default function ProfilePage() {
   // Blocked users list (owner only)
   const [blockedUsers, setBlockedUsers]               = useState([]);
   const [blockedUsersLoading, setBlockedUsersLoading] = useState(false);
-  const [unblockTarget, setUnblockTarget]             = useState(null); // user object
+  const [unblockTarget, setUnblockTarget]             = useState(null);
   const [unblockLoading, setUnblockLoading]           = useState(false);
 
   // ── Fetch user ──
@@ -566,7 +608,6 @@ export default function ProfilePage() {
     fetchUser();
   }, [profileUserId]);
 
-  // ── Fetch block status (visitor only) ──
   useEffect(() => {
     if (!currentUser || isOwner) return;
     async function fetchBlockStatus() {
@@ -582,7 +623,6 @@ export default function ProfilePage() {
     fetchBlockStatus();
   }, [currentUser, isOwner, profileUserId]);
 
-  // ── Fetch blocked-users list (owner only) ──
   useEffect(() => {
     if (!isOwner) return;
     async function fetchBlockedUsers() {
@@ -599,67 +639,6 @@ export default function ProfilePage() {
     fetchBlockedUsers();
   }, [isOwner]);
 
-  async function handleOwnerUnblock() {
-    if (!unblockTarget) return;
-    setUnblockLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/users/${unblockTarget.id}/block`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.message || "Failed to unblock.");
-      }
-      setBlockedUsers(prev => prev.filter(u => u.id !== unblockTarget.id));
-      setToast({ type: "success", message: `${unblockTarget.username} has been unblocked.` });
-    } catch (e) {
-      setToast({ type: "error", message: e.message });
-    }
-    setUnblockTarget(null);
-    setUnblockLoading(false);
-  }
-
-  async function handleBlock() {
-    setBlockLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/users/${profileUserId}/block`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.message || "Failed to block.");
-      }
-      setIsBlockedByMe(true);
-      setBlockConfirm(false);
-      setToast({ type: "success", message: `${profileUser?.username} has been blocked.` });
-    } catch (e) {
-      setToast({ type: "error", message: e.message });
-    }
-    setBlockLoading(false);
-  }
-
-  async function handleUnblock() {
-    setBlockLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/users/${profileUserId}/block`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.message || "Failed to unblock.");
-      }
-      setIsBlockedByMe(false);
-      setToast({ type: "success", message: `${profileUser?.username} has been unblocked.` });
-    } catch (e) {
-      setToast({ type: "error", message: e.message });
-    }
-    setBlockLoading(false);
-  }
-
-  // ── Fetch wallet ──
   useEffect(() => {
     async function fetchWallet() {
       setWalletLoading(true);
@@ -675,7 +654,6 @@ export default function ProfilePage() {
     fetchWallet();
   }, [profileUserId, isOwner]);
 
-  // ── Fetch submissions (owner: /mine, visitor: public list filtered by userId) ──
   useEffect(() => {
     async function fetchSubmissions() {
       setSubLoading(true);
@@ -695,7 +673,6 @@ export default function ProfilePage() {
     fetchSubmissions();
   }, [profileUserId, isOwner, subPage]);
 
-  // ── Fetch critiques given by this user ──
   useEffect(() => {
     async function fetchCritiques() {
       setCritiqueLoading(true);
@@ -715,9 +692,6 @@ export default function ProfilePage() {
     fetchCritiques();
   }, [profileUserId, critiquePage]);
 
-  // ── Fetch discovery stories ──
-  // NOTE: The backend /discovery endpoint needs a userId query param added.
-  // See discoveryservice.js update below. Client-side filter is a safety net.
   useEffect(() => {
     async function fetchStories() {
       setStoryLoading(true);
@@ -728,21 +702,15 @@ export default function ProfilePage() {
         );
         if (res.ok) {
           const data = await res.json();
-          // Safety-net filter: only show this user's stories in case backend ignores userId param
           const userStories = (data.stories ?? []).filter(s => s.userId === profileUserId || s.user?.id === profileUserId);
           setApprovedStories(userStories);
           setStoryTotalPages(data.totalPages ?? 1);
         }
-
         if (isOwner) {
-          const pendingRes = await fetch(
-            `${API_URL}/discovery/pending?limit=50`,
-            { credentials: "include" }
-          );
+          const pendingRes = await fetch(`${API_URL}/discovery/pending?limit=50`, { credentials: "include" });
           if (pendingRes.ok) {
             const pendingData = await pendingRes.json();
-            const myPending = (pendingData.stories ?? []).filter(s => s.userId === profileUserId);
-            setPendingStories(myPending);
+            setPendingStories((pendingData.stories ?? []).filter(s => s.userId === profileUserId));
           }
         }
       } catch {}
@@ -751,7 +719,6 @@ export default function ProfilePage() {
     fetchStories();
   }, [profileUserId, isOwner, storyPage]);
 
-  // ── Fetch snippets shared by this user ──
   useEffect(() => {
     async function fetchSnippets() {
       setSnippetLoading(true);
@@ -770,107 +737,98 @@ export default function ProfilePage() {
     }
     fetchSnippets();
   }, [profileUserId, snippetPage]);
+
+  // ── Actions ──
   async function confirmDelete() {
     if (!deleteTarget) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_URL}/feedback/submissions/${deleteTarget.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await fetch(`${API_URL}/feedback/submissions/${deleteTarget.id}`, { method: "DELETE", credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete.");
       setSubmissions(prev => prev.filter(s => s.id !== deleteTarget.id));
-      setToast({
-        type: "success",
-        message: data.refunded
-          ? `Submission deleted. ${data.pointsRefunded} pts refunded.`
-          : "Submission deleted.",
-      });
-    } catch (e) {
-      setToast({ type: "error", message: e.message });
-    }
+      setToast({ type: "success", message: data.refunded ? `Submission deleted. ${data.pointsRefunded} pts refunded.` : "Submission deleted." });
+    } catch (e) { setToast({ type: "error", message: e.message }); }
     setDeleteTarget(null);
     setActionLoading(false);
   }
 
-  // ── Close submission ──
-  async function confirmClose() {
-    if (!closeTarget) return;
+  async function confirmMoveToDraft() {
+    if (!moveToDraftTarget) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_URL}/feedback/submissions/${closeTarget.id}/close`, {
-        method: "PATCH",
-        credentials: "include",
-      });
+      const res = await fetch(`${API_URL}/drafts/unpublish/${moveToDraftTarget.id}`, { method: "POST", credentials: "include" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to close.");
-      setSubmissions(prev =>
-        prev.map(s => s.id === closeTarget.id ? { ...s, isOpen: false } : s)
-      );
-      setToast({ type: "success", message: "Submission closed." });
-    } catch (e) {
-      setToast({ type: "error", message: e.message });
-    }
-    setCloseTarget(null);
+      if (!res.ok) throw new Error(data.message || "Failed to move to draft.");
+      setSubmissions(prev => prev.filter(s => s.id !== moveToDraftTarget.id));
+      setToast({ type: "success", message: `"${moveToDraftTarget.title}" moved to your drafts.` });
+    } catch (e) { setToast({ type: "error", message: e.message }); }
+    setMoveToDraftTarget(null);
     setActionLoading(false);
   }
 
-  // ── Reopen submission ──
-  async function confirmReopen() {
-    if (!reopenTarget) return;
-    setActionLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/feedback/submissions/${reopenTarget.id}/reopen`, {
-        method: "PATCH",
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to reopen.");
-      setSubmissions(prev =>
-        prev.map(s => s.id === reopenTarget.id ? { ...s, isOpen: true } : s)
-      );
-      setToast({ type: "success", message: "Submission reopened — it's now accepting new critiques." });
-    } catch (e) {
-      setToast({ type: "error", message: e.message });
-    }
-    setReopenTarget(null);
-    setActionLoading(false);
-  }
-
-  // ── Delete discovery story ──
   async function confirmDeleteStory() {
     if (!deleteStoryTarget) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_URL}/discovery/${deleteStoryTarget.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await fetch(`${API_URL}/discovery/${deleteStoryTarget.id}`, { method: "DELETE", credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to delete story.");
       setApprovedStories(prev => prev.filter(s => s.id !== deleteStoryTarget.id));
       setPendingStories(prev => prev.filter(s => s.id !== deleteStoryTarget.id));
       setToast({ type: "success", message: "Story deleted successfully." });
-    } catch (e) {
-      setToast({ type: "error", message: e.message });
-    }
+    } catch (e) { setToast({ type: "error", message: e.message }); }
     setDeleteStoryTarget(null);
     setActionLoading(false);
   }
 
-  // ── Derived ──
+  async function handleBlock() {
+    setBlockLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${profileUserId}/block`, { method: "POST", credentials: "include" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to block."); }
+      setIsBlockedByMe(true);
+      setBlockConfirm(false);
+      setToast({ type: "success", message: `${profileUser?.username} has been blocked.` });
+    } catch (e) { setToast({ type: "error", message: e.message }); }
+    setBlockLoading(false);
+  }
+
+  async function handleUnblock() {
+    setBlockLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${profileUserId}/block`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to unblock."); }
+      setIsBlockedByMe(false);
+      setToast({ type: "success", message: `${profileUser?.username} has been unblocked.` });
+    } catch (e) { setToast({ type: "error", message: e.message }); }
+    setBlockLoading(false);
+  }
+
+  async function handleOwnerUnblock() {
+    if (!unblockTarget) return;
+    setUnblockLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/${unblockTarget.id}/block`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to unblock."); }
+      setBlockedUsers(prev => prev.filter(u => u.id !== unblockTarget.id));
+      setToast({ type: "success", message: `${unblockTarget.username} has been unblocked.` });
+    } catch (e) { setToast({ type: "error", message: e.message }); }
+    setUnblockTarget(null);
+    setUnblockLoading(false);
+  }
+
   const joinedDate = profileUser?.createdAt ? formatDate(profileUser.createdAt) : null;
-  const tierStyle = wallet?.tier ? (TIER_STYLES[wallet.tier.name] ?? TIER_STYLES.Bronze) : null;
+  const tabs = TAB_DEFS(isOwner, profileUser?.username);
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-[#f9f6f1]">
       <Header />
-      {/* ── PROFILE HEADER ──────────────────────────────────────────────────── */}
-      <div className="relative w-full overflow-hidden" style={{ minHeight: 200 }}>
-        {/* Blurred avatar background — same technique as story page */}
+
+      {/* ── PROFILE HERO ──────────────────────────────────────────────────── */}
+      <div className="relative w-full overflow-hidden" style={{ minHeight: 220 }}>
         {profileUser?.avatar && !userLoading ? (
           <div
             className="absolute inset-0"
@@ -888,7 +846,6 @@ export default function ProfilePage() {
             style={{ background: "linear-gradient(135deg, #1e2235 0%, #2d3748 60%, #3b4a6b 100%)" }}
           />
         )}
-        {/* Gradient overlay for readability */}
         <div
           className="absolute inset-0"
           style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.60) 100%)" }}
@@ -900,9 +857,9 @@ export default function ProfilePage() {
             {/* Avatar */}
             <div className="flex-shrink-0">
               {userLoading ? (
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-white/10 animate-pulse" />
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white/10 animate-pulse" />
               ) : (
-                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-white/40 bg-white/10 shadow-2xl">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white/30 bg-white/10 shadow-2xl ring-1 ring-white/10">
                   {profileUser?.avatar ? (
                     <img src={profileUser.avatar} alt={profileUser.username} className="w-full h-full object-cover" />
                   ) : (
@@ -952,55 +909,44 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Edit profile button */}
-            {isOwner && !userLoading && (
-              <Link
-                to="/settings"
-                className="flex-shrink-0 self-start sm:self-auto px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white hover:bg-white/20 transition-all font-medium backdrop-blur-sm"
-              >
-                Edit profile
-              </Link>
-            )}
-
-            {/* Block / Unblock button (visitor only, logged in) */}
-            {!isOwner && currentUser && !userLoading && (
-              isBlockedByMe ? (
-                <button
-                  onClick={handleUnblock}
-                  disabled={blockLoading}
-                  className="flex-shrink-0 self-start sm:self-auto px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white/80 hover:bg-white/20 transition-all font-medium backdrop-blur-sm disabled:opacity-50"
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-auto">
+              {isOwner && !userLoading && (
+                <Link
+                  to="/settings"
+                  className="px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white hover:bg-white/20 transition-all font-medium backdrop-blur-sm"
                 >
-                  {blockLoading ? "Unblocking…" : "Unblock"}
-                </button>
-              ) : (
-                <button
-                  onClick={() => setBlockConfirm(true)}
-                  disabled={blockLoading}
-                  className="flex-shrink-0 self-start sm:self-auto px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white/80 hover:bg-red-500/60 hover:border-red-400/50 transition-all font-medium backdrop-blur-sm disabled:opacity-50"
-                >
-                  Block
-                </button>
-              )
-            )}
-          </div>
-
-          {/* Stats row
-          {!walletLoading && (
-            <div className="flex flex-wrap gap-3 mt-6">
-              <StatPill label="Submissions" value={submissions.length} />
-              <StatPill label="Stories" value={approvedStories.length + pendingStories.length} />
-              {wallet && (
-                <>
-                  <StatPill label="Reputation" value={wallet.reputation ?? 0} />
-                  {isOwner && <StatPill label="Points" value={wallet.postingBalance ?? 0} />}
-                </>
+                  Edit profile
+                </Link>
+              )}
+              {!isOwner && currentUser && !userLoading && (
+                isBlockedByMe ? (
+                  <button
+                    onClick={handleUnblock}
+                    disabled={blockLoading}
+                    className="px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white/80 hover:bg-white/20 transition-all font-medium backdrop-blur-sm disabled:opacity-50"
+                  >
+                    {blockLoading ? "Unblocking…" : "Unblock"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setBlockConfirm(true)}
+                    disabled={blockLoading}
+                    className="px-4 py-2 rounded-xl bg-white/10 border border-white/25 text-sm text-white/80 hover:bg-red-500/60 hover:border-red-400/50 transition-all font-medium backdrop-blur-sm disabled:opacity-50"
+                  >
+                    Block
+                  </button>
+                )
               )}
             </div>
-          )} */}
+          </div>
         </div>
       </div>
 
-      {/* ── MAIN CONTENT ────────────────────────────────────────────────────── */}
+      {/* ── TAB NAV ───────────────────────────────────────────────────────── */}
+      <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
+
+      {/* ── CONTENT ───────────────────────────────────────────────────────── */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-20">
 
         {/* Toast */}
@@ -1021,32 +967,25 @@ export default function ProfilePage() {
           </div>
         )}
 
-        <div className="space-y-6">
-
-          {/* ── FEEDBACK STANDING ────────────────────────────────────── */}
-          {(walletLoading || wallet) && (
-            <Section
-              title="Feedback Standing"
-              badge={wallet?.tier?.name}
-            >
-              {walletLoading ? (
-                <Skeleton className="h-28 w-full rounded-2xl" />
-              ) : (
-                <WalletCard wallet={wallet} isOwner={isOwner} />
-              )}
-            </Section>
-          )}
-
-          {/* ── FEEDBACK SUBMISSIONS ─────────────────────────────────── */}
-          <Section
-            title={isOwner ? "My Submissions" : "Feedback Submissions"}
-            badge={!subLoading ? submissions.length : undefined}
-            action={
-              <Link to="/feedback" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
+        {/* ── SUBMISSIONS TAB ─────────────────────────────────────────── */}
+        {activeTab === "submissions" && (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <h2 className="font-serif text-xl text-[#1e2a38]">
+                  {isOwner ? "My Submissions" : "Feedback Submissions"}
+                </h2>
+                {!subLoading && (
+                  <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full tabular-nums">
+                    {submissions.length}
+                  </span>
+                )}
+              </div>
+              <Link to="/critique" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
                 Feedback Hub →
               </Link>
-            }
-          >
+            </div>
+
             {subLoading ? (
               <div className="space-y-3">
                 {[1, 2].map(i => (
@@ -1065,7 +1004,7 @@ export default function ProfilePage() {
               <EmptyState
                 message="No submissions yet"
                 cta={isOwner ? "Submit a chapter" : undefined}
-                ctaTo={isOwner ? "/feedback/submit" : undefined}
+                ctaTo={isOwner ? "/critique/submit" : undefined}
               />
             ) : (
               <>
@@ -1076,21 +1015,30 @@ export default function ProfilePage() {
                       sub={sub}
                       isOwner={isOwner}
                       onDelete={setDeleteTarget}
-                      onClose={setCloseTarget}
-                      onReopen={setReopenTarget}
+                      onMoveToDraft={setMoveToDraftTarget}
                     />
                   ))}
                 </div>
                 <Pagination page={subPage} totalPages={subTotalPages} onChange={setSubPage} />
               </>
             )}
-          </Section>
+          </div>
+        )}
 
-          {/* ── CRITIQUES GIVEN ──────────────────────────────────────── */}
-          <Section
-            title={isOwner ? "Critiques I've Given" : "Critiques Given"}
-            badge={!critiqueLoading ? critiquesGiven.length : undefined}
-          >
+        {/* ── CRITIQUES TAB ───────────────────────────────────────────── */}
+        {activeTab === "critiques" && (
+          <div>
+            <div className="flex items-center gap-2.5 mb-5">
+              <h2 className="font-serif text-xl text-[#1e2a38]">
+                {isOwner ? "Critiques I've Given" : "Critiques Given"}
+              </h2>
+              {!critiqueLoading && (
+                <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full tabular-nums">
+                  {critiquesGiven.length}
+                </span>
+              )}
+            </div>
+
             {critiqueLoading ? (
               <div className="space-y-3">
                 {[1, 2].map(i => (
@@ -1121,23 +1069,31 @@ export default function ProfilePage() {
                 <Pagination page={critiquePage} totalPages={critiqueTotalPages} onChange={setCritiquePage} />
               </>
             )}
-          </Section>
+          </div>
+        )}
 
-          {/* ── DAILY WRITING SNIPPETS ───────────────────────────────── */}
-          <Section
-            title="Writing Snippets"
-            badge={!snippetLoading ? snippets.length : undefined}
-            action={
+        {/* ── SNIPPETS TAB ────────────────────────────────────────────── */}
+        {activeTab === "snippets" && (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <h2 className="font-serif text-xl text-[#1e2a38]">Writing Snippets</h2>
+                {!snippetLoading && (
+                  <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full tabular-nums">
+                    {snippets.length}
+                  </span>
+                )}
+              </div>
               <Link to="/snippets" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
                 All snippets →
               </Link>
-            }
-            description={
-              isOwner
+            </div>
+            <p className="text-sm text-[#9a8c7a] mb-5 leading-relaxed">
+              {isOwner
                 ? "Your daily writing shared with the community."
-                : `Writing ${profileUser?.username ?? "this writer"} has shared with the community.`
-            }
-          >
+                : `Writing ${profileUser?.username ?? "this writer"} has shared with the community.`}
+            </p>
+
             {snippetLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2, 3].map(i => (
@@ -1158,25 +1114,31 @@ export default function ProfilePage() {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {snippets.map(s => (
-                    <SnippetCard key={s.id} snippet={s} />
-                  ))}
+                  {snippets.map(s => <SnippetCard key={s.id} snippet={s} />)}
                 </div>
                 <Pagination page={snippetPage} totalPages={snippetTotalPages} onChange={setSnippetPage} />
               </>
             )}
-          </Section>
+          </div>
+        )}
 
-          {/* ── DISCOVERY STORIES — APPROVED ─────────────────────────── */}
-          <Section
-            title="Discovery Stories"
-            badge={!storyLoading ? approvedStories.length : undefined}
-            action={
-              <Link to="/discovery" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
+        {/* ── STORIES TAB ─────────────────────────────────────────────── */}
+        {activeTab === "stories" && (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <h2 className="font-serif text-xl text-[#1e2a38]">Discovery Stories</h2>
+                {!storyLoading && (
+                  <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full tabular-nums">
+                    {approvedStories.length}
+                  </span>
+                )}
+              </div>
+              <Link to="/stories" className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">
                 Discovery page →
               </Link>
-            }
-          >
+            </div>
+
             {storyLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2, 3].map(i => (
@@ -1193,7 +1155,7 @@ export default function ProfilePage() {
               <EmptyState
                 message="No approved stories yet"
                 cta={isOwner ? "Share a story" : undefined}
-                ctaTo={isOwner ? "/discovery/submit" : undefined}
+                ctaTo={isOwner ? "/stories/submit" : undefined}
               />
             ) : (
               <>
@@ -1210,98 +1172,125 @@ export default function ProfilePage() {
                 <Pagination page={storyPage} totalPages={storyTotalPages} onChange={setStoryPage} />
               </>
             )}
-          </Section>
 
-          {/* ── PENDING STORIES — owner only ─────────────────────────── */}
-          {isOwner && !storyLoading && pendingStories.length > 0 && (
-            <Section
-              title="Awaiting Approval"
-              badge={pendingStories.length}
-              description="These stories are under review and not yet visible to others. You will be notified once they go live."
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {pendingStories.map(s => (
-                  <DiscoveryCard
-                    key={s.id}
-                    story={s}
-                    isOwner={true}
-                    onDeleteStory={setDeleteStoryTarget}
-                  />
+            {/* Pending stories — owner only */}
+            {isOwner && !storyLoading && pendingStories.length > 0 && (
+              <div className="mt-8">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <h3 className="font-serif text-lg text-[#1e2a38]">Awaiting Approval</h3>
+                  <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full">
+                    {pendingStories.length}
+                  </span>
+                </div>
+                <p className="text-sm text-[#9a8c7a] mb-4 leading-relaxed">
+                  These stories are under review and not yet visible to others.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingStories.map(s => (
+                    <DiscoveryCard
+                      key={s.id}
+                      story={s}
+                      isOwner={true}
+                      onDeleteStory={setDeleteStoryTarget}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── STANDING TAB ────────────────────────────────────────────── */}
+        {activeTab === "standing" && (
+          <div>
+            <div className="flex items-center gap-2.5 mb-5">
+              <h2 className="font-serif text-xl text-[#1e2a38]">Feedback Standing</h2>
+              {wallet?.tier?.name && (
+                <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full">
+                  {wallet.tier.name}
+                </span>
+              )}
+            </div>
+            {walletLoading ? (
+              <Skeleton className="h-28 w-full rounded-2xl" />
+            ) : (
+              <WalletCard wallet={wallet} isOwner={isOwner} />
+            )}
+          </div>
+        )}
+
+        {/* ── BLOCKED USERS TAB — owner only ──────────────────────────── */}
+        {activeTab === "blocked" && isOwner && (
+          <div>
+            <div className="flex items-center gap-2.5 mb-2">
+              <h2 className="font-serif text-xl text-[#1e2a38]">Blocked Users</h2>
+              {!blockedUsersLoading && (
+                <span className="text-[11px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] border border-[#e8e0d0] px-2 py-0.5 rounded-full tabular-nums">
+                  {blockedUsers.length}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-[#9a8c7a] mb-5 leading-relaxed">
+              These writers cannot leave critiques or paragraph comments on your submissions. Only you can see this list.
+            </p>
+
+            {blockedUsersLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-[#e8e0d0]">
+                    <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-7 w-20 ml-auto rounded-lg" />
+                  </div>
                 ))}
               </div>
-            </Section>
-          )}
-
-          {/* ── BLOCKED USERS — owner only ───────────────────────────── */}
-          {isOwner && (blockedUsersLoading || blockedUsers.length > 0) && (
-            <Section
-              title="Blocked Users"
-              badge={!blockedUsersLoading ? blockedUsers.length : undefined}
-              description="These writers cannot leave critiques or paragraph comments on your submissions. Only you can see this list."
-            >
-              {blockedUsersLoading ? (
-                <div className="space-y-3">
-                  {[1, 2].map(i => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-[#e8e0d0]">
-                      <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-7 w-20 ml-auto rounded-lg" />
+            ) : blockedUsers.length === 0 ? (
+              <EmptyState message="No blocked users" />
+            ) : (
+              <div className="space-y-2">
+                {blockedUsers.map(u => (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[#e8e0d0] bg-[#faf8f5] hover:border-[#c4b8a8] transition-colors"
+                  >
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-[#e8e0d0] flex-shrink-0 border border-[#ddd5c8]">
+                      {u.avatar ? (
+                        <img src={u.avatar} alt={u.username} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="font-serif text-sm text-[#9a8c7a]">
+                            {u.username?.[0]?.toUpperCase() ?? "?"}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {blockedUsers.map(u => (
-                    <div
-                      key={u.id}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[#e8e0d0] bg-[#faf8f5] hover:border-[#c4b8a8] transition-colors"
+                    <Link
+                      to={`/profile/${u.id}`}
+                      className="flex-1 min-w-0 text-sm font-medium text-[#2d3748] hover:text-[#1e2a38] truncate transition-colors"
                     >
-                      {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full overflow-hidden bg-[#e8e0d0] flex-shrink-0 border border-[#ddd5c8]">
-                        {u.avatar ? (
-                          <img src={u.avatar} alt={u.username} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="font-serif text-sm text-[#9a8c7a]">
-                              {u.username?.[0]?.toUpperCase() ?? "?"}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      {u.username}
+                    </Link>
+                    <button
+                      onClick={() => setUnblockTarget(u)}
+                      className="flex-shrink-0 px-3 py-1.5 rounded-lg border border-[#e8e0d0] text-xs font-medium text-[#7a6e62] hover:border-[#2d3748] hover:text-[#2d3748] transition-all"
+                    >
+                      Unblock
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-                      {/* Username link */}
-                      <Link
-                        to={`/profile/${u.id}`}
-                        className="flex-1 min-w-0 text-sm font-medium text-[#2d3748] hover:text-[#1e2a38] truncate transition-colors"
-                      >
-                        {u.username}
-                      </Link>
-
-                      {/* Unblock button */}
-                      <button
-                        onClick={() => setUnblockTarget(u)}
-                        className="flex-shrink-0 px-3 py-1.5 rounded-lg border border-[#e8e0d0] text-xs font-medium text-[#7a6e62] hover:border-[#2d3748] hover:text-[#2d3748] transition-all"
-                      >
-                        Unblock
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Section>
-          )}
-
-        </div>
       </div>
 
-      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      {/* ── MODALS ─────────────────────────────────────────────────────────── */}
       {isOwner && deleteTarget && (
         <ConfirmModal
           title="Delete submission?"
           body={
-            (deleteTarget._count?.responses ?? 0) === 0 &&
-            !deleteTarget.wasFreePost &&
-            deleteTarget.pointsCost > 0
+            (deleteTarget._count?.responses ?? 0) === 0 && !deleteTarget.wasFreePost && deleteTarget.pointsCost > 0
               ? `This will permanently delete "${deleteTarget.title}" and refund ${deleteTarget.pointsCost} pts (no critiques yet).`
               : `This will permanently delete "${deleteTarget.title}". Points will not be refunded since critiques have been received.`
           }
@@ -1311,29 +1300,16 @@ export default function ProfilePage() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-
-      {isOwner && closeTarget && (
+      {isOwner && moveToDraftTarget && (
         <ConfirmModal
-          title="Close submission?"
-          body={`"${closeTarget.title}" will stop accepting new critiques. Existing feedback stays visible, and you can reopen it any time from your profile.`}
-          confirmLabel={actionLoading ? "Closing..." : "Close submission"}
+          title="Move to drafts?"
+          body={`"${moveToDraftTarget.title}" will be removed from the Critique Hub and moved to your drafts. All critiques and comments are preserved — you can edit and republish it any time.`}
+          confirmLabel={actionLoading ? "Moving..." : "Move to draft"}
           danger={false}
-          onConfirm={confirmClose}
-          onCancel={() => setCloseTarget(null)}
+          onConfirm={confirmMoveToDraft}
+          onCancel={() => setMoveToDraftTarget(null)}
         />
       )}
-
-      {isOwner && reopenTarget && (
-        <ConfirmModal
-          title="Reopen submission?"
-          body={`"${reopenTarget.title}" will be open to new critiques again.`}
-          confirmLabel={actionLoading ? "Reopening..." : "Reopen"}
-          danger={false}
-          onConfirm={confirmReopen}
-          onCancel={() => setReopenTarget(null)}
-        />
-      )}
-
       {isOwner && deleteStoryTarget && (
         <ConfirmModal
           title="Delete story?"
@@ -1344,7 +1320,6 @@ export default function ProfilePage() {
           onCancel={() => setDeleteStoryTarget(null)}
         />
       )}
-
       {!isOwner && blockConfirm && (
         <ConfirmModal
           title={`Block ${profileUser?.username}?`}
@@ -1355,7 +1330,6 @@ export default function ProfilePage() {
           onCancel={() => setBlockConfirm(false)}
         />
       )}
-
       {isOwner && unblockTarget && (
         <ConfirmModal
           title={`Unblock ${unblockTarget.username}?`}

@@ -266,7 +266,7 @@ export default function DiscoveryStoryPage() {
         {/* Back link */}
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-5">
           <Link
-            to="/discovery"
+            to="/stories"
             className="inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
