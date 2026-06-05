@@ -220,7 +220,7 @@ function GuestHero() {
     <div className="bg-[#1a1a2e] mb-0">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8 flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-10">
         <div className="flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-2">Quillweave</p>          <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-2">Inkwell</p>          <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">
             Write more. Together.
           </h1>
           <p className="text-white/55 text-sm leading-relaxed max-w-md">
@@ -520,7 +520,7 @@ function EventsSection() {
         // If no active events, fetch all events and get winners from the most recent ended one
         if (active.length === 0) {
           try {
-            const allRes  = await fetch(`${API_URL}/events/admin/all`);
+            const allRes  = await fetch(`${API_URL}/events/all`);
             if (allRes.ok) {
               const allData  = await allRes.json();
               const ended    = (allData?.events ?? [])
