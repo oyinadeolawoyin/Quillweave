@@ -62,7 +62,6 @@ function ReputationBadge({ rep }) {
 
 function LeaderRow({ rank, user, stat, statLabel }) {
   const medals = { 1: "🥇", 2: "🥈", 3: "🥉" };
-  const reputation = user?.feedbackPoints?.reputation ?? 5;
 
   return (
     <Link
@@ -77,9 +76,6 @@ function LeaderRow({ rank, user, stat, statLabel }) {
         <p className="text-[13px] font-semibold text-[#1a1a2e] truncate group-hover:text-[#1a5fb4] transition-colors">
           @{user?.username}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <ReputationBadge rep={reputation} />
-        </div>
       </div>
       <div className="text-right flex-shrink-0">
         <p className="text-[15px] font-bold text-[#d4af37]">{stat}</p>
@@ -443,7 +439,7 @@ export default function MembersPage() {
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-8 h-0.5 bg-[#d4af37]" />
                   <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37]">
-                    New to Quillweave
+                    New to Inkwell
                   </p>
                 </div>
                 <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden">
@@ -513,7 +509,7 @@ export default function MembersPage() {
                     to="/discovery/submit"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-[#d4af37] text-[#1a1a2e] text-[12px] font-bold rounded-lg hover:bg-[#c9a42d] transition-colors"
                   >
-                    announce your publication
+                    Recommend a story
                   </Link>
                 </div>
               </section>
