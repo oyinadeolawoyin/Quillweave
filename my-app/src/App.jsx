@@ -456,9 +456,12 @@ function SpotlightList() {
                       {sub.title}
                     </Link>
                     {isLongStay && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border"
-                        style={{ color: "#b8860b", background: "#fdf9ed", borderColor: "#f0d98a" }}>
-                        +2 pts
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
+                        style={{ color: "#b8860b", background: "#fffdf0", borderColor: "#d4af37", opacity: 0.9 }}>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 15"/>
+                        </svg>
+                        {Math.floor(days)}d · +2 pts
                       </span>
                     )}
                   </div>

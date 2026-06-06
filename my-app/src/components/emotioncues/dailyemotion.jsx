@@ -117,13 +117,8 @@ export default function DailyEmotion() {
   // Show exactly 6 cues on homepage
   const previewCues = (entry.cues ?? []).slice(0, 6);
 
-  // Community sentence display logic:
-  //  - 0 comments → hide community section
-  //  - 1 comment  → show the 1 sentence, no count badge
-  //  - 2+ comments → show up to 2 sentences, show count badge
-  const showCommunitySection = commentCount > 0;
-  const showCountBadge       = commentCount > 1;
-  const previewSentences     = comments.slice(0, 2); // max 2
+  // Show sentence count whenever there are any
+  const showCountBadge = commentCount > 0;
 
   return (
     <div
@@ -214,31 +209,7 @@ export default function DailyEmotion() {
         {/* Divider */}
         <div className="mb-5 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
 
-        {/* Community sentences preview (only shown when logged in and comments exist) */}
-        {showCommunitySection && (
-          <div className="mb-4 space-y-2">
-            <p className="text-[10px] font-bold tracking-[0.18em] uppercase mb-2" style={{ color: "rgba(212,175,55,0.6)" }}>
-              From the community
-            </p>
-            {previewSentences.map((c, i) => (
-              <div
-                key={c.id ?? i}
-                className="px-4 py-3 rounded-xl"
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border:     "1px solid rgba(255,255,255,0.07)",
-                }}
-              >
-                <p className="text-white leading-relaxed line-clamp-2" style={{ fontSize: 12, opacity: 0.75, fontStyle: "italic" }}>
-                  "{c.content.length > 140 ? c.content.slice(0, 137) + "…" : c.content}"
-                </p>
-                {c.author?.username && (
-                  <p className="text-[10px] text-white/30 mt-1">— @{c.author.username}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+
 
         {/* Footer */}
         <div className="flex items-center gap-4">

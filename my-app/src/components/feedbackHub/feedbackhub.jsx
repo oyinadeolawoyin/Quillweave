@@ -156,13 +156,6 @@ function SpotlightRow({ sub }) {
       to={`/critique/${sub.id}`}
       className="group relative flex items-start gap-5 bg-white border border-[#e8e0d0] rounded-xl px-5 py-4 hover:border-[#1a1a2e] hover:shadow-[0_4px_20px_rgba(26,26,46,0.08)] transition-all duration-200"
     >
-      {/* Long-stay bonus badge */}
-      {sub.isLongStay && (
-        <div className="absolute top-3.5 right-20 bg-[#fffdf0] border border-[#d4af37]/50 text-[#b8860b] text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wide">
-          +2 pts
-        </div>
-      )}
-
       {/* Main content */}
       <div className="flex-1 min-w-0">
         {/* Tags */}
@@ -176,6 +169,14 @@ function SpotlightRow({ sub }) {
           <span className="text-[10px] text-[#9a8c7a] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
             {DRAFT_LABELS[sub.draftStage]}
           </span>
+          {sub.isLongStay && (
+            <span className="text-[10px] font-bold text-[#b8860b] bg-[#fffdf0] border border-[#d4af37]/40 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              10+ days · +2 pts
+            </span>
+          )}
           {sub.feedbackWanted?.slice(0, 2).map((tag, i) => (
             <span key={i} className="text-[10px] text-[#6558d4] bg-[#f2f0fd] px-2 py-0.5 rounded-full">
               {tag}
