@@ -22,6 +22,7 @@ import AdminBlog from './components/blog/adminBlog';
 import EmotionPracticePage from './components/emotioncues/emotionpracticepage';
 import ThesaurusPage from './components/emotioncues/ThesaurusPage';
 import App from './App'
+import MembersPage from './components/leaderBoard/memberspage';
 import AccountabilityPage from './components/sprint/accountabilitypage';
 import SnippetFeed from './components/sprint/snippetfeed';
 import SnippetPage from './components/sprint/snippetpage';
@@ -37,6 +38,7 @@ import FeedbackHub from './components/feedbackHub/feedbackhub';
 import SubmitFeedback from './components/feedbackHub/submitFeedback';
 import FeedbackPage from './components/feedbackHub/feedbackPage';
 import ArchivePage from './components/feedbackHub/archivePage';
+import AdminReportsPage from './components/feedbackHub/adminreportspage';
 import QueuePage from './components/feedbackHub/queuePage';
 import DiscoveryFeed from './components/discovery/discoveryfeed';
 import DiscoveryStoryPage from './components/discovery/discoverystorypage';
@@ -120,6 +122,10 @@ const router = createBrowserRouter([
     element: <AdminSoundscapes />
   },
   {
+    path: "/members",
+    element: <MembersPage />
+  },
+  {
     path: "/accountability",
     element: <AccountabilityPage />
   },
@@ -174,6 +180,10 @@ const router = createBrowserRouter([
   {
     path: "/critique/queue",
     element: <QueuePage />
+  },
+  {
+    path: "/admin/reports",
+    element: <AdminReportsPage />
   },
   { 
     path: "/profile/:userId",     

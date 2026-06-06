@@ -120,7 +120,7 @@ export default function Header() {
 
   const navItems = [
     { to: "/critique",  label: "Critique"  },
-    { to: "/stories",   label: "Stories"   },
+    { to: "/members",   label: "Members"   },
     { to: "/snippets",  label: "Community" },
     
     // { to: "/thesaurus", label: "Thesaurus" },

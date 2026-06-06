@@ -384,7 +384,7 @@ function MySubmissions({ user, wallet }) {
 function SpotlightList() {
   const [spotlight, setSpotlight] = useState([]);
   const [loading, setLoading]     = useState(true);
-
+ 
   useEffect(() => {
     fetch(`${API_URL}/feedback/submissions/spotlight`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
@@ -392,7 +392,7 @@ function SpotlightList() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
+ 
   return (
     <div className="bg-white border border-[#e8e0d0] rounded-xl overflow-hidden mb-5">
       <div className="bg-[#1a1a2e] px-5 py-3 flex items-center justify-between">
@@ -408,7 +408,7 @@ function SpotlightList() {
       <p className="text-[11px] text-[#9a8c7a] mb-3">
         3 critiques to graduate · works over 10 days earn critics +2 pts
       </p>
-
+ 
       {loading && (
         <div className="space-y-3">
           {[1,2,3].map(i => (
@@ -419,7 +419,7 @@ function SpotlightList() {
           ))}
         </div>
       )}
-
+ 
       {!loading && spotlight.length === 0 && (
         <div className="py-4 text-center">
           <p className="text-xs text-[#9a8c7a] mb-1">No chapters in the spotlight yet.</p>
@@ -428,24 +428,25 @@ function SpotlightList() {
           </Link>
         </div>
       )}
-
+ 
       {!loading && spotlight.length > 0 && (
         <div className="divide-y divide-[#f4f1ec]">
           {spotlight.map(sub => {
             const author     = sub.user;
             const responses  = sub.critiqueCount ?? sub._count?.responses ?? 0;
             const comments   = sub._count?.paragraphComments ?? 0;
+            // Prefer server-sent flag; fall back to local calculation
             const days       = spotlightDays(sub);
-            const isLongStay = days > 10;
-
+            const isLongStay = sub.isLongStay ?? days > 10;
+ 
             return (
               <div key={sub.id} className="py-2.5 first:pt-0 flex items-center gap-2">
-                {/* Gray clap icon */}
+                {/* Gold clap icon */}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" aria-hidden="true">
                   <path d="M9 11L7 9l1.5-1.5 2 2M9 11l4.5-4.5L15 8l-4.5 4.5M9 11l-3 3a4 4 0 0 0 6 5.3L17 14a1.5 1.5 0 0 0-2.1-2.1l-1.4 1.4"/>
                   <path d="M12.5 6.5L14 5l1.5 1.5-1.5 1.5M14 5l1.5-1.5L17 5l-1.5 1.5"/>
                 </svg>
-
+ 
                 {/* Text block */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
@@ -455,16 +456,22 @@ function SpotlightList() {
                     >
                       {sub.title}
                     </Link>
+ 
+                    {/* ── 10+ day badge ── */}
                     {isLongStay && (
-                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
-                        style={{ color: "#b8860b", background: "#fffdf0", borderColor: "#d4af37", opacity: 0.9 }}>
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
+                        style={{ color: "#b8860b", background: "#fffdf0", borderColor: "#d4af37" }}
+                        title={`This chapter has been waiting ${Math.floor(days)} days — critiquing earns +2 bonus pts`}
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 15"/>
                         </svg>
                         {Math.floor(days)}d · +2 pts
                       </span>
                     )}
                   </div>
+ 
                   <p className="text-[11px] text-[#9a8c7a]">
                     <span className="font-medium uppercase tracking-wide text-[10px] text-[#2d3748]">{sub.genre}</span>
                     <span className="mx-1">·</span>
@@ -476,9 +483,14 @@ function SpotlightList() {
                     </Link>
                     {comments > 0 && <><span className="mx-1">·</span>{comments} comment{comments !== 1 ? "s" : ""}</>}
                   </p>
+ 
+                  {/* Critique progress bar */}
+                  <div className="mt-1">
+                    <CritBar count={responses} />
+                  </div>
                 </div>
-
-                {/* Critique button — exact CC "Crit Story" style */}
+ 
+                {/* Critique button */}
                 <Link
                   to={`/critique/${sub.id}`}
                   className="flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 border border-[#1a1a2e] text-[#1a1a2e] rounded hover:bg-[#1a1a2e] hover:text-white transition-all whitespace-nowrap"
@@ -490,7 +502,7 @@ function SpotlightList() {
           })}
         </div>
       )}
-
+ 
       <div className="mt-3 pt-2.5 border-t border-[#f4f1ec] flex items-center justify-between">
         <Link to="/critique" className="text-[11px] text-[#1a5fb4] hover:underline font-semibold">
           Browse all chapters

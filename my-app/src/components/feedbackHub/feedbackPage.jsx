@@ -256,7 +256,7 @@ function ReportModal({ responseId, onClose, onSuccess }) {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/feedback/responses/${responseId}/report`, {
+      const res = await fetch(`${API_URL}/reports/responses/${responseId}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -882,8 +882,8 @@ function CritiqueCard({ response, submissionAuthorId, user, onUpvote, onEdit, on
               </span>
             )}
 
-            {/* Report button — only for the submission author, only if not already reported */}
-            {isSubmissionAuthor && !isCritiqueAuthor && (
+            {/* Report button — visible to any logged-in user who isn't the critique author */}
+            {user && !isCritiqueAuthor && (
               alreadyReported ? (
                 <span className="inline-flex items-center gap-1 text-[11px] text-[#9a8c7a] border border-[#e8e0d0] bg-[#faf7f2] px-2.5 py-1 rounded-lg">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
