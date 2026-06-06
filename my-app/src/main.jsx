@@ -194,7 +194,7 @@ const router = createBrowserRouter([
     element: <DiscoveryFeed /> 
   },
   { 
-    path: "/discovery/submit", 
+    path: "/stories/submit", 
     element: <SubmitDiscoveryStory /> 
   },
   { 

@@ -475,20 +475,28 @@ export default function MembersPage() {
                 <div className="flex items-end justify-between mb-6">
                   <div>
                     <h3 className="font-serif text-[#1a1a2e] text-xl font-bold">Publication Showcase</h3>
-                    <p className="text-[12px] text-[#9a8c7a] mt-0.5">Stories our writers are reading and recommending</p>
+                    <p className="text-[12px] text-[#9a8c7a] mt-0.5">Stories written by our community — find your next favourite read.</p>
                   </div>
-                  <Link
-                    to="/stories"
-                    className="text-[11px] font-bold text-[#1a5fb4] hover:text-[#1a1a2e] transition-colors uppercase tracking-wide"
-                  >
-                    View all →
-                  </Link>
+                  {data.publications.length >= 10 && (
+                    <Link
+                      to="/stories"
+                      className="text-[11px] font-bold text-[#1a5fb4] hover:text-[#1a1a2e] transition-colors uppercase tracking-wide"
+                    >
+                      View all →
+                    </Link>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {data.publications.map((story) => (
                     <PublicationCard key={story.id} story={story} />
                   ))}
                 </div>
+                <Link
+                    to="/stories/submit"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#d4af37] text-[#1a1a2e] text-[12px] font-bold rounded-lg hover:bg-[#c9a42d] transition-colors"
+                  >
+                    Announce your publication
+                  </Link>
               </section>
             )}
 

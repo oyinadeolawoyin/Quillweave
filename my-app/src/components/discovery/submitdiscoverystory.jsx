@@ -300,9 +300,9 @@ export default function SubmitDiscoveryStory() {
       if (!res.ok) throw new Error(data.message || (isEditMode ? "Update failed." : "Submission failed."));
 
       if (isEditMode) {
-        navigate(`/discovery/${storyId}`, { state: { updated: true } });
+        navigate(`/stories/${storyId}`, { state: { updated: true } });
       } else {
-        navigate("/discovery", { state: { submitted: true } });
+        navigate("/stories", { state: { submitted: true } });
       }
     } catch (e) {
       setError(e.message);

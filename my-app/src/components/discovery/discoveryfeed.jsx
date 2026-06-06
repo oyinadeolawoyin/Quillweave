@@ -196,7 +196,7 @@ export default function DiscoveryFeed() {
             </div>
             {user && (
               <Link
-                to="/discovery/submit"
+                to="/stories/submit"
                 className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors shadow-sm text-[#12181f]"
                 style={{ background: "linear-gradient(135deg, #d4af37 0%, #c09a28 100%)", boxShadow: "0 4px 16px rgba(212,175,55,0.35)" }}
               >
