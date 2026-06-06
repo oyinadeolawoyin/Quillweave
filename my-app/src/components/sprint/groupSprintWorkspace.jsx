@@ -316,6 +316,11 @@ export default function GroupSprintWorkspace() {
   const [currentWordCount,  setCurrentWordCount]  = useState(0);
   const startWordsRef = useRef(null); // baseline word count when sprint started (set by onDraftLoaded)
 
+  // Draft loading — true while the editor is fetching + counting words in the draft.
+  // The editor is read-only (overlaid) until this resolves so startWordsRef is set
+  // before the writer types anything.
+  const [draftLoading, setDraftLoading] = useState(false);
+
   // Sprint summary
   const [showSummary,        setShowSummary]        = useState(false);
   const [sprintWordsWritten, setSprintWordsWritten] = useState(0);
@@ -390,6 +395,15 @@ export default function GroupSprintWorkspace() {
   }, [user]);
 
   useEffect(() => { fetchGroupSprint(); fetchMySprint(); }, [fetchGroupSprint, fetchMySprint]);
+
+  // Reset the draft-loading gate whenever the active draft changes so the
+  // overlay re-appears and startWordsRef gets re-baselined from the new draft.
+  useEffect(() => {
+    if (writeMode) {
+      setDraftLoading(true);
+      startWordsRef.current = null;
+    }
+  }, [activeDraftId, writeMode]);
 
   // Auto-restore most recent draft when entering write mode with no draft selected
   useEffect(() => {
@@ -474,8 +488,12 @@ export default function GroupSprintWorkspace() {
           ringFired.current = true;
           playRing();
 
-          const wordsNow   = currentWordCount;
-          const startWords = startWordsRef.current ?? 0;
+          const wordsNow = currentWordCount;
+          // Use the baseline from the loaded draft (startWordsRef) when in
+          // Inkwell mode. Fall back to the startWords stored on mySprint (set
+          // at join time) if the editor hasn't loaded a draft yet, and
+          // finally fall back to 0 so we never go negative.
+          const startWords = startWordsRef.current ?? mySprint?.startWords ?? 0;
           const written    = Math.max(0, wordsNow - startWords);
           setSprintWordsWritten(written);
 
@@ -499,7 +517,7 @@ export default function GroupSprintWorkspace() {
     tick();
     timerRef.current = setInterval(tick, 1000);
     return () => clearInterval(timerRef.current);
-  }, [groupSprint, sprintEnded, hasCheckedOut, isHost, groupSprintId, fetchGroupSprint, writeMode, currentWordCount]);
+  }, [groupSprint, sprintEnded, hasCheckedOut, isHost, groupSprintId, fetchGroupSprint, writeMode, currentWordCount, mySprint]);
 
   // ── Auto-save handler ──────────────────────────────────────────────────────
   const handleAutoSave = useCallback(async ({ draftId, title, content, wordCount }) => {
@@ -524,6 +542,23 @@ export default function GroupSprintWorkspace() {
   // ── Save & go to drafts ────────────────────────────────────────────────────
   async function handleSaveDraft() {
     setShowSummary(false);
+
+    // Call checkout API so the sprint's wordsWritten is saved in the DB.
+    // Only do this if the user is actually in an active sprint and hasn't
+    // already checked out (e.g. they clicked "Save" from the summary modal).
+    if (mySprint?.id && mySprint.isActive) {
+      try {
+        await fetch(`${API_URL}/sprint/${mySprint.id}/checkout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ currentWordCount }),
+        });
+      } catch (err) {
+        console.error("[Sprint] checkout on save failed:", err);
+      }
+    }
+
     navigate("/drafts");
   }
 
@@ -725,12 +760,27 @@ export default function GroupSprintWorkspace() {
               </div>
             )}
 
-            <div className="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-md border border-[#e8e0d0]">
+            <div className="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-md border border-[#e8e0d0] relative">
+              {/* Loading overlay — shown while we calculate the draft's starting word count.
+                  Writers cannot type until startWordsRef is set, preventing a 0-baseline bug. */}
+              {draftLoading && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/90 backdrop-blur-sm">
+                  <svg className="animate-spin h-6 w-6 text-[#d4af37]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <p className="text-sm text-[#7a6a50] font-medium">Counting your starting words…</p>
+                  <p className="text-xs text-[#b8a898]">Just a moment before you start writing</p>
+                </div>
+              )}
               <WriteEditor
                 draftId={activeDraftId}
                 onWordsUpdate={setCurrentWordCount}
                 onAutoSave={handleAutoSave}
-                onDraftLoaded={(savedWC) => { startWordsRef.current = savedWC; }}
+                onDraftLoaded={(savedWC) => {
+                  startWordsRef.current = savedWC;
+                  setDraftLoading(false);
+                }}
                 showColorTools={true}
               />
             </div>
