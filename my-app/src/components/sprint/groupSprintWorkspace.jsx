@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import Header from "../profile/header";
 import API_URL from "@/config/api";
-import { CheckoutModal } from "./groupSprintModal";
+import { CheckoutModal, JoinGroupSprintModal } from "./groupSprintModal";
 import { Room, Track } from "livekit-client";
 import {
   ThesaurusDrawer,
@@ -31,6 +31,23 @@ function playRing() {
 }
 
 function encodeMsg(obj) { return new TextEncoder().encode(JSON.stringify(obj)); }
+
+// ─── Invite toast ──────────────────────────────────────────────────────────────
+// Brief "Copied!" confirmation shown after tapping the invite link button.
+
+function InviteToast({ show }) {
+  if (!show) return null;
+  return (
+    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#2d3748] text-white text-sm font-medium shadow-xl animate-fade-in-up">
+        <svg className="w-4 h-4 text-[#d4af37] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+        Link copied — share it with your fellow writers!
+      </div>
+    </div>
+  );
+}
 
 // ─── Soundscape hook ───────────────────────────────────────────────────────────
 
@@ -288,6 +305,13 @@ export default function GroupSprintWorkspace() {
   const [thesaurusOpen,   setThesaurusOpen]   = useState(false);
   const [draftsModalOpen, setDraftsModalOpen] = useState(false);
 
+  // Join modal — triggered by "Join sprint" button on the workspace
+  const [showJoinModal, setShowJoinModal] = useState(false);
+
+  // Invite link toast
+  const [showInviteToast, setShowInviteToast] = useState(false);
+  const inviteToastTimer = useRef(null);
+
   // Word tracking — currentWordCount is updated live from the WriteEditor
   const [currentWordCount,  setCurrentWordCount]  = useState(0);
   const startWordsRef = useRef(null); // baseline word count when sprint started (set by onDraftLoaded)
@@ -307,12 +331,43 @@ export default function GroupSprintWorkspace() {
   const isHost       = user && groupSprint && Number(user.id) === Number(groupSprint.userId);
   const mySoundscape = mySprint?.soundscape;
   const soundscapeState = useSoundscape(mySoundscape?.fileUrl || null, groupSprint?.isActive ?? false);
+  // Has this user joined the sprint at all (active or checked out)?
+  const hasJoined = Boolean(mySprint);
 
   const broadcastSoundscape = useCallback((muted) => {
     if (!roomRef.current) return;
     try { roomRef.current.localParticipant.publishData(encodeMsg({ type: DC_SOUNDSCAPE, muted }), { reliable: true }); }
     catch (e) { console.warn("[DC] broadcast failed:", e); }
   }, []);
+
+  // ── Invite link handler ────────────────────────────────────────────────────
+  function handleCopyInvite() {
+    const url = window.location.href;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).catch(() => {
+        // Fallback for older mobile browsers
+        const el = document.createElement("input");
+        el.value = url;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      });
+    } else {
+      // Legacy fallback
+      const el = document.createElement("input");
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setShowInviteToast(true);
+    clearTimeout(inviteToastTimer.current);
+    inviteToastTimer.current = setTimeout(() => setShowInviteToast(false), 2800);
+  }
+
+  useEffect(() => () => clearTimeout(inviteToastTimer.current), []);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchGroupSprint = useCallback(async () => {
@@ -419,10 +474,6 @@ export default function GroupSprintWorkspace() {
           ringFired.current = true;
           playRing();
 
-          // ── Calculate words written during this sprint ─────────────────
-          // currentWordCount is the live count from WriteEditor's onWordsUpdate.
-          // startWordsRef is set when the draft loads (onDraftLoaded) so we
-          // correctly measure only words added *during* the sprint.
           const wordsNow   = currentWordCount;
           const startWords = startWordsRef.current ?? 0;
           const written    = Math.max(0, wordsNow - startWords);
@@ -451,15 +502,11 @@ export default function GroupSprintWorkspace() {
   }, [groupSprint, sprintEnded, hasCheckedOut, isHost, groupSprintId, fetchGroupSprint, writeMode, currentWordCount]);
 
   // ── Auto-save handler ──────────────────────────────────────────────────────
-  // Receives wordCount from the WriteEditor so the backend always gets the
-  // correct count even when the content is HTML (not plain text).
   const handleAutoSave = useCallback(async ({ draftId, title, content, wordCount }) => {
     const body = {
       draftId:   draftId || undefined,
       title,
       content,
-      // Pass wordCount if your sprint-save endpoint accepts it;
-      // the backend draftService.sprintAutoSave will use it or recount from content.
       wordCount: wordCount ?? undefined,
     };
     const res = await fetch(`${API_URL}/drafts/sprint-save`, {
@@ -491,6 +538,12 @@ export default function GroupSprintWorkspace() {
   function handleCheckedOut() {
     setShowCheckout(false);
     setShowEarlyCheckout(false);
+    fetchMySprint();
+    fetchGroupSprint();
+  }
+
+  // Called after successfully joining via the JoinGroupSprintModal
+  function handleJoined() {
     fetchMySprint();
     fetchGroupSprint();
   }
@@ -572,6 +625,7 @@ export default function GroupSprintWorkspace() {
               </button>
             )}
 
+            {/* Thesaurus — always visible (no join required) */}
             <button
               onClick={() => setThesaurusOpen(o => !o)}
               className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
@@ -596,10 +650,11 @@ export default function GroupSprintWorkspace() {
               </button>
             )}
 
+            {/* Invite — visible on ALL screen sizes when sprint is active */}
             {groupSprint.isActive && (
               <button
-                onClick={() => navigator.clipboard?.writeText(window.location.href)}
-                className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#ddd0bb] text-[#7a6a50] rounded-full hover:border-[#c9b090] hover:text-[#5a4a30] transition-all font-medium bg-[#faf5ed]">
+                onClick={handleCopyInvite}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[#ddd0bb] text-[#7a6a50] rounded-full hover:border-[#c9b090] hover:text-[#5a4a30] transition-all font-medium bg-[#faf5ed]">
                 🔗 <span>Invite</span>
               </button>
             )}
@@ -671,13 +726,6 @@ export default function GroupSprintWorkspace() {
             )}
 
             <div className="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-md border border-[#e8e0d0]">
-              {/*
-                WriteEditor is now the SHARED component from writeeditorshared.jsx.
-                onWordsUpdate → keeps currentWordCount in sync (used for sprint word-diff calc).
-                onDraftLoaded → sets startWordsRef so we measure only new words this sprint.
-                onAutoSave receives { draftId, title, content, wordCount } — wordCount is the
-                accurate count from the rich editor, passed straight to the backend.
-              */}
               <WriteEditor
                 draftId={activeDraftId}
                 onWordsUpdate={setCurrentWordCount}
@@ -708,7 +756,8 @@ export default function GroupSprintWorkspace() {
               </div>
             )}
 
-            {groupSprint.isActive && !hasCheckedOut && (
+            {/* ── Active sprint: joined member view ── */}
+            {groupSprint.isActive && hasJoined && !hasCheckedOut && (
               <div className="rounded-3xl border border-[#e0d0b8] shadow-sm p-6 sm:p-8"
                 style={{ background: "linear-gradient(160deg, #fffdf8 0%, #faf3e4 100%)" }}>
 
@@ -728,6 +777,7 @@ export default function GroupSprintWorkspace() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Inkwell — always available to joined members */}
                   <button onClick={() => setWriteMode(true)}
                     className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#d4af37] bg-[#fffbf0] hover:bg-[#fff8e0] hover:shadow-md transition-all text-left group">
                     <div className="w-10 h-10 rounded-xl bg-[#2d3748] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -739,6 +789,7 @@ export default function GroupSprintWorkspace() {
                     </div>
                   </button>
 
+                  {/* Thesaurus — always available to joined members */}
                   <button onClick={() => setThesaurusOpen(true)}
                     className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] hover:shadow-md transition-all text-left group">
                     <div className="w-10 h-10 rounded-xl bg-[#f4f1ec] border border-[#e8dcc8] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -762,6 +813,71 @@ export default function GroupSprintWorkspace() {
               </div>
             )}
 
+            {/* ── Active sprint: visitor / not-yet-joined view ── */}
+            {groupSprint.isActive && !hasJoined && (
+              <div className="rounded-3xl border border-[#e0d0b8] shadow-sm p-6 sm:p-8"
+                style={{ background: "linear-gradient(160deg, #fffdf8 0%, #faf3e4 100%)" }}>
+
+                <div className="flex justify-center mb-6">
+                  <TimerPill secondsLeft={secondsLeft} ended={sprintEnded} large />
+                </div>
+
+                <div className="mb-6">
+                  <h2 className="font-serif text-xl text-[#2d3748] mb-1" style={{ fontFamily: "'Georgia', serif" }}>
+                    A sprint is in progress.
+                  </h2>
+                  <p className="text-sm text-[#9a8a70]">
+                    Jump in and write alongside {activeWriters} writer{activeWriters !== 1 ? "s" : ""},
+                    or browse — the thesaurus and Inkwell are always open.
+                  </p>
+                </div>
+
+                {/* Visitor action grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Join sprint */}
+                  <button onClick={() => setShowJoinModal(true)}
+                    className="sm:col-span-3 flex items-center gap-4 p-5 rounded-2xl border-2 border-[#d4af37] bg-[#fffbf0] hover:bg-[#fff8e0] hover:shadow-md transition-all text-left group">
+                    <div className="w-10 h-10 rounded-xl bg-[#d4af37] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <svg className="w-5 h-5 text-[#2d3748]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-[#2d3748]">Join this sprint</p>
+                      <p className="text-xs text-[#9a8a70] mt-0.5">Check in and write alongside everyone</p>
+                    </div>
+                    <svg className="w-4 h-4 text-[#b8962e] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  {/* Inkwell — available without joining */}
+                  <button onClick={() => setWriteMode(true)}
+                    className="flex items-center gap-3 p-4 rounded-2xl border-2 border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] hover:shadow-md transition-all text-left group">
+                    <div className="w-8 h-8 rounded-xl bg-[#2d3748] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <svg className="w-4 h-4 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-[#2d3748]">Inkwell</p>
+                      <p className="text-[11px] text-[#9a8a70] mt-0.5">Write freely</p>
+                    </div>
+                  </button>
+
+                  {/* Thesaurus — available without joining */}
+                  <button onClick={() => setThesaurusOpen(true)}
+                    className="flex items-center gap-3 p-4 rounded-2xl border-2 border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] hover:shadow-md transition-all text-left group">
+                    <div className="w-8 h-8 rounded-xl bg-[#f4f1ec] border border-[#e8dcc8] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <svg className="w-4 h-4 text-[#7a6a50]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-[#2d3748]">Thesaurus</p>
+                      <p className="text-[11px] text-[#9a8a70] mt-0.5">Synonyms</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {!groupSprint.isActive && (
               <div className="rounded-3xl border border-[#e0d0b8] shadow-sm p-8 text-center"
                 style={{ background: "linear-gradient(160deg, #fffdf8 0%, #faf3e4 100%)" }}>
@@ -771,6 +887,20 @@ export default function GroupSprintWorkspace() {
                 </p>
                 {groupSprint.totalWordsWritten > 0 && <p className="text-sm text-[#7a6a50]">words written together</p>}
                 {hasCheckedOut && <p className="text-sm text-emerald-600 font-medium mt-2">✓ You checked out — great session!</p>}
+
+                {/* Thesaurus & Inkwell still available after sprint ends */}
+                <div className="mt-6 grid grid-cols-2 gap-3 max-w-xs mx-auto">
+                  <button onClick={() => setWriteMode(true)}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl border border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] transition-all text-xs font-medium text-[#5a4a30] group">
+                    <svg className="w-3.5 h-3.5 text-[#9a8a70] group-hover:text-[#d4af37] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    Inkwell
+                  </button>
+                  <button onClick={() => setThesaurusOpen(true)}
+                    className="flex items-center justify-center gap-2 p-3 rounded-xl border border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] transition-all text-xs font-medium text-[#5a4a30] group">
+                    <svg className="w-3.5 h-3.5 text-[#9a8a70] group-hover:text-[#7a6a50] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    Thesaurus
+                  </button>
+                </div>
               </div>
             )}
 
@@ -830,7 +960,10 @@ export default function GroupSprintWorkspace() {
         </div>
       )}
 
-      {/* Thesaurus drawer (both modes) */}
+      {/* ── Invite toast (all screen sizes) ──────────────────────────────────── */}
+      <InviteToast show={showInviteToast} />
+
+      {/* Thesaurus drawer (both modes, no join required) */}
       <ThesaurusDrawer isOpen={thesaurusOpen} onClose={() => setThesaurusOpen(false)} />
 
       {/* Drafts picker */}
@@ -850,6 +983,14 @@ export default function GroupSprintWorkspace() {
         onContinueSprint={handleContinueSprint}
         onClose={() => setShowSummary(false)}
       />
+
+      {/* Join sprint modal — triggered from the workspace for visitors */}
+      {showJoinModal && groupSprint && (
+        <JoinGroupSprintModal
+          preselectedSprint={groupSprint}
+          onClose={() => setShowJoinModal(false)}
+        />
+      )}
 
       {/* Checkout modals */}
       <CheckoutModal

@@ -480,16 +480,11 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
 }
 
 // ─── JOIN GROUP SPRINT MODAL ──────────────────────────────────────────────────
-// Step 1 (if no preselect): pick a room
-// Step 2: personal check-in (writing mode, start words, project, soundscape)
+// Requires a preselectedSprint — skips room-list step entirely.
+// Shows only the personal check-in form for that specific sprint.
 
-export function JoinGroupSprintModal({ onClose, preselectedSprint = null }) {
+export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [step, setStep]                             = useState(preselectedSprint ? 2 : 1);
-  const [activeSprints, setActiveSprints]           = useState([]);
-  const [loadingRooms, setLoadingRooms]             = useState(!preselectedSprint);
-  const [selectedSprint, setSelectedSprint]         = useState(preselectedSprint);
   const [writingMode, setWritingMode]               = useState("inkwell");
   const [checkin, setCheckin]                       = useState("");
   const [startWordCount, setStartWordCount]         = useState("");
@@ -500,27 +495,21 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint = null }) {
   const [isLoading, setIsLoading]                   = useState(false);
   const [error, setError]                           = useState(null);
 
-  useEffect(() => {
-    if (preselectedSprint) return;
-    fetch(`${API_URL}/sprint/activeGroupSprints?limit=10`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : { groupSprints: [] })
-      .then(d => setActiveSprints(d.groupSprints || []))
-      .catch(() => setActiveSprints([]))
-      .finally(() => setLoadingRooms(false));
-  }, [preselectedSprint]);
+  // preselectedSprint is required for this modal — guard early
+  if (!preselectedSprint) return null;
+
+  const isReadingSprint = preselectedSprint.sprintType === "READING";
 
   useEffect(() => {
-    if (step !== 2 && !preselectedSprint) return;
     setLoadingSoundscapes(true);
     fetch(`${API_URL}/soundscapes`)
       .then(r => r.ok ? r.json() : { soundscapes: [] })
       .then(d => setSoundscapes(d.soundscapes || []))
       .catch(() => setSoundscapes([]))
       .finally(() => setLoadingSoundscapes(false));
-  }, [step, preselectedSprint]);
+  }, []);
 
   function handleClose() {
-    setStep(preselectedSprint ? 2 : 1); setSelectedSprint(preselectedSprint);
     setCheckin(""); setStartWordCount(""); setSoundscapeId(null);
     setSelectedProjectId(null); setError(null); setWritingMode("inkwell");
     onClose();
@@ -528,7 +517,7 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint = null }) {
 
   async function handleJoin(e) {
     e.preventDefault();
-    const isWriting = selectedSprint?.sprintType === "WRITING";
+    const isWriting = preselectedSprint.sprintType === "WRITING";
     if (isWriting && writingMode === "external" && !startWordCount) {
       setError("Please enter your starting word count for your external doc."); return;
     }
@@ -539,16 +528,17 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint = null }) {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          groupSprintId: selectedSprint.id,
+          groupSprintId: preselectedSprint.id,
           checkin:       checkin.trim() || null,
           startWords:    isWriting ? (Number(startWordCount) || 0) : 0,
           soundscapeId:  soundscapeId || null,
           projectId:     isWriting ? (selectedProjectId || null) : null,
+          writingMode:   isWriting ? writingMode : null,
         }),
       });
       if (res.ok) {
         handleClose();
-        navigate(`/group-sprint/${selectedSprint.id}`, {
+        navigate(`/group-sprint/${preselectedSprint.id}`, {
           state: { writingMode: isWriting ? writingMode : null }
         });
       } else {
@@ -562,141 +552,86 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint = null }) {
     }
   }
 
-  const isReadingSprint = selectedSprint?.sprintType === "READING";
-
   return (
     <ModalShell onClose={handleClose}
-      step={preselectedSprint ? 1 : step} totalSteps={preselectedSprint ? 1 : 2}
-      title={step === 1 ? "Enter the Shop" : `Joining @${selectedSprint?.user?.username}'s sprint`}
-      subtitle={step === 1 ? "Active sessions" : "Your check-in"}
+      step={1} totalSteps={1}
+      title={`Joining @${preselectedSprint.user?.username}'s sprint`}
+      subtitle="Your check-in"
     >
-      {/* Room list */}
-      {step === 1 && (
-        <div className="p-6">
-          {loadingRooms ? (
-            <div className="flex items-center justify-center py-12 gap-2.5 text-[#9a8c7a] text-sm">
-              <Spinner /> Loading rooms…
-            </div>
-          ) : activeSprints.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="font-serif text-[#2d3748] text-lg mb-2">No active sprints right now</p>
-              <p className="text-sm text-[#9a8c7a] mb-5">Check back soon or start your own room.</p>
-              <button onClick={handleClose} className="text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors">Close</button>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              <p className="text-xs text-[#9a8c7a] mb-4">{activeSprints.length} active session{activeSprints.length !== 1 ? "s" : ""}</p>
-              {activeSprints.map(gs => {
-                const alreadyJoined = user && gs.sprints?.some(s => Number(s.userId) === Number(user.id) && s.isActive !== false);
-                return (
-                  <button key={gs.id}
-                    onClick={() => {
-                      if (alreadyJoined) { handleClose(); navigate(`/group-sprint/${gs.id}`); }
-                      else { setSelectedSprint(gs); setStep(2); }
-                    }}
-                    className={`w-full text-left p-4 rounded-xl border-2 transition-all group ${
-                      alreadyJoined ? "border-[#d4af37] bg-[#fffbf0]" : "border-[#e8e0d0] hover:border-[#d4af37] hover:bg-[#fffbf0] bg-[#faf7f2]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live
-                          </span>
-                          <span className="text-xs text-[#9a8c7a]">@{gs.user?.username} · {gs.duration} min</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                            gs.sprintType === "READING" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-700"
-                          }`}>{gs.sprintType === "READING" ? "Reading" : "Writing"}</span>
-                          <span className="text-xs text-[#9a8c7a]">{gs._count?.sprints || 0} writer{(gs._count?.sprints || 0) !== 1 ? "s" : ""} inside</span>
-                        </div>
-                      </div>
-                      {alreadyJoined
-                        ? <span className="text-xs font-semibold text-[#d4af37]">Joined · Continue</span>
-                        : <svg className="w-4 h-4 text-[#c4bdb4] group-hover:text-[#d4af37] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                      }
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+      <form onSubmit={handleJoin} className="p-6 space-y-5">
+        {/* Sprint info pill */}
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#faf7f2] border border-[#e8e0d0]">
+          <div className="w-1.5 h-8 rounded-full bg-[#d4af37] flex-shrink-0" />
+          <div>
+            <p className="text-xs text-[#9a8c7a] uppercase tracking-wider font-semibold">Joining</p>
+            <p className="text-sm font-semibold text-[#2d3748]">
+              @{preselectedSprint.user?.username}'s room · {preselectedSprint.duration} min
+              {preselectedSprint.sprintType === "READING" && (
+                <span className="ml-2 text-[11px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">Reading</span>
+              )}
+            </p>
+          </div>
         </div>
-      )}
 
-      {/* Personal check-in */}
-      {step === 2 && selectedSprint && (
-        <form onSubmit={handleJoin} className="p-6 space-y-5">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#faf7f2] border border-[#e8e0d0]">
-            <div className="w-1.5 h-8 rounded-full bg-[#d4af37] flex-shrink-0" />
-            <div>
-              <p className="text-xs text-[#9a8c7a] uppercase tracking-wider font-semibold">Joining</p>
-              <p className="text-sm font-semibold text-[#2d3748]">@{selectedSprint.user?.username}'s room · {selectedSprint.duration} min</p>
+        {/* Writing mode — only for writing sprints */}
+        {!isReadingSprint && (
+          <Field label="Where are you writing?">
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: "inkwell", label: "Inkwell editor", desc: "Write here, auto-saves" },
+                { value: "external", label: "My own doc", desc: "Google Docs, Scrivener…" },
+              ].map(m => (
+                <button key={m.value} type="button" onClick={() => setWritingMode(m.value)}
+                  className={`p-3 rounded-xl border-2 transition-all text-left ${
+                    writingMode === m.value ? "border-[#d4af37] bg-[#fffbf0]" : "border-[#e8e0d0] hover:border-[#b8a898] bg-[#faf7f2]"
+                  }`}
+                >
+                  <p className={`text-sm font-semibold ${writingMode === m.value ? "text-[#2d3748]" : "text-[#6b5c4a]"}`}>{m.label}</p>
+                  <p className={`text-xs mt-0.5 ${writingMode === m.value ? "text-[#6b5c4a]" : "text-[#9a8c7a]"}`}>{m.desc}</p>
+                </button>
+              ))}
             </div>
-          </div>
-
-          {/* Writing mode — only for writing sprints */}
-          {!isReadingSprint && (
-            <Field label="Where are you writing?">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { value: "inkwell", label: "Inkwell editor", desc: "Write here, auto-saves" },
-                  { value: "external", label: "My own doc", desc: "Google Docs, Scrivener…" },
-                ].map(m => (
-                  <button key={m.value} type="button" onClick={() => setWritingMode(m.value)}
-                    className={`p-3 rounded-xl border-2 transition-all text-left ${
-                      writingMode === m.value ? "border-[#d4af37] bg-[#fffbf0]" : "border-[#e8e0d0] hover:border-[#b8a898] bg-[#faf7f2]"
-                    }`}
-                  >
-                    <p className={`text-sm font-semibold ${writingMode === m.value ? "text-[#2d3748]" : "text-[#6b5c4a]"}`}>{m.label}</p>
-                    <p className={`text-xs mt-0.5 ${writingMode === m.value ? "text-[#6b5c4a]" : "text-[#9a8c7a]"}`}>{m.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </Field>
-          )}
-
-          {/* External: starting word count */}
-          {!isReadingSprint && writingMode === "external" && (
-            <Field label="Starting word count" hint="We'll subtract this from your final count to calculate words written.">
-              <input type="number" value={startWordCount} onChange={e => setStartWordCount(e.target.value)}
-                placeholder="e.g. 3400" min={0}
-                className="w-full px-4 py-3 rounded-xl border border-[#e8e0d0] focus:ring-2 focus:ring-[#d4af37]/30 focus:border-[#d4af37] text-[#2d3748] placeholder-[#c4bdb4] text-sm transition-all bg-[#faf7f2]"
-              />
-            </Field>
-          )}
-
-          <Field label={isReadingSprint ? "What are you reading today?" : "What are you writing today?"} optional>
-            <textarea value={checkin} onChange={e => setCheckin(e.target.value)}
-              placeholder={isReadingSprint ? "e.g. Chapter 5 of The Midnight Library…" : "e.g. Chapter 12 — the confrontation scene…"}
-              rows={2} maxLength={200}
-              className="w-full px-4 py-3 rounded-xl border border-[#e8e0d0] focus:ring-2 focus:ring-[#d4af37]/30 focus:border-[#d4af37] text-[#2d3748] placeholder-[#c4bdb4] text-sm resize-none transition-all bg-[#faf7f2]"
-            />
-            <p className="text-xs text-[#c4bdb4] text-right">{checkin.length}/200</p>
           </Field>
+        )}
 
-          {!isReadingSprint && (
-            <ProjectPicker selectedId={selectedProjectId} onChange={setSelectedProjectId} />
-          )}
+        {/* External: starting word count */}
+        {!isReadingSprint && writingMode === "external" && (
+          <Field label="Starting word count" hint="We'll subtract this from your final count to calculate words written.">
+            <input type="number" value={startWordCount} onChange={e => setStartWordCount(e.target.value)}
+              placeholder="e.g. 3400" min={0}
+              className="w-full px-4 py-3 rounded-xl border border-[#e8e0d0] focus:ring-2 focus:ring-[#d4af37]/30 focus:border-[#d4af37] text-[#2d3748] placeholder-[#c4bdb4] text-sm transition-all bg-[#faf7f2]"
+            />
+          </Field>
+        )}
 
-          <SoundscapePicker soundscapeId={soundscapeId} onChange={setSoundscapeId} soundscapes={soundscapes} loading={loadingSoundscapes} />
+        <Field label={isReadingSprint ? "What are you reading today?" : "What are you writing today?"} optional>
+          <textarea value={checkin} onChange={e => setCheckin(e.target.value)}
+            placeholder={isReadingSprint ? "e.g. Chapter 5 of The Midnight Library…" : "e.g. Chapter 12 — the confrontation scene…"}
+            rows={2} maxLength={200}
+            className="w-full px-4 py-3 rounded-xl border border-[#e8e0d0] focus:ring-2 focus:ring-[#d4af37]/30 focus:border-[#d4af37] text-[#2d3748] placeholder-[#c4bdb4] text-sm resize-none transition-all bg-[#faf7f2]"
+          />
+          <p className="text-xs text-[#c4bdb4] text-right">{checkin.length}/200</p>
+        </Field>
 
-          <ErrorBanner message={error} />
+        {!isReadingSprint && (
+          <ProjectPicker selectedId={selectedProjectId} onChange={setSelectedProjectId} />
+        )}
 
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={() => { if (preselectedSprint) handleClose(); else { setStep(1); setError(null); } }}
-              className="px-5 py-3 border border-[#e8e0d0] text-[#6b5c4a] rounded-xl text-sm font-medium hover:border-[#b8a898] transition-all bg-[#faf7f2]">
-              {preselectedSprint ? "Cancel" : "Back"}
-            </button>
-            <button type="submit" disabled={isLoading}
-              className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-semibold hover:bg-[#3d4f64] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-              {isLoading ? <><Spinner /> Joining…</> : "Enter the room"}
-            </button>
-          </div>
-        </form>
-      )}
+        <SoundscapePicker soundscapeId={soundscapeId} onChange={setSoundscapeId} soundscapes={soundscapes} loading={loadingSoundscapes} />
+
+        <ErrorBanner message={error} />
+
+        <div className="flex gap-3 pt-1">
+          <button type="button" onClick={handleClose}
+            className="px-5 py-3 border border-[#e8e0d0] text-[#6b5c4a] rounded-xl text-sm font-medium hover:border-[#b8a898] transition-all bg-[#faf7f2]">
+            Cancel
+          </button>
+          <button type="submit" disabled={isLoading}
+            className="flex-1 py-3 bg-[#2d3748] text-white rounded-xl text-sm font-semibold hover:bg-[#3d4f64] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+            {isLoading ? <><Spinner /> Joining…</> : "Enter the room"}
+          </button>
+        </div>
+      </form>
     </ModalShell>
   );
 }
