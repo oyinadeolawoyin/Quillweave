@@ -704,7 +704,12 @@ function CritiqueForm({ submissionId, minWords, feedbackWanted, onSuccess }) {
 
         {/* What's working */}
         <div className="mb-5">
-          <WordCountBar current={workingWords} min={Math.floor(minWords / 2)} label="What's working" />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-semibold text-[#2d3748]">What's working</label>
+            {workingWords > 0 && (
+              <span className="text-xs text-[#9a8c7a]">{workingWords} words</span>
+            )}
+          </div>
           <textarea
             value={whatWorking}
             onChange={(e) => { setWhatWorking(e.target.value); setError(""); }}
@@ -716,7 +721,12 @@ function CritiqueForm({ submissionId, minWords, feedbackWanted, onSuccess }) {
 
         {/* What needs improvement */}
         <div className="mb-7">
-          <WordCountBar current={needsWorkWords} min={Math.floor(minWords / 2)} label="What needs improvement" />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-semibold text-[#2d3748]">What needs improvement</label>
+            {needsWorkWords > 0 && (
+              <span className="text-xs text-[#9a8c7a]">{needsWorkWords} words</span>
+            )}
+          </div>
           <textarea
             value={whatNeedsWork}
             onChange={(e) => { setWhatNeedsWork(e.target.value); setError(""); }}
