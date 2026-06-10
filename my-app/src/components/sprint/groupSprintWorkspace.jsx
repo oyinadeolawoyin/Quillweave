@@ -276,10 +276,8 @@ export default function GroupSprintWorkspace() {
   const navigate          = useNavigate();
   const location          = useLocation();
 
-  const routeWritingMode  = location.state?.writingMode  || null;
-  const routeDraftId      = location.state?.draftId      || null;
-  const returnTo          = location.state?.returnTo     || null;
-  const returnReason      = location.state?.returnReason || null;
+  const routeWritingMode = location.state?.writingMode || null;
+  const routeDraftId     = location.state?.draftId     || null;
 
   // Sprint data
   const [groupSprint, setGroupSprint] = useState(null);
@@ -561,7 +559,7 @@ export default function GroupSprintWorkspace() {
       }
     }
 
-    navigate(returnTo ? returnTo : "/drafts", returnTo ? { state: { returnReason } } : undefined);
+    navigate("/drafts");
   }
 
   function handleContinueSprint() {
@@ -569,16 +567,12 @@ export default function GroupSprintWorkspace() {
     setSprintEnded(false);
     ringFired.current = false;
     startWordsRef.current = null;
-    navigate(returnTo ? returnTo : "/", returnTo ? { state: { returnReason } } : undefined);
+    navigate("/");
   }
 
   function handleCheckedOut() {
     setShowCheckout(false);
     setShowEarlyCheckout(false);
-    if (returnTo) {
-      navigate(returnTo, { state: { returnReason } });
-      return;
-    }
     fetchMySprint();
     fetchGroupSprint();
   }

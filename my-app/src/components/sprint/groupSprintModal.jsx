@@ -89,6 +89,69 @@ function Field({ label, hint, children, optional = false }) {
   );
 }
 
+// ─── Project picker ───────────────────────────────────────────────────────────
+
+function ProjectPicker({ selectedId, onChange }) {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/projects/myProjects`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : { projects: [] })
+      .then(d => setProjects((d.projects || []).filter(p => p.status === "IN_PROGRESS")))
+      .catch(() => setProjects([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    function onOut(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", onOut);
+    return () => document.removeEventListener("mousedown", onOut);
+  }, []);
+
+  const selected = projects.find(p => p.id === selectedId);
+
+  return (
+    <Field label="Link a project" optional hint="Words you write will be added to this project automatically.">
+      <div className="relative" ref={ref}>
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-left text-sm bg-[#faf7f2] transition-all ${
+            open ? "border-[#d4af37] ring-2 ring-[#d4af37]/20" : "border-[#e8e0d0] hover:border-[#b8a898]"
+          }`}
+        >
+          <span className={selected ? "text-[#2d3748]" : "text-[#9a8c7a]"}>
+            {loading ? "Loading…" : selected ? selected.title : "No project link"}
+          </span>
+          <svg className={`w-4 h-4 text-[#9a8c7a] flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {open && (
+          <div className="absolute z-10 mt-1.5 w-full bg-white border border-[#e8e0d0] rounded-xl shadow-lg overflow-hidden">
+            <div className="max-h-48 overflow-y-auto divide-y divide-[#f0ebe3]">
+              <button type="button" onClick={() => { onChange(null); setOpen(false); }}
+                className="w-full text-left px-4 py-3 text-sm text-[#9a8c7a] hover:bg-[#faf7f2] transition-colors">
+                No project link
+              </button>
+              {projects.map(p => (
+                <button key={p.id} type="button" onClick={() => { onChange(p.id); setOpen(false); }}
+                  className="w-full text-left px-4 py-3 text-sm text-[#2d3748] hover:bg-[#faf7f2] transition-colors">
+                  <p className="font-medium truncate">{p.title}</p>
+                  {p.genre && <p className="text-xs text-[#9a8c7a]">{p.genre}</p>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
 // ─── Soundscape picker ────────────────────────────────────────────────────────
 
 function SoundscapePicker({ soundscapeId, onChange, soundscapes, loading }) {
@@ -154,7 +217,7 @@ function SoundscapePicker({ soundscapeId, onChange, soundscapes, loading }) {
 }
 
 // ─── START GROUP SPRINT MODAL ─────────────────────────────────────────────────
-// Step 1: Personal check-in (what you're writing, word count if external, soundscape)
+// Step 1: Personal check-in (what you're writing, word count if external, project, soundscape)
 // Step 2: Group sprint settings (duration, visibility, sprint type)
 
 export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
@@ -167,6 +230,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   const [soundscapeId, setSoundscapeId]     = useState(null);
   const [soundscapes, setSoundscapes]       = useState([]);
   const [loadingSoundscapes, setLoadingSoundscapes] = useState(false);
+  const [selectedProjectId, setSelectedProjectId]   = useState(null);
   // Group fields (step 2)
   const [duration, setDuration]             = useState(25);
   const [visibility, setVisibility]         = useState("PUBLIC");
@@ -188,7 +252,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   function handleClose() {
     setStep(1); setDuration(25); setSoundscapeId(null); setSprintType("WRITING");
     setCheckin(""); setStartWordCount(""); setError(null); setGroupSprint(null);
-    setVisibility("PUBLIC"); setWritingMode("inkwell");
+    setSelectedProjectId(null); setVisibility("PUBLIC"); setWritingMode("inkwell");
     onClose();
   }
 
@@ -234,6 +298,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
           checkin:       checkin.trim() || null,
           startWords:    sprintType === "WRITING" ? (Number(startWordCount) || 0) : 0,
           soundscapeId:  soundscapeId || null,
+          projectId:     sprintType === "WRITING" ? (selectedProjectId || null) : null,
           writingMode:   sprintType === "WRITING" ? writingMode : null,
         }),
       });
@@ -322,6 +387,11 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
             />
             <p className="text-xs text-[#c4bdb4] text-right">{checkin.length}/200</p>
           </Field>
+
+          {/* Project link — writing only */}
+          {isWriting && (
+            <ProjectPicker selectedId={selectedProjectId} onChange={setSelectedProjectId} />
+          )}
 
           <SoundscapePicker soundscapeId={soundscapeId} onChange={setSoundscapeId} soundscapes={soundscapes} loading={loadingSoundscapes} />
 
@@ -421,6 +491,7 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
   const [soundscapeId, setSoundscapeId]             = useState(null);
   const [soundscapes, setSoundscapes]               = useState([]);
   const [loadingSoundscapes, setLoadingSoundscapes] = useState(false);
+  const [selectedProjectId, setSelectedProjectId]   = useState(null);
   const [isLoading, setIsLoading]                   = useState(false);
   const [error, setError]                           = useState(null);
 
@@ -440,7 +511,7 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
 
   function handleClose() {
     setCheckin(""); setStartWordCount(""); setSoundscapeId(null);
-    setError(null); setWritingMode("inkwell");
+    setSelectedProjectId(null); setError(null); setWritingMode("inkwell");
     onClose();
   }
 
@@ -461,6 +532,7 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
           checkin:       checkin.trim() || null,
           startWords:    isWriting ? (Number(startWordCount) || 0) : 0,
           soundscapeId:  soundscapeId || null,
+          projectId:     isWriting ? (selectedProjectId || null) : null,
           writingMode:   isWriting ? writingMode : null,
         }),
       });
@@ -540,6 +612,10 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
           />
           <p className="text-xs text-[#c4bdb4] text-right">{checkin.length}/200</p>
         </Field>
+
+        {!isReadingSprint && (
+          <ProjectPicker selectedId={selectedProjectId} onChange={setSelectedProjectId} />
+        )}
 
         <SoundscapePicker soundscapeId={soundscapeId} onChange={setSoundscapeId} soundscapes={soundscapes} loading={loadingSoundscapes} />
 
