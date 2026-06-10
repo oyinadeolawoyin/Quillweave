@@ -124,7 +124,7 @@ export default function DailyEmotion() {
     <div
       className="relative rounded-3xl overflow-hidden"
       style={{
-        background: "linear-gradient(140deg, #1a1a2e 0%, #1e2240 55%, #1a2d4a 100%)",
+        background: "linear-gradient(140deg, #1a1a2e 0%, #1e2240 55%, #1a5fb4 100%)",
         boxShadow:  "0 2px 4px rgba(0,0,0,0.08), 0 24px 64px rgba(10,15,30,0.28)",
       }}
     >
