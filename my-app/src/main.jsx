@@ -28,12 +28,6 @@ import SnippetFeed from './components/sprint/snippetfeed';
 import SnippetPage from './components/sprint/snippetpage';
 import AdminSoundscapes from './components/sprint/Adminsoundscapes';
 import Settings from './components/profile/settings';
-import ProjectsPage from './components/projects/projectspage';
-import CreateEditProject from './components/projects/createeditproject';
-import ProjectStats from './components/projects/projectstats';
-import AdminEvents from './components/projects/adminevents';
-import EventPage from './components/projects/eventpage';
-import EventsListPage from './components/projects/eventslistpage';
 import FeedbackHub from './components/feedbackHub/feedbackhub';
 import SubmitFeedback from './components/feedbackHub/submitFeedback';
 import FeedbackPage from './components/feedbackHub/feedbackPage';
@@ -46,6 +40,9 @@ import SubmitDiscoveryStory from './components/discovery/submitdiscoverystory';
 import AdminDiscovery from './components/discovery/admindiscovery';
 import DraftsPage from './components/drafts/draftspage';
 import WritePage from './components/drafts/writePage';
+import ChallengePage from './components/challenge/challengepage';
+import ThreadPage from './components/threads/threadpage';
+import AdminThreadsPage from './components/threads/adminthreadspage';
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
@@ -114,7 +111,7 @@ const router = createBrowserRouter([
     element: <AdminBlog />
   },
   {
-    path: "/emotions/practice",
+    path: "/emotion-practice",
     element: <EmotionPracticePage />
   },
   {
@@ -129,33 +126,17 @@ const router = createBrowserRouter([
     path: "/accountability",
     element: <AccountabilityPage />
   },
-  { 
-    path: "/projects",             
-    element: <ProjectsPage /> 
-  },
-  { 
-    path: "/projects/create",      
-    element: <CreateEditProject /> 
-  },
-  { 
-    path: "/projects/:projectId",  
-    element: <ProjectStats /> 
-  },
-  { 
-    path: "/projects/:projectId/edit", 
-    element: <CreateEditProject /> 
+  {
+    path: "/challenge",
+    element: <ChallengePage />
   },
   {
-    path: "/admin/events",
-    element: <AdminEvents />
+    path: "/threads/:threadId",
+    element: <ThreadPage />
   },
   {
-    path: "/events/:eventId",
-    element: <EventPage />
-  },
-  {
-    path: "/events",
-    element: <EventsListPage />
+    path: "/admin/threads",
+    element: <AdminThreadsPage />
   },
   { 
     path: "/critique", 
