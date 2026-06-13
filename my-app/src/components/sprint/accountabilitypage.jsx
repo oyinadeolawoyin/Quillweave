@@ -270,12 +270,6 @@ export default function AccountabilityPage() {
               <p className="text-white/55 text-[12px] leading-relaxed mb-5">
                 Every Friday at 4pm UTC. The room opens a few minutes early. Show up, share your goal, and write.
               </p>
-              <Link
-                to="/group-sprint"
-                className="block w-full py-3 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-lg hover:bg-[#c9a42d] transition-colors"
-              >
-                Open the sprint room
-              </Link>
             </div>
 
             {/* Discord card */}

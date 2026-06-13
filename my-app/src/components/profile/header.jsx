@@ -2,20 +2,11 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { useState, useEffect, useRef } from "react";
 import API_URL from "@/config/api";
-import EventsDropdown from "./eventsDropdown";
-
 // ── Dropdown nav icons (inline SVG) ──────────────────────────────────────────
 const ProfileIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
     <circle cx="12" cy="7" r="4"/>
-  </svg>
-);
-
-const ProjectsIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
-    <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
   </svg>
 );
 
@@ -50,9 +41,6 @@ export default function Header() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
-  const [activeEvents, setActiveEvents] = useState([]);
-
-  const [eventsDropdownOpen, setEventsDropdownOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const profileRef = useRef(null);
@@ -65,13 +53,9 @@ export default function Header() {
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchActiveEvents();
-  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
-    setEventsDropdownOpen(false);
     setProfileOpen(false);
   }, [pathname]);
 
@@ -100,18 +84,6 @@ export default function Header() {
     }
   }
 
-  async function fetchActiveEvents() {
-    try {
-      const res = await fetch(`${API_URL}/events/active`);
-      if (res.ok) {
-        const data = await res.json();
-        setActiveEvents(data.events || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch active events:", error);
-    }
-  }
-
   async function handleLogout() {
     await logout();
     navigate("/login");
@@ -119,12 +91,12 @@ export default function Header() {
   }
 
   const navItems = [
-    { to: "/critique",  label: "Critique"  },
+    { to: "/critique",  label: "Spotlight Critique" },
     { to: "/members",   label: "Members"   },
-    { to: "/snippets",  label: "Community" },
-    
+    // { to: "/snippets",  label: "Community" },
+
     // { to: "/thesaurus", label: "Thesaurus" },
-    // { to: "/blog",      label: "Blog"      },
+    { to: "/blog",      label: "Blog"      },
   ];
 
   function isActive(to) {
@@ -133,14 +105,18 @@ export default function Header() {
 
   return (
     <header className="bg-white border-b border-[#e5e5e5] sticky top-0 z-50 shadow-sm">
+      {/* Gold accent bar */}
+      <div className="h-[3px] w-full" style={{ background: "linear-gradient(90deg, #d4af37 0%, #f3dea0 50%, #d4af37 100%)" }} />
+
       <div className="w-full px-4 sm:px-8">
         <div className="flex items-center justify-between h-16 sm:h-[4.5rem]">
 
           {/* LEFT */}
           <div className="flex items-center">
-            <Link to="/" className="flex items-center shrink-0">
+            <Link to="/" className="flex items-center gap-1.5 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37]" aria-hidden="true" />
               <span className="text-[22px] font-serif font-semibold tracking-wide text-[#2d3748]">
-                Inkwell
+                Quill<span className="text-[#b8860b]">weave</span>
               </span>
             </Link>
 
@@ -155,32 +131,38 @@ export default function Header() {
                   {/* Background fill for active */}
                   <span
                     className="absolute inset-0 rounded-lg transition-colors"
-                    style={{ background: isActive(to) ? "#f7f4ee" : "transparent" }}
+                    style={{ background: isActive(to) ? "#fdf9ed" : "transparent" }}
                   />
 
                   {/* Label */}
                   <span className="relative z-10 group-hover:text-[#2d3748]">{label}</span>
 
-                  {/* Blue active indicator line */}
+                  {/* Gold active indicator line */}
                   {isActive(to) && (
                     <span
                       className="absolute bottom-0 left-3 right-3 h-[2.5px] rounded-full"
-                      style={{ background: "#3b82f6" }}
+                      style={{ background: "#d4af37" }}
                     />
                   )}
                 </Link>
               ))}
 
-              <EventsDropdown
-                open={eventsDropdownOpen}
-                setOpen={setEventsDropdownOpen}
-                activeEvents={activeEvents}
-              />
             </nav>
           </div>
 
           {/* RIGHT */}
           <div className="flex items-center gap-3">
+
+            {/* ☀️ DAILY WARMUP */}
+            <Link
+              to="/emotion-practice"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#e8e0d0] bg-white text-[11px] font-semibold text-[#9a8c7a] hover:border-[#d4af37] hover:text-[#b8860b] hover:bg-[#fdf9ed] transition-all"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+              </svg>
+              Daily warmup
+            </Link>
 
             {/* 🔔 NOTIFICATION */}
             <Link
@@ -227,7 +209,7 @@ export default function Header() {
                     onClick={() => setProfileOpen(o => !o)}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-[#f7f4ee] transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-[#2d3748] flex items-center justify-center text-white text-sm font-semibold overflow-hidden ring-2 ring-[#d4af37]/50">
                       {user?.avatar ? (
                         <img src={user.avatar} className="w-full h-full object-cover" alt={user.username} />
                       ) : (
@@ -249,7 +231,7 @@ export default function Header() {
 
                   {/* ── Profile dropdown ──────────────────────────────────── */}
                   {profileOpen && (
-                    <div className="absolute right-0 mt-2 w-52 bg-white border border-[#e5e5e5] rounded-xl shadow-xl overflow-hidden z-50">
+                    <div className="absolute right-0 mt-2 w-52 bg-white border border-[#e5e5e5] rounded-xl shadow-xl overflow-hidden z-50" style={{ borderTop: "3px solid #d4af37" }}>
 
                       {/* User info header */}
                       <div className="px-4 py-3 border-b border-[#f0ebe3] bg-[#fafaf9]">
@@ -265,14 +247,6 @@ export default function Header() {
                         >
                           <span className="text-[#737373]"><ProfileIcon /></span>
                           Profile
-                        </Link>
-
-                        <Link
-                          to="/projects"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#4a4a4a] hover:bg-[#fafaf9] transition-colors"
-                        >
-                          <span className="text-[#737373]"><ProjectsIcon /></span>
-                          Projects
                         </Link>
 
                         <Link
@@ -311,7 +285,7 @@ export default function Header() {
               ) : (
                 <Link
                   to="/login"
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-[#2d3748] hover:bg-[#1f2937] transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-[#2d3748] hover:bg-[#1f2937] transition-colors ring-1 ring-[#d4af37]/60"
                 >
                   Sign in
                 </Link>
@@ -331,25 +305,28 @@ export default function Header() {
               to={to}
               className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive(to)
-                  ? "bg-[#f7f4ee] text-[#2d3748]"
+                  ? "bg-[#fdf9ed] text-[#2d3748]"
                   : "text-[#737373] hover:text-[#2d3748] hover:bg-[#fafaf9]"
               }`}
             >
               {label}
-              {/* Blue dot for active on mobile */}
+              {/* Gold dot for active on mobile */}
               {isActive(to) && (
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] flex-shrink-0" />
               )}
             </Link>
           ))}
 
-          <div className="pt-1">
-            <EventsDropdown
-              open={eventsDropdownOpen}
-              setOpen={setEventsDropdownOpen}
-              activeEvents={activeEvents}
-            />
-          </div>
+          <Link
+            to="/emotion-practice"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-[#737373] hover:text-[#b8860b] hover:bg-[#fdf9ed] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+            Daily warmup
+          </Link>
+
         </div>
       )}
     </header>

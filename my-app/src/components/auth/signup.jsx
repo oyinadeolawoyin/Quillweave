@@ -16,7 +16,13 @@ export default function Signup() {
     email: "",
     password: "",
     timezone: "",
+    referralSource: "",
   });
+
+  // Tracks which option is selected in the dropdown (separate from
+  // formData.referralSource, since when "Other" is picked the actual
+  // referralSource value becomes whatever the user types)
+  const [referralOption, setReferralOption] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +38,20 @@ export default function Signup() {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setServerError("");
+  }
+
+  function handleReferralOptionChange(e) {
+    const { value } = e.target;
+    setReferralOption(value);
+    setServerError("");
+
+    if (value === "other") {
+      // Clear it so the user has to type their own answer,
+      // and so we don't accidentally submit "other" as the value
+      setFormData(prev => ({ ...prev, referralSource: "" }));
+    } else {
+      setFormData(prev => ({ ...prev, referralSource: value }));
+    }
   }
 
   async function handleSubmit(e) {
@@ -80,11 +100,11 @@ export default function Signup() {
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 lg:p-10">
           {/* Header */}
           <div className="text-center mb-6 sm:mb-8">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif text-ink-primary mb-2 sm:mb-3">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif mb-2 sm:mb-3">
               Welcome to Inkwell
             </h1>
             <p className="text-ink-gray text-base sm:text-lg">
-              Your gentle companion for consistent writing
+              Your writing community
             </p>
           </div>
 
@@ -197,6 +217,58 @@ export default function Signup() {
               💡 We auto-detected your timezone. Change it if incorrect.
             </p>
           </div>
+
+          {/* How did you find us */}
+          <div>
+            <label
+              htmlFor="referralSource"
+              className="block text-xs sm:text-sm font-medium text-ink-primary mb-1 sm:mb-2"
+            >
+              How did you find Quillweave?
+            </label>
+            <select
+              id="referralSource"
+              name="referralSource"
+              value={referralOption}
+              onChange={handleReferralOptionChange}
+              disabled={isLoading}
+              required
+              className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray transition-all"
+            >
+              <option value="">Select an option…</option>
+              <option value="twitter">Twitter / X</option>
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="discord">Discord</option>
+              <option value="reddit">Reddit</option>
+              <option value="friend">A friend told me</option>
+              <option value="search">Search engine (Google etc.)</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {/* If "Other" selected, let the user type their own answer */}
+          {referralOption === "other" && (
+            <div>
+              <label
+                htmlFor="referralSource"
+                className="block text-xs sm:text-sm font-medium text-ink-primary mb-1 sm:mb-2"
+              >
+                Please tell us where you heard about Inkwell
+              </label>
+              <input
+                type="text"
+                id="referralSource"
+                name="referralSource"
+                value={formData.referralSource}
+                onChange={handleChange}
+                className="w-full px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
+                placeholder="e.g. a podcast, a blog post, a friend's recommendation..."
+                required
+                disabled={isLoading}
+              />
+            </div>
+          )}
 
           {/* Submit Button */}
           <button

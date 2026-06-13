@@ -477,26 +477,28 @@ export default function MembersPage() {
                     <h3 className="font-serif text-[#1a1a2e] text-xl font-bold">Publication Showcase</h3>
                     <p className="text-[12px] text-[#9a8c7a] mt-0.5">Stories written by our community — find your next favourite read.</p>
                   </div>
-                  {data.publications.length >= 10 && (
+                  <div className="flex items-center gap-3 flex-shrink-0 ml-4">
                     <Link
-                      to="/stories"
-                      className="text-[11px] font-bold text-[#1a5fb4] hover:text-[#1a1a2e] transition-colors uppercase tracking-wide"
+                      to="/stories/submit"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#d4af37] text-[#1a1a2e] text-[12px] font-bold rounded-lg hover:bg-[#c9a42d] transition-colors whitespace-nowrap"
                     >
-                      View all →
+                      Announce your publication
                     </Link>
-                  )}
+                    {data.publications.length >= 10 && (
+                      <Link
+                        to="/stories"
+                        className="text-[11px] font-bold text-[#1a5fb4] hover:text-[#1a1a2e] transition-colors uppercase tracking-wide whitespace-nowrap"
+                      >
+                        View all →
+                      </Link>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {data.publications.map((story) => (
                     <PublicationCard key={story.id} story={story} />
                   ))}
                 </div>
-                <Link
-                    to="/stories/submit"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#d4af37] text-[#1a1a2e] text-[12px] font-bold rounded-lg hover:bg-[#c9a42d] transition-colors"
-                  >
-                    Announce your publication
-                  </Link>
               </section>
             )}
 
@@ -512,12 +514,12 @@ export default function MembersPage() {
                 <div className="bg-white border border-[#e8e0d0] rounded-2xl p-10 text-center">
                   <p className="text-3xl mb-3">📚</p>
                   <p className="font-serif text-[#1a1a2e] text-lg font-bold mb-1">No publications yet</p>
-                  <p className="text-[12px] text-[#9a8c7a] mb-4">Be the first to share a story you love with the community.</p>
+                  <p className="text-[12px] text-[#9a8c7a] mb-4">Be the first to share a story you've written with the community.</p>
                   <Link
-                    to="/discovery/submit"
+                    to="/stories/submit"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-[#d4af37] text-[#1a1a2e] text-[12px] font-bold rounded-lg hover:bg-[#c9a42d] transition-colors"
                   >
-                    Recommend a story
+                    Announce your publication
                   </Link>
                 </div>
               </section>

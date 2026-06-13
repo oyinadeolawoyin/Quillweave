@@ -231,10 +231,11 @@ function CelebrationModal({ result, onClose }) {
 // ─── join form ───────────────────────────────────────────────────────────────
 
 function JoinForm({ onJoined }) {
-  const [goalValue, setGoalValue] = useState("");
-  const [goalType, setGoalType]   = useState("WORDS");
-  const [saving, setSaving]       = useState(false);
-  const [err, setErr]             = useState("");
+  const [goalValue, setGoalValue]           = useState("");
+  const [goalType, setGoalType]             = useState("WORDS");
+  const [remindersEnabled, setReminders]    = useState(true);
+  const [saving, setSaving]                 = useState(false);
+  const [err, setErr]                       = useState("");
 
   async function submit() {
     if (!goalValue || isNaN(goalValue) || Number(goalValue) < 1) {
@@ -246,7 +247,7 @@ function JoinForm({ onJoined }) {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goalValue: Number(goalValue), goalType }),
+        body: JSON.stringify({ goalValue: Number(goalValue), goalType, remindersEnabled }),
       });
       const d = await r.json();
       if (!r.ok) { setErr(d.message ?? "Something went wrong."); return; }
@@ -307,6 +308,39 @@ function JoinForm({ onJoined }) {
       </div>
 
       {err && <p className="text-[11px] text-[#c0392b] mb-3">{err}</p>}
+
+      {/* Reminder nudge */}
+      <label className="flex items-start gap-3 mb-5 cursor-pointer group">
+        <div className="relative flex-shrink-0 mt-0.5">
+          <input
+            type="checkbox"
+            checked={remindersEnabled}
+            onChange={e => setReminders(e.target.checked)}
+            className="sr-only"
+          />
+          <div
+            className="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+            style={{
+              background:   remindersEnabled ? "#1a1a2e" : "#fff",
+              borderColor:  remindersEnabled ? "#1a1a2e" : "#d4af37",
+            }}
+          >
+            {remindersEnabled && (
+              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </div>
+        </div>
+        <div>
+          <p className="text-[13px] font-semibold text-[#1a1a2e] leading-snug">
+            Remind me daily
+          </p>
+          <p className="text-[11px] text-[#9a8c7a] mt-0.5 leading-relaxed">
+            Get a daily nudge with your goal and current streak so you never forget to show up.
+          </p>
+        </div>
+      </label>
 
       <button
         onClick={submit}
@@ -748,6 +782,631 @@ function GoalActionsBar({ participation, onUpdated, onLeave }) {
   );
 }
 
+// ─── daily thread panel ──────────────────────────────────────────────────────
+// Embedded thread on the challenge page: 200-word limit, media on comments/replies,
+// forum-style bold reply headers
+
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7)  return `${d}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function countWords(str) {
+  return str.trim().split(/\s+/).filter(Boolean).length;
+}
+
+const WORD_LIMIT = 200;
+
+// Media preview pill shown below textarea when file is selected
+function MediaPreview({ file, onRemove }) {
+  if (!file) return null;
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+  const url = URL.createObjectURL(file);
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      {isImage && <img src={url} alt="" className="h-14 w-14 rounded-lg object-cover border border-[#e8e0d0] flex-shrink-0" />}
+      {isVideo && (
+        <video src={url} className="h-14 rounded-lg border border-[#e8e0d0] flex-shrink-0" muted />
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] text-[#6b5c4a] truncate font-medium">{file.name}</p>
+        <p className="text-[10px] text-[#9a8c7a]">{isImage ? "Image" : "Video"} · {(file.size / 1024).toFixed(0)} KB</p>
+      </div>
+      <button onClick={onRemove} className="text-[#9a8c7a] hover:text-[#c0392b] transition-colors flex-shrink-0 p-1">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// Compose box with word counter, media upload, Ctrl+Enter shortcut
+function ThreadComposeBox({ placeholder, onSubmit, onCancel, autoFocus = false, compact = false }) {
+  const [value, setValue]   = useState("");
+  const [file, setFile]     = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr]       = useState("");
+  const textRef  = useRef(null);
+  const fileRef  = useRef(null);
+  const words    = countWords(value);
+  const overLimit = words > WORD_LIMIT;
+
+  useEffect(() => {
+    if (autoFocus && textRef.current) {
+      textRef.current.focus();
+      textRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [autoFocus]);
+
+  async function handleSubmit() {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (overLimit) { setErr(`Too long — please trim to ${WORD_LIMIT} words.`); return; }
+    setSaving(true); setErr("");
+    try {
+      await onSubmit(trimmed, file || null);
+      setValue(""); setFile(null);
+    } catch (e) {
+      setErr(e.message ?? "Something went wrong.");
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="rounded-xl border border-[#e8e0d0] bg-white shadow-sm overflow-hidden">
+      <textarea
+        ref={textRef}
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit(); }}
+        placeholder={placeholder}
+        rows={compact ? 2 : 3}
+        className="w-full px-4 pt-3 pb-2 text-[13px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none resize-none bg-white leading-relaxed"
+      />
+      <MediaPreview file={file} onRemove={() => setFile(null)} />
+      {err && <p className="text-[11px] text-[#c0392b] px-4 pb-1 mt-1">{err}</p>}
+      <div className="flex items-center justify-between px-4 pb-3 pt-2 bg-white border-t border-[#f4f1ec]">
+        <div className="flex items-center gap-3">
+          {/* word count */}
+          <span className={`text-[10px] tabular-nums font-medium ${overLimit ? "text-[#c0392b]" : "text-[#c8b89a]"}`}>
+            {words}/{WORD_LIMIT}
+          </span>
+          {/* media upload */}
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors"
+            title="Attach image or video"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            onChange={e => setFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <div className="flex gap-2 items-center">
+          {onCancel && (
+            <button onClick={onCancel} className="px-3 py-1.5 text-[12px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors">
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={handleSubmit}
+            disabled={!value.trim() || overLimit || saving}
+            className="px-4 py-1.5 bg-[#1a1a2e] text-white text-[12px] font-semibold rounded-lg hover:bg-[#252545] transition-colors disabled:opacity-40"
+          >
+            {saving ? "Posting…" : "Post"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Modal wrapper for ThreadComposeBox — pops up centred with blur backdrop
+function ThreadComposeModal({ placeholder, onSubmit, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      style={{ background: "rgba(26,26,46,0.55)", backdropFilter: "blur(4px)", animation: "tcmFadeIn 0.15s ease" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl bg-white overflow-hidden"
+        style={{ boxShadow: "0 24px 64px rgba(26,26,46,0.22)", animation: "tcmSlideUp 0.18s ease" }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#f4f1ec]">
+          <span className="text-[13px] font-bold text-[#1a1a2e]">
+            {placeholder?.toLowerCase().includes("reply") ? "Write a reply" : "Share your check-in"}
+          </span>
+          <button onClick={onClose} className="p-1.5 text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors rounded-lg hover:bg-[#f4f1ec]">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-5">
+          <ThreadComposeBox
+            placeholder={placeholder}
+            onSubmit={async (content, file) => { await onSubmit(content, file); onClose(); }}
+            onCancel={onClose}
+            autoFocus
+          />
+        </div>
+      </div>
+      <style>{`
+        @keyframes tcmFadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes tcmSlideUp { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }
+      `}</style>
+    </div>
+  );
+}
+
+// Lightbox for full-screen media view
+function MediaLightbox({ url, onClose }) {
+  const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url);
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={onClose}
+      style={{ animation: "fadeIn 0.18s ease" }}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+      >
+        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <div onClick={e => e.stopPropagation()} className="max-w-[92vw] max-h-[92vh] flex items-center justify-center">
+        {isVideo
+          ? <video src={url} controls autoPlay className="max-w-full max-h-[90vh] rounded-xl shadow-2xl" />
+          : <img src={url} alt="" className="max-w-full max-h-[90vh] rounded-xl shadow-2xl object-contain" />
+        }
+      </div>
+      <style>{`@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }`}</style>
+    </div>
+  );
+}
+
+// Media renderer for comments/replies — zoomable
+function MediaBlock({ url }) {
+  const [lightbox, setLightbox] = useState(false);
+  if (!url) return null;
+  const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url);
+  return (
+    <>
+      {isVideo ? (
+        <div className="mt-3 rounded-xl overflow-hidden border border-[#e8e0d0] cursor-pointer relative group"
+          onClick={() => setLightbox(true)}>
+          <video src={url} className="w-full max-h-72 object-cover" muted />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all">
+            <div className="opacity-0 group-hover:opacity-100 w-12 h-12 rounded-full bg-white/80 flex items-center justify-center transition-all">
+              <svg className="w-5 h-5 text-[#1a1a2e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="mt-3 rounded-xl overflow-hidden border border-[#e8e0d0] cursor-zoom-in relative group"
+          onClick={() => setLightbox(true)}
+        >
+          <img src={url} alt="" className="w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            style={{ maxHeight: "280px" }} />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all" />
+          <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-full p-1.5">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+      )}
+      {lightbox && <MediaLightbox url={url} onClose={() => setLightbox(false)} />}
+    </>
+  );
+}
+
+// Forum-style reply row: author name bold + large, timestamp, indented content
+function ThreadReplyRow({ reply, user, threadId, commentId, onLikeToggled, onReplyTo }) {
+  const [liked, setLiked]       = useState(reply.likedByMe ?? false);
+  const [likes, setLikes]       = useState(reply._count?.likes ?? 0);
+  const [toggling, setToggling] = useState(false);
+  const [heartPop, setHeartPop] = useState(false);
+
+  async function toggleLike() {
+    if (!user || toggling) return;
+    setToggling(true);
+    try {
+      const r = await fetch(
+        `${API_URL}/threads/${threadId}/comments/${commentId}/replies/${reply.id}/like`,
+        { method: "POST", credentials: "include" }
+      );
+      if (r.ok) {
+        const d = await r.json();
+        setLiked(d.liked); setLikes(d.likesCount); onLikeToggled?.();
+        if (d.liked) { setHeartPop(true); setTimeout(() => setHeartPop(false), 400); }
+      }
+    } finally { setToggling(false); }
+  }
+
+  return (
+    <div className="flex gap-3 pt-3.5 border-t border-[#f4f1ec] first:border-0 first:pt-0">
+      <Avatar user={reply.author} size={28} />
+      <div className="flex-1 min-w-0">
+        {/* Forum-style bold header line */}
+        <div className="flex items-baseline gap-2 mb-1.5">
+          <span className="text-[15px] font-bold text-[#1a1a2e] leading-tight">
+            {reply.author?.username ?? "Deleted user"}
+          </span>
+          <span className="text-[11px] text-[#c8b89a]">{timeAgo(reply.createdAt)}</span>
+        </div>
+        <p className="text-[14px] font-medium text-[#2d2416] leading-relaxed">{reply.content}</p>
+        <MediaBlock url={reply.mediaUrl} />
+        <div className="flex items-center gap-1 mt-2">
+          <button
+            onClick={toggleLike}
+            disabled={!user || toggling}
+            className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${liked ? "text-[#d4af37] bg-[#d4af37]/10" : "text-[#9a8c7a] hover:text-[#d4af37] hover:bg-[#d4af37]/08"} disabled:opacity-40`}
+            style={{ transform: heartPop ? "scale(1.35)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), color 0.15s" }}
+          >
+            <svg className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={liked ? 0 : 2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            <span className="text-[12px] font-bold tabular-nums">{likes}</span>
+          </button>
+          {user && (
+            <button
+              onClick={() => onReplyTo?.(reply.author?.username)}
+              className="text-[11px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] px-2.5 py-1.5 rounded-lg hover:bg-[#f0ebe3] transition-colors"
+            >
+              Reply
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Comment card — nested replies inline, forum-style bold author on replies
+function DailyThreadComment({ comment, user, threadId }) {
+  const [liked, setLiked]           = useState(comment.likedByMe ?? false);
+  const [likes, setLikes]           = useState(comment._count?.likes ?? 0);
+  const [toggling, setToggling]     = useState(false);
+  const [heartPop, setHeartPop]     = useState(false);
+  const [replies, setReplies]       = useState([]);
+  const [repliesLoaded, setLoaded]  = useState(false);
+  const [repliesVisible, setVisible] = useState(false);
+  const [loadingReplies, setLR]     = useState(false);
+  const [showModal, setShowModal]   = useState(false);
+  const [replyPrefix, setPrefix]    = useState("");
+
+  const replyCount = comment._count?.replies ?? 0;
+
+  async function toggleLike() {
+    if (!user || toggling) return;
+    setToggling(true);
+    try {
+      const r = await fetch(
+        `${API_URL}/threads/${threadId}/comments/${comment.id}/like`,
+        { method: "POST", credentials: "include" }
+      );
+      if (r.ok) {
+        const d = await r.json(); setLiked(d.liked); setLikes(d.likesCount);
+        if (d.liked) { setHeartPop(true); setTimeout(() => setHeartPop(false), 400); }
+      }
+    } finally { setToggling(false); }
+  }
+
+  async function loadReplies() {
+    // If already loaded, just toggle visibility
+    if (repliesLoaded) { setVisible(v => !v); return; }
+    setLR(true);
+    try {
+      const r = await fetch(`${API_URL}/threads/${threadId}/comments/${comment.id}/replies?limit=50`);
+      if (r.ok) { const d = await r.json(); setReplies(d.replies ?? []); setLoaded(true); setVisible(true); }
+    } finally { setLR(false); }
+  }
+
+  async function submitReply(content, file) {
+    const form = new FormData();
+    form.append("content", content);
+    if (file) form.append("media", file);
+    const r = await fetch(
+      `${API_URL}/threads/${threadId}/comments/${comment.id}/replies`,
+      { method: "POST", credentials: "include", body: form }
+    );
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message ?? "Failed to post reply.");
+    setReplies(prev => [...prev, d.reply]);
+    setLoaded(true);
+    setVisible(true);
+    setPrefix("");
+  }
+
+  function handleReplyTo(username) {
+    setPrefix(`@${username} `);
+    setShowModal(true);
+    if (!repliesLoaded) loadReplies();
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-[#e8e0d0] overflow-hidden">
+      {/* comment body */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex gap-3">
+          <Avatar user={comment.author} size={32} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1.5">
+              <span className="text-[14px] font-semibold text-[#1a1a2e]">
+                {comment.author?.username ?? "Deleted user"}
+              </span>
+              <span className="text-[11px] text-[#c8b89a]">{timeAgo(comment.createdAt)}</span>
+            </div>
+            <p className="text-[14px] text-[#2d2416] leading-relaxed whitespace-pre-wrap">{comment.content}</p>
+            <MediaBlock url={comment.mediaUrl} />
+          </div>
+        </div>
+
+        {/* action row */}
+        <div className="flex items-center gap-1 mt-2.5 pl-[44px]">
+          <button
+            onClick={toggleLike}
+            disabled={!user || toggling}
+            className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${liked ? "text-[#d4af37] bg-[#d4af37]/10" : "text-[#9a8c7a] hover:text-[#d4af37] hover:bg-[#d4af37]/08"} disabled:opacity-40`}
+            style={{ transform: heartPop ? "scale(1.35)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), color 0.15s" }}
+          >
+            <svg className="w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={liked ? 0 : 2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            <span className="text-[12px] font-bold tabular-nums">{likes}</span>
+          </button>
+          {user && (
+            <button
+              onClick={() => { setPrefix(""); setShowModal(true); }}
+              className="text-[11px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] px-2.5 py-1.5 rounded-lg hover:bg-[#f0ebe3] transition-colors"
+            >
+              Reply
+            </button>
+          )}
+          {replyCount > 0 && (
+            <button
+              onClick={loadReplies}
+              className="flex items-center gap-1 text-[11px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] px-2.5 py-1.5 rounded-lg hover:bg-[#f0ebe3] transition-colors"
+            >
+              {loadingReplies ? (
+                "Loading…"
+              ) : repliesLoaded && repliesVisible ? (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7"/>
+                  </svg>
+                  Hide replies
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                  </svg>
+                  {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* replies section */}
+      {repliesLoaded && repliesVisible && replies.length > 0 && (
+        <div className="border-t border-[#f4f1ec] bg-[#faf7f2] px-4 py-3 space-y-0">
+          {replies.map(rp => (
+            <ThreadReplyRow
+              key={rp.id}
+              reply={rp}
+              user={user}
+              threadId={threadId}
+              commentId={comment.id}
+              onReplyTo={handleReplyTo}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* reply compose modal */}
+      {showModal && user && (
+        <ThreadComposeModal
+          placeholder={replyPrefix ? `${replyPrefix}…` : "Write a reply…"}
+          onSubmit={(content, file) => submitReply(replyPrefix ? `${replyPrefix}${content}` : content, file)}
+          onClose={() => { setShowModal(false); setPrefix(""); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// The main panel embedded in the challenge page's right column
+function DailyThread({ user }) {
+  const [thread, setThread]       = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [comments, setComments]   = useState([]);
+  const [loadingC, setLoadingC]   = useState(false);
+  const [showCompose, setCompose] = useState(false);
+  const [page, setPage]           = useState(1);
+  const [hasMore, setHasMore]     = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const r = await fetch(`${API_URL}/threads/daily-challenge`);
+        if (!r.ok) { setLoading(false); return; }
+        const d = await r.json();
+        setThread(d.thread);
+        fetchComments(d.thread.id, 1);
+      } catch { setLoading(false); }
+    }
+    load();
+  }, []);
+
+  async function fetchComments(threadId, p) {
+    setLoadingC(true);
+    try {
+      const r = await fetch(`${API_URL}/threads/${threadId}/comments?page=${p}&limit=10`);
+      if (r.ok) {
+        const d = await r.json();
+        setComments(prev => p === 1 ? (d.comments ?? []) : [...prev, ...(d.comments ?? [])]);
+        setHasMore(p < d.totalPages);
+        setPage(p);
+      }
+    } finally { setLoadingC(false); setLoading(false); }
+  }
+
+  async function submitComment(content, file) {
+    const form = new FormData();
+    form.append("content", content);
+    if (file) form.append("media", file);
+    const r = await fetch(`${API_URL}/threads/${thread.id}/comments`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message ?? "Failed to post.");
+    setComments(prev => [d.comment, ...prev]);
+    setCompose(false);
+  }
+
+  if (loading) return (
+    <div className="h-32 bg-white border border-[#e8e0d0] rounded-2xl animate-pulse" />
+  );
+  if (!thread) return null;
+
+  return (
+    <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden" style={{ borderTop: "4px solid #1a1a2e" }}>
+      {/* header */}
+      <div className="px-5 pt-5 pb-4 border-b border-[#f0ebe3]">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#d4af37] mb-1">Community thread</p>
+        <h3 className="font-serif text-[#1a1a2e] text-base font-bold leading-snug mb-1">{thread.title}</h3>
+        <p className="text-[12px] text-[#6b5c4a] leading-relaxed">{thread.context}</p>
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-[10px] text-[#9a8c7a]">
+            {thread._count?.comments ?? 0} {(thread._count?.comments ?? 0) === 1 ? "comment" : "comments"}
+          </span>
+          <Link
+            to={`/threads/${thread.id}`}
+            className="text-[11px] font-semibold text-[#1a1a2e] hover:text-[#d4af37] transition-colors"
+          >
+            Full thread →
+          </Link>
+        </div>
+      </div>
+
+      {/* compose trigger */}
+      <div className="px-5 py-3 border-b border-[#f4f1ec]">
+        {user ? (
+          <>
+            <button
+              onClick={() => setCompose(true)}
+              className="w-full text-left px-4 py-2.5 rounded-xl border border-[#e8e0d0] text-[12px] text-[#c8b89a] hover:border-[#d4af37] transition-colors bg-[#faf7f2]"
+            >
+              Share how today's writing went…
+            </button>
+            {showCompose && (
+              <ThreadComposeModal
+                placeholder="Share how today's writing went… (200 words max)"
+                onSubmit={submitComment}
+                onClose={() => setCompose(false)}
+              />
+            )}
+          </>
+        ) : (
+          <p className="text-[11px] text-[#9a8c7a] text-center py-1">
+            <Link to="/login" className="font-semibold text-[#1a1a2e] hover:underline">Sign in</Link> to join the conversation
+          </p>
+        )}
+      </div>
+
+      {/* comments list — scrollable, capped height */}
+      <div className="relative">
+        <div
+          className="overflow-y-auto px-5 py-4 space-y-3"
+          style={{
+            maxHeight: 480,
+            scrollbarWidth: "thin",
+            scrollbarColor: "#e8e0d0 transparent",
+          }}
+        >
+          {comments.length === 0 && !loadingC && (
+            <p className="text-[12px] text-[#9a8c7a] text-center py-4">
+              No comments yet — be the first to check in.
+            </p>
+          )}
+          {comments.map(c => (
+            <DailyThreadComment
+              key={c.id}
+              comment={c}
+              user={user}
+              threadId={thread.id}
+            />
+          ))}
+          {hasMore && (
+            <button
+              onClick={() => fetchComments(thread.id, page + 1)}
+              disabled={loadingC}
+              className="w-full py-2.5 text-[11px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors disabled:opacity-50"
+            >
+              {loadingC ? "Loading…" : "Load more comments"}
+            </button>
+          )}
+        </div>
+        {/* bottom fade — hints there's more to scroll */}
+        {comments.length > 2 && (
+          <div
+            className="pointer-events-none absolute bottom-0 left-0 right-0 h-10"
+            style={{ background: "linear-gradient(to bottom, transparent, #fff)" }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── community stats ─────────────────────────────────────────────────────────
 
 function CommunityStats({ stats }) {
@@ -1111,8 +1770,9 @@ export default function ChallengePage() {
             </div>
 
             {/* RIGHT — community */}
-            <div>
+            <div className="flex flex-col gap-4">
               <CommunityStats stats={stats} />
+              <DailyThread user={user} />
             </div>
 
           </div>

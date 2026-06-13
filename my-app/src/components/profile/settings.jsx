@@ -22,6 +22,21 @@ export default function Settings() {
   const [profileSuccess, setProfileSuccess] = useState("");
   const fileInputRef = useRef(null);
 
+  // ─── Social links state ───────────────────────────────────────
+  const parseSocialLinks = (raw) => {
+    if (!raw) return [{ platform: "", url: "" }, { platform: "", url: "" }];
+    try {
+      const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const filled = Array.isArray(arr) ? arr.slice(0, 2) : [];
+      while (filled.length < 2) filled.push({ platform: "", url: "" });
+      return filled;
+    } catch { return [{ platform: "", url: "" }, { platform: "", url: "" }]; }
+  };
+  const [socialLinks, setSocialLinks] = useState(() => parseSocialLinks(user?.socialLinks));
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [socialError, setSocialError]     = useState("");
+  const [socialSuccess, setSocialSuccess] = useState("");
+
   // ─── Discord state ────────────────────────────────────────────
   const [discordError, setDiscordError]     = useState("");
   const [discordSuccess, setDiscordSuccess] = useState("");
@@ -98,6 +113,41 @@ export default function Settings() {
       setProfileError("Something went wrong. Please try again.");
     } finally {
       setProfileLoading(false);
+    }
+  }
+
+  // ─── Social links save ────────────────────────────────────────
+  async function handleSaveSocialLinks(e) {
+    e.preventDefault();
+    setSocialError("");
+    setSocialSuccess("");
+
+    const urlRegex = /^https?:\/\/.+/i;
+    for (const link of socialLinks) {
+      if (link.url.trim() && !urlRegex.test(link.url.trim())) {
+        return setSocialError(`"${link.url}" must start with http:// or https://`);
+      }
+    }
+
+    setSocialLoading(true);
+    try {
+      const cleaned = socialLinks.filter(l => l.platform.trim() && l.url.trim());
+      const body = new FormData();
+      body.append("socialLinks", JSON.stringify(cleaned));
+
+      const res = await fetch(`${API_URL}/users/updateUser`, {
+        method: "POST",
+        credentials: "include",
+        body,
+      });
+      const data = await res.json();
+      if (!res.ok) return setSocialError(data.message || "Failed to save social links.");
+      if (updateUserContext) updateUserContext(data.user);
+      setSocialSuccess("Social links updated.");
+    } catch {
+      setSocialError("Something went wrong. Please try again.");
+    } finally {
+      setSocialLoading(false);
     }
   }
 
@@ -372,6 +422,71 @@ export default function Settings() {
               className="w-full py-3 px-6 bg-ink-primary text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {profileLoading ? "Saving..." : "Save profile"}
+            </button>
+          </form>
+        </section>
+
+        {/* ─── Social links section ─────────────────────────────── */}
+        <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#eff6ff" }}>
+              <svg className="w-5 h-5" style={{ color: "#2563eb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-ink-primary">Social links</h2>
+              <p className="text-sm text-[#9a8c7a] mt-0.5">Add up to 2 links to your profile — Twitter, Instagram, a personal site, anything.</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveSocialLinks} className="space-y-4">
+            {socialLinks.map((link, i) => (
+              <div key={i} className="flex gap-3 items-start">
+                <div className="w-36 flex-shrink-0">
+                  <label className="block text-xs font-medium text-ink-primary mb-1">
+                    Platform
+                  </label>
+                  <input
+                    type="text"
+                    value={link.platform}
+                    onChange={(e) => {
+                      const updated = socialLinks.map((l, idx) => idx === i ? { ...l, platform: e.target.value } : l);
+                      setSocialLinks(updated);
+                      setSocialError(""); setSocialSuccess("");
+                    }}
+                    placeholder="e.g. Twitter"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-ink-primary mb-1">
+                    URL
+                  </label>
+                  <input
+                    type="url"
+                    value={link.url}
+                    onChange={(e) => {
+                      const updated = socialLinks.map((l, idx) => idx === i ? { ...l, url: e.target.value } : l);
+                      setSocialLinks(updated);
+                      setSocialError(""); setSocialSuccess("");
+                    }}
+                    placeholder="https://twitter.com/yourhandle"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
+                  />
+                </div>
+              </div>
+            ))}
+
+            {socialError   && <p className="text-sm text-red-600">{socialError}</p>}
+            {socialSuccess && <p className="text-sm text-green-600">{socialSuccess}</p>}
+
+            <button
+              type="submit"
+              disabled={socialLoading}
+              className="px-5 py-2 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:bg-[#1e2a38] transition-colors disabled:opacity-50"
+            >
+              {socialLoading ? "Saving…" : "Save links"}
             </button>
           </form>
         </section>

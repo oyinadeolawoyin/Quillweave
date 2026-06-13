@@ -365,7 +365,64 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
   );
 }
 
-// ─── Rich text toolbar ────────────────────────────────────────────────────────
+// ─── Floating format bar (sticky bottom) ─────────────────────────────────────
+// Shows B / I / U (and em-dash) in a pill fixed to the bottom of the viewport
+// while the editor is focused. Disappears when the user leaves the editor.
+//
+// Props:
+//   onCommand  fn(cmd)  — same execCommand helper from the parent editor
+//   visible    bool
+
+function FloatingFormatBar({ onCommand, visible }) {
+  const btns = [
+    { cmd: "bold",      label: <strong style={{ fontFamily: "sans-serif" }}>B</strong>, title: "Bold (Ctrl+B)" },
+    { cmd: "italic",    label: <em    style={{ fontFamily: "sans-serif" }}>I</em>,      title: "Italic (Ctrl+I)" },
+    { cmd: "underline", label: <span  style={{ textDecoration: "underline", fontFamily: "sans-serif" }}>U</span>, title: "Underline (Ctrl+U)" },
+    { cmd: "__emdash",  label: <span style={{ fontSize: "15px", letterSpacing: "-0.5px" }}>—</span>, title: "Em dash" },
+  ];
+
+  return (
+    <div
+      className="fixed bottom-5 left-1/2 z-50 transition-all duration-200"
+      style={{
+        transform: `translateX(-50%) translateY(${visible ? "0" : "80px"})`,
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? "auto" : "none",
+      }}
+    >
+      <div className="flex items-center gap-1 px-3 py-2 rounded-2xl shadow-2xl border border-[#e8dcc8]"
+        style={{ background: "#1a1a2e" }}>
+        {btns.map(({ cmd, label, title }) => (
+          <button
+            key={cmd}
+            title={title}
+            onMouseDown={e => {
+              e.preventDefault();
+              if (cmd === "__emdash") {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                  const range = sel.getRangeAt(0);
+                  range.deleteContents();
+                  range.insertNode(document.createTextNode("—"));
+                  range.collapse(false);
+                }
+              } else {
+                document.execCommand(cmd, false, null);
+              }
+            }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-white/80 hover:text-white hover:bg-white/15 transition-all text-sm"
+          >
+            {label}
+          </button>
+        ))}
+        <div className="w-px h-5 bg-white/20 mx-1" />
+        <span className="text-[10px] text-white/30 pr-1 select-none">Format</span>
+      </div>
+    </div>
+  );
+}
+
+
 // Includes: Bold, Italic, Underline, Lists, Em-dash, Font family, Font size,
 //           Text colour, Background colour.
 //
@@ -634,6 +691,7 @@ export function WriteEditor({
   const [saving, setSaving]       = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [wordCount, setWordCount] = useState(0);
+  const [editorFocused, setEditorFocused] = useState(false);
 
   // Typography / colour state (persisted in draft HTML via wrapper div style)
   const [fontFamily,   setFontFamily]   = useState(FONT_FAMILIES[0].value);
@@ -826,6 +884,8 @@ export function WriteEditor({
         contentEditable
         suppressContentEditableWarning
         onInput={handleEditorInput}
+        onFocus={() => setEditorFocused(true)}
+        onBlur={() => setEditorFocused(false)}
         data-placeholder="Begin writing…"
         className="px-8 pb-10 outline-none"
         style={editorContainerStyle}
@@ -835,6 +895,9 @@ export function WriteEditor({
       <div className="px-8 py-3 border-t border-[#f0e8d8] flex-shrink-0">
         <p className="text-xs text-[#b8a898]">{wordCount.toLocaleString()} words</p>
       </div>
+
+      {/* Sticky floating format bar — visible when editor is focused */}
+      <FloatingFormatBar onCommand={handleCommand} visible={editorFocused} />
 
       <style>{`
         [contenteditable]:empty:before {

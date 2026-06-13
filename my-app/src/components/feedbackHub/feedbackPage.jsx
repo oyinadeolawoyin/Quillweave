@@ -997,6 +997,7 @@ export default function FeedbackPage() {
   const [submission, setSubmission]     = useState(null);
   const [comments, setComments]         = useState([]);
   const [loading, setLoading]           = useState(true);
+  const [guestBlocked, setGuestBlocked] = useState(false);
   const [sidebarOpen, setSidebarOpen]   = useState(false);
   const [activePara, setActivePara]     = useState(null);
   const [hasResponded, setHasResponded] = useState(false);
@@ -1028,7 +1029,15 @@ export default function FeedbackPage() {
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/feedback/submissions/${id}`, { credentials: "include" });
-      if (!res.ok) { navigate("/feedback"); return; }
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          setGuestBlocked(true);
+        } else {
+          navigate("/critique");
+        }
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
       setSubmission(data);
       setComments(data.paragraphComments ?? []);
@@ -1190,7 +1199,35 @@ export default function FeedbackPage() {
     );
   }
 
-  if (!submission) return null;
+  if (!submission) {
+    if (guestBlocked) {
+      return (
+        <div className="min-h-screen bg-[#faf7f2]">
+          <Header />
+          <div className="max-w-md mx-auto px-4 py-24 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#f4f1ec] flex items-center justify-center mx-auto mb-5">
+              <svg className="w-6 h-6 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h2 className="font-serif text-2xl text-[#2d3748] mb-2">Sign in to read this</h2>
+            <p className="text-sm text-[#9a8c7a] mb-7 leading-relaxed">
+              Create a free account or sign in to read submissions and leave critiques.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Link to="/login" className="px-5 py-2.5 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all">
+                Sign in
+              </Link>
+              <Link to="/signup" className="px-5 py-2.5 border border-[#e8e0d0] text-[#2d3748] text-sm font-semibold rounded-xl hover:border-[#2d3748] transition-all">
+                Create account
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const activeComments = activePara !== null ? getParaComments(activePara.index) : [];
 
