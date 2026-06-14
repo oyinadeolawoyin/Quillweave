@@ -97,6 +97,7 @@ function ProfileBar({ user, wallet, streaks, discussionCount = 0 }) {
   const active  = wallet?.activeChapterCount ?? 0;
   const currentStreak = streaks?.current ?? 0;
   const longestStreak = streaks?.longest ?? 0;
+  const missedDaysInRow = streaks?.missed ?? 0;
   const joinDate = user.createdAt
     ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", year: "2-digit" })
     : null;
@@ -227,6 +228,21 @@ function ProfileBar({ user, wallet, streaks, discussionCount = 0 }) {
                   <div>
                     <p className="text-[14px] font-bold text-[#1a1a2e] leading-none">{longestStreak}<span className="text-[10px] font-normal text-[#9a8c7a] ml-0.5">d</span></p>
                     <p className="text-[10px] text-[#9a8c7a] mt-0.5">Longest streak</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Missed days in a row — warns before streak reset at 3 */}
+              {streaks && missedDaysInRow > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "#fdf6f0" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c2703d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 9v3.75m0 3.75h.008M10.34 3.94l-8.2 14.2A1.5 1.5 0 003.5 20.4h17a1.5 1.5 0 001.3-2.26l-8.2-14.2a1.5 1.5 0 00-2.6 0z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-bold text-[#a8552c] leading-none">{missedDaysInRow}<span className="text-[10px] font-normal text-[#9a8c7a] ml-0.5">d</span></p>
+                    <p className="text-[10px] text-[#9a8c7a] mt-0.5">Missed in a row</p>
                   </div>
                 </div>
               )}
@@ -462,26 +478,39 @@ function DailyChallengeBanner({ onJoin, isParticipating, progress }) {
         {/* Accumulated progress — only once joined. Streak is intentionally
             hidden here so the focus stays on cumulative output. */}
         {isParticipating && (
-          <Link
-            to="/challenge"
-            className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-lg border border-[#e8e0d0] bg-[#faf7f2] hover:border-[#d4af37] hover:bg-[#fdf9ed] transition-colors group"
-          >
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-[#9a8c7a] mb-0.5">Your progress so far</p>
-              <p className="text-[18px] font-bold text-[#1a1a2e] leading-none">
-                {totalLogged.toLocaleString()}
-                <span className="text-[11px] font-normal text-[#9a8c7a] ml-1.5">
-                  {goalUnitLabel(progress?.goalType, totalLogged)} written
-                </span>
-              </p>
-            </div>
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-[#b8860b] group-hover:text-[#1a1a2e] flex-shrink-0 whitespace-nowrap">
-              View details
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </span>
-          </Link>
+          <>
+            {progress?.missed > 0 && (
+              <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg border border-[#f3ddc9]" style={{ background: "#fdf6f0" }}>
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="#c2703d" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.34 3.94l-8.2 14.2A1.5 1.5 0 003.5 20.4h17a1.5 1.5 0 001.3-2.26l-8.2-14.2a1.5 1.5 0 00-2.6 0z" />
+                </svg>
+                <p className="text-[11px] text-[#a8552c]">
+                  {progress.missed} day{progress.missed === 1 ? "" : "s"} missed in a row.{" "}
+                  {progress.missed >= 3 ? "Streak reset." : `${3 - progress.missed} more and your streak resets.`}
+                </p>
+              </div>
+            )}
+            <Link
+              to="/challenge"
+              className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-lg border border-[#e8e0d0] bg-[#faf7f2] hover:border-[#d4af37] hover:bg-[#fdf9ed] transition-colors group"
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#9a8c7a] mb-0.5">Your progress so far</p>
+                <p className="text-[18px] font-bold text-[#1a1a2e] leading-none">
+                  {totalLogged.toLocaleString()}
+                  <span className="text-[11px] font-normal text-[#9a8c7a] ml-1.5">
+                    {goalUnitLabel(progress?.goalType, totalLogged)} written
+                  </span>
+                </p>
+              </div>
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-[#b8860b] group-hover:text-[#1a1a2e] flex-shrink-0 whitespace-nowrap">
+                View details
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </span>
+            </Link>
+          </>
         )}
       </div>
     </div>
@@ -852,7 +881,7 @@ function RecentBlogPosts() {
 
   return (
     <div className="mt-3 pt-3 border-t border-[#f0ebe3]">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-2">Recent blog posts</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-2">Latest Community News</p>
 
       {loading && (
         <div className="space-y-2">
@@ -988,6 +1017,7 @@ export default function Homepage() {
           setStreaks({
             current: d.currentStreak ?? 0,
             longest: d.longestStreak ?? 0,
+            missed: d.missedDaysInRow ?? 0,
             // Accumulated progress so far (e.g. total words/chapters/minutes logged)
             totalLogged: d.totalLogged ?? d.totalProgress ?? 0,
             goalValue: d.goalValue ?? 0,

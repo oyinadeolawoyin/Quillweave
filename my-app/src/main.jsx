@@ -18,6 +18,7 @@ import NotFound from './components/NotFound';
 import About from './components/about/about';
 import Blog from './components/blog/blog';
 import BlogPost from './components/blog/blogPost';
+import BlogSeries from './components/blog/blogSeries';
 import AdminBlog from './components/blog/adminBlog';
 import EmotionPracticePage from './components/emotioncues/emotionpracticepage';
 import ThesaurusPage from './components/emotioncues/ThesaurusPage';
@@ -99,7 +100,7 @@ const router = createBrowserRouter([
     element: <ThesaurusPage />
   },
   {
-    path: "/blog",
+    path: "/communityNews",
     element: <Blog />
   },
   {
@@ -109,6 +110,10 @@ const router = createBrowserRouter([
   {
     path: "/admin/blog",
     element: <AdminBlog />
+  },
+  {
+    path: "/blog/series/:slug",
+    element: <BlogSeries />
   },
   {
     path: "/emotion-practice",

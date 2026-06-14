@@ -134,7 +134,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
             <p className="text-xs text-[#9a8c7a] font-semibold uppercase tracking-wider">Writer's toolkit</p>
             <p className="text-sm font-serif text-[#2d3748]">Words & emotions</p>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className="w-7 h-7 rounded-full bg-[#f0ebe3] flex items-center justify-center text-[#9a8c7a] hover:bg-[#e8e0d0] hover:text-[#2d3748] transition-all">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,14 +145,14 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
 
         {/* Tabs */}
         <div className="flex border-b border-[#f0ebe3] flex-shrink-0">
-          <button
+          <button type="button"
             onClick={() => setTab("thesaurus")}
             className={`flex-1 py-2.5 text-xs font-semibold transition-all ${
               tab === "thesaurus" ? "text-[#2d3748] border-b-2 border-[#d4af37]" : "text-[#9a8c7a] hover:text-[#5a4a30]"
             }`}>
             📖 Thesaurus
           </button>
-          <button
+          <button type="button"
             onClick={() => setTab("emotions")}
             className={`flex-1 py-2.5 text-xs font-semibold transition-all ${
               tab === "emotions" ? "text-[#2d3748] border-b-2 border-[#d4af37]" : "text-[#9a8c7a] hover:text-[#5a4a30]"
@@ -174,7 +174,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
                   placeholder="Search a word…"
                   className="flex-1 px-3 py-2 text-sm bg-[#faf7f2] border border-[#e8e0d0] rounded-lg focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 text-[#2d3748] placeholder-[#c4bdb4] transition-all"
                 />
-                <button
+                <button type="button"
                   onClick={() => search(query)}
                   className="px-3 py-2 bg-[#2d3748] text-white rounded-lg text-sm font-medium hover:bg-[#3d4f64] transition-all">
                   Go
@@ -228,7 +228,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
                       <p className="text-xs font-semibold text-[#2d3748] mb-2">Synonyms</p>
                       <div className="flex flex-wrap gap-1.5">
                         {results.synonyms.map(s => (
-                          <button
+                          <button type="button"
                             key={s}
                             onClick={() => { setQuery(s); search(s); }}
                             className="text-xs px-2.5 py-1 bg-[#faf7f2] border border-[#e8e0d0] text-[#5a4a30] rounded-full hover:border-[#d4af37] hover:bg-[#fffbf0] transition-all">
@@ -243,7 +243,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
                       <p className="text-xs font-semibold text-[#2d3748] mb-2">Antonyms</p>
                       <div className="flex flex-wrap gap-1.5">
                         {results.antonyms.map(a => (
-                          <button
+                          <button type="button"
                             key={a}
                             onClick={() => { setQuery(a); search(a); }}
                             className="text-xs px-2.5 py-1 bg-[#fff0f0] border border-[#f5caca] text-[#7a3a3a] rounded-full hover:border-[#e57a7a] transition-all">
@@ -283,7 +283,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
             {emotionsError && !emotionsLoading && (
               <div className="px-4 py-8 text-center">
                 <p className="text-sm text-[#9a8c7a]">{emotionsError}</p>
-                <button
+                <button type="button"
                   onClick={() => { setEmotions([]); setEmotionsError(null); }}
                   className="mt-3 text-xs text-[#d4af37] hover:underline">
                   Retry
@@ -304,7 +304,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
                   Tap an emotion to see its sensory cues — use them to write more vividly.
                 </p>
                 {emotions.map(e => (
-                  <button
+                  <button type="button"
                     key={e.id}
                     onClick={() => setExpandedEmotion(e.id)}
                     className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#faf7f2] hover:bg-[#f4f0e8] border border-[#e8dcc8] hover:border-[#d4af37] transition-all text-left group">
@@ -335,7 +335,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
                     .filter(Boolean);
               return (
                 <div className="flex flex-col flex-1">
-                  <button
+                  <button type="button"
                     onClick={() => setExpandedEmotion(null)}
                     className="flex items-center gap-2 px-4 py-3 bg-[#faf7f2] border-b border-[#e8dcc8] hover:bg-[#f4f0e8] transition-all text-left w-full group flex-shrink-0">
                     <svg className="w-4 h-4 text-[#9a8c7a] group-hover:text-[#2d3748] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -366,57 +366,218 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
 }
 
 // ─── Floating format bar (sticky bottom) ─────────────────────────────────────
-// Shows B / I / U (and em-dash) in a pill fixed to the bottom of the viewport
-// while the editor is focused. Disappears when the user leaves the editor.
+// Full toolbar mirror — all commands accessible from anywhere in the editor.
+// Appears when editor is focused, slides away when not.
 //
 // Props:
-//   onCommand  fn(cmd)  — same execCommand helper from the parent editor
-//   visible    bool
+//   onCommand   fn(cmd)
+//   onImagePicked fn(payload) — for inline image insert
+//   visible     bool
 
-function FloatingFormatBar({ onCommand, visible }) {
-  const btns = [
-    { cmd: "bold",      label: <strong style={{ fontFamily: "sans-serif" }}>B</strong>, title: "Bold (Ctrl+B)" },
-    { cmd: "italic",    label: <em    style={{ fontFamily: "sans-serif" }}>I</em>,      title: "Italic (Ctrl+I)" },
-    { cmd: "underline", label: <span  style={{ textDecoration: "underline", fontFamily: "sans-serif" }}>U</span>, title: "Underline (Ctrl+U)" },
-    { cmd: "__emdash",  label: <span style={{ fontSize: "15px", letterSpacing: "-0.5px" }}>—</span>, title: "Em dash" },
-  ];
+function FloatingFormatBar({ onCommand, onImagePicked, visible }) {
+  const [showTextColor, setShowTextColor] = useState(false);
+  const [showHighlight, setShowHighlight] = useState(false);
+  const [showFontSize, setShowFontSize] = useState(false);
+
+  const floatBtn = "w-8 h-8 rounded-lg flex items-center justify-center text-white/75 hover:text-white hover:bg-white/15 transition-all text-sm flex-shrink-0";
+
+  const HIGHLIGHT_COLORS = ["#fef08a","#bbf7d0","#bae6fd","#f9a8d4","#fca5a5","#c4b5fd","#fdba74"];
+  const SEL_TEXT_COLORS  = ["#ffffff","#fde68a","#6ee7b7","#93c5fd","#f9a8d4","#c05621","#1a1a2e"];
+
+  function insertEmdash() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createTextNode("—"));
+      range.collapse(false);
+    }
+  }
 
   return (
     <div
       className="fixed bottom-5 left-1/2 z-50 transition-all duration-200"
       style={{
-        transform: `translateX(-50%) translateY(${visible ? "0" : "80px"})`,
+        transform: `translateX(-50%) translateY(${visible ? "0" : "90px"})`,
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? "auto" : "none",
       }}
     >
-      <div className="flex items-center gap-1 px-3 py-2 rounded-2xl shadow-2xl border border-[#e8dcc8]"
-        style={{ background: "#1a1a2e" }}>
-        {btns.map(({ cmd, label, title }) => (
-          <button
-            key={cmd}
-            title={title}
-            onMouseDown={e => {
-              e.preventDefault();
-              if (cmd === "__emdash") {
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount > 0) {
-                  const range = sel.getRangeAt(0);
-                  range.deleteContents();
-                  range.insertNode(document.createTextNode("—"));
-                  range.collapse(false);
-                }
-              } else {
-                document.execCommand(cmd, false, null);
-              }
-            }}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white/80 hover:text-white hover:bg-white/15 transition-all text-sm"
+      <div
+        className="flex items-center gap-0.5 px-2 py-1.5 rounded-2xl shadow-2xl border border-white/10"
+        style={{ background: "#1a1a2e" }}
+      >
+        {/* Bold / Italic / Underline */}
+        <button type="button" title="Bold" onMouseDown={e => { e.preventDefault(); onCommand("bold"); }} className={floatBtn}>
+          <strong style={{ fontFamily: "sans-serif", fontSize: "13px" }}>B</strong>
+        </button>
+        <button type="button" title="Italic" onMouseDown={e => { e.preventDefault(); onCommand("italic"); }} className={floatBtn}>
+          <em style={{ fontFamily: "sans-serif", fontSize: "13px" }}>I</em>
+        </button>
+        <button type="button" title="Underline" onMouseDown={e => { e.preventDefault(); onCommand("underline"); }} className={floatBtn}>
+          <span style={{ textDecoration: "underline", fontFamily: "sans-serif", fontSize: "13px" }}>U</span>
+        </button>
+
+        <div className="w-px h-4 bg-white/15 mx-0.5" />
+
+        {/* Alignment */}
+        <button type="button" title="Left" onMouseDown={e => { e.preventDefault(); onCommand("justifyLeft"); }} className={floatBtn}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 10h12M3 14h18M3 18h12" />
+          </svg>
+        </button>
+        <button type="button" title="Centre" onMouseDown={e => { e.preventDefault(); onCommand("justifyCenter"); }} className={floatBtn}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M6 10h12M3 14h18M6 18h12" />
+          </svg>
+        </button>
+        <button type="button" title="Right" onMouseDown={e => { e.preventDefault(); onCommand("justifyRight"); }} className={floatBtn}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M9 10h12M3 14h18M9 18h12" />
+          </svg>
+        </button>
+
+        <div className="w-px h-4 bg-white/15 mx-0.5" />
+
+        {/* Lists */}
+        <button type="button" title="Bullet list" onMouseDown={e => { e.preventDefault(); onCommand("insertUnorderedList"); }} className={floatBtn}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+          </svg>
+        </button>
+        <button type="button" title="Numbered list" onMouseDown={e => { e.preventDefault(); onCommand("insertOrderedList"); }} className={floatBtn}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h1v4M4 6H3m1 4H3m4-4h13M7 12h13M7 18h13M3 14h1l1 2-1 2H3" />
+          </svg>
+        </button>
+
+        <div className="w-px h-4 bg-white/15 mx-0.5" />
+
+        {/* Text colour for selection */}
+        <div className="relative">
+          <button type="button"
+            title="Text colour"
+            onMouseDown={e => { e.preventDefault(); setShowTextColor(p => !p); setShowHighlight(false); setShowFontSize(false); }}
+            className={floatBtn}
           >
-            {label}
+            <span className="text-[11px] font-black" style={{ color: "#fde68a" }}>A</span>
           </button>
-        ))}
-        <div className="w-px h-5 bg-white/20 mx-1" />
-        <span className="text-[10px] text-white/30 pr-1 select-none">Format</span>
+          {showTextColor && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-[#0f1724] border border-white/15 rounded-xl p-2 flex gap-1.5 shadow-2xl">
+              {SEL_TEXT_COLORS.map(c => (
+                <button type="button"
+                  key={c}
+                  onMouseDown={e => { e.preventDefault(); document.execCommand("foreColor", false, c); setShowTextColor(false); }}
+                  className="w-5 h-5 rounded-full border-2 border-white/20 hover:border-white/60 transition-all flex-shrink-0"
+                  style={{ background: c }}
+                  title={c}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Highlight for selection */}
+        <div className="relative">
+          <button type="button"
+            title="Highlight"
+            onMouseDown={e => { e.preventDefault(); setShowHighlight(p => !p); setShowTextColor(false); setShowFontSize(false); }}
+            className={floatBtn}
+          >
+            <svg className="w-3.5 h-3.5 text-[#fde68a]" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </button>
+          {showHighlight && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-[#0f1724] border border-white/15 rounded-xl p-2 flex gap-1.5 shadow-2xl">
+              {HIGHLIGHT_COLORS.map(c => (
+                <button type="button"
+                  key={c}
+                  onMouseDown={e => { e.preventDefault(); document.execCommand("hiliteColor", false, c); setShowHighlight(false); }}
+                  className="w-5 h-5 rounded-full border-2 border-white/20 hover:border-white/60 transition-all flex-shrink-0"
+                  style={{ background: c }}
+                  title={c}
+                />
+              ))}
+              <button type="button"
+                onMouseDown={e => { e.preventDefault(); document.execCommand("removeFormat", false, null); setShowHighlight(false); }}
+                className="w-5 h-5 rounded-full border-2 border-white/20 hover:border-white/60 transition-all flex-shrink-0 flex items-center justify-center text-white/60 text-[9px]"
+                style={{ background: "repeating-linear-gradient(45deg,#555 0,#555 1px,transparent 0,transparent 50%)" }}
+                title="Remove highlight"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Font size for selection */}
+        <div className="relative">
+          <button type="button"
+            title="Font size"
+            onMouseDown={e => { e.preventDefault(); setShowFontSize(p => !p); setShowTextColor(false); setShowHighlight(false); }}
+            className={`${floatBtn} text-[10px] font-bold`}
+          >
+            <span style={{ fontSize: "11px", lineHeight: 1 }}>Aa</span>
+          </button>
+          {showFontSize && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-[#0f1724] border border-white/15 rounded-xl p-1.5 flex flex-col gap-0.5 shadow-2xl w-24">
+              {FONT_SIZES.map(s => (
+                <button type="button"
+                  key={s.value}
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    const sel = window.getSelection();
+                    if (sel && !sel.isCollapsed) {
+                      const range = sel.getRangeAt(0);
+                      const span = document.createElement("span");
+                      span.style.fontSize = s.value;
+                      try { range.surroundContents(span); } catch {}
+                    }
+                    setShowFontSize(false);
+                  }}
+                  className="w-full text-left px-2 py-1 text-white/75 hover:text-white hover:bg-white/10 rounded text-xs transition-all"
+                >
+                  {s.label} <span className="text-white/40">({s.value})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="w-px h-4 bg-white/15 mx-0.5" />
+
+        {/* Em dash */}
+        <button type="button" title="Em dash —" onMouseDown={e => { e.preventDefault(); insertEmdash(); }} className={`${floatBtn} text-base`}>
+          —
+        </button>
+
+        {/* Divider line */}
+        <button type="button"
+          title="Section divider"
+          onMouseDown={e => {
+            e.preventDefault();
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            const hr = document.createElement("hr");
+            hr.setAttribute("data-divider", "1");
+            hr.style.cssText = "border:none;border-top:2px solid #c9b090;margin:1.5em auto;width:40%;display:block;";
+            range.insertNode(hr);
+            const after = document.createElement("div");
+            after.innerHTML = "<br>";
+            hr.parentNode.insertBefore(after, hr.nextSibling);
+            const nr = document.createRange();
+            nr.setStart(after, 0);
+            nr.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(nr);
+          }}
+          className={floatBtn}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -449,6 +610,7 @@ export function RichToolbar({
   onBgColor,
   currentTextColor = "#2d3748",
   currentBgColor   = "transparent",
+  onImagePicked,
 }) {
   const [colorPicker, setColorPicker] = useState(null); // "text" | "bg" | null
   const colorPickerRef = useRef(null);
@@ -496,35 +658,56 @@ export function RichToolbar({
       <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
 
       {/* Bold */}
-      <button onMouseDown={e => { e.preventDefault(); onCommand("bold"); }} className={btn} title="Bold (Ctrl+B)">
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("bold"); }} className={btn} title="Bold (Ctrl+B)">
         <strong>B</strong>
       </button>
       {/* Italic */}
-      <button onMouseDown={e => { e.preventDefault(); onCommand("italic"); }} className={btn} title="Italic (Ctrl+I)">
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("italic"); }} className={btn} title="Italic (Ctrl+I)">
         <em>I</em>
       </button>
       {/* Underline */}
-      <button onMouseDown={e => { e.preventDefault(); onCommand("underline"); }} className={btn} title="Underline (Ctrl+U)">
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("underline"); }} className={btn} title="Underline (Ctrl+U)">
         <span style={{ textDecoration: "underline" }}>U</span>
       </button>
 
       <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
 
+      {/* Align left */}
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("justifyLeft"); }} className={btn} title="Align left">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 10h12M3 14h18M3 18h12" />
+        </svg>
+      </button>
+      {/* Align centre */}
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("justifyCenter"); }} className={btn} title="Align centre">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M6 10h12M3 14h18M6 18h12" />
+        </svg>
+      </button>
+      {/* Align right */}
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("justifyRight"); }} className={btn} title="Align right">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M9 10h12M3 14h18M9 18h12" />
+        </svg>
+      </button>
+
+      <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
+
       {/* Bullet list */}
-      <button onMouseDown={e => { e.preventDefault(); onCommand("insertUnorderedList"); }} className={btn} title="Bullet list">
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("insertUnorderedList"); }} className={btn} title="Bullet list">
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
         </svg>
       </button>
       {/* Numbered list */}
-      <button onMouseDown={e => { e.preventDefault(); onCommand("insertOrderedList"); }} className={btn} title="Numbered list">
+      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("insertOrderedList"); }} className={btn} title="Numbered list">
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h1v4M4 6H3m1 4H3m4-4h13M7 12h13M7 18h13M3 14h1l1 2-1 2H3" />
         </svg>
       </button>
 
       {/* Em dash */}
-      <button
+      <button type="button"
         onMouseDown={e => {
           e.preventDefault();
           const sel = window.getSelection();
@@ -541,7 +724,7 @@ export function RichToolbar({
       </button>
 
       {/* Divider */}
-      <button
+      <button type="button"
         onMouseDown={e => {
           e.preventDefault();
           const sel = window.getSelection();
@@ -571,6 +754,145 @@ export function RichToolbar({
         </svg>
       </button>
 
+      {/* Insert image — uploads to server first, then inserts URL */}
+      <label
+        className={`${btn} cursor-pointer`}
+        title="Insert image"
+        onMouseDown={e => e.preventDefault()}
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async e => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            e.target.value = "";
+
+            // Save cursor position before async upload
+            const sel = window.getSelection();
+            let savedRange = null;
+            if (sel && sel.rangeCount > 0) savedRange = sel.getRangeAt(0).cloneRange();
+
+            // Show uploading placeholder
+            let placeholder = null;
+            if (savedRange) {
+              placeholder = document.createElement("span");
+              placeholder.textContent = "⏳ Uploading image…";
+              placeholder.style.cssText = "color:#9a8c7a;font-style:italic;font-size:0.875em;";
+              placeholder.setAttribute("data-upload-placeholder", "1");
+              const r = savedRange.cloneRange();
+              r.deleteContents();
+              r.insertNode(placeholder);
+            }
+
+            try {
+              const fd = new FormData();
+              fd.append("file", file);
+              const res = await fetch(`${API_URL}/blog/upload`, {
+                method: "POST",
+                credentials: "include",
+                body: fd,
+              });
+              if (!res.ok) throw new Error("Upload failed");
+              const data = await res.json();
+              const url = data.url || data.fileUrl || data.mediaUrl;
+              if (!url) throw new Error("No URL returned");
+
+              // Remove placeholder and show size picker
+              if (placeholder && placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+
+              // Show size picker modal
+              onImagePicked?.({ url, savedRange });
+            } catch (err) {
+              if (placeholder && placeholder.parentNode) {
+                placeholder.textContent = "⚠️ Upload failed — please try again.";
+                setTimeout(() => placeholder.parentNode?.removeChild(placeholder), 3000);
+              }
+            }
+          }}
+        />
+      </label>
+
+      {/* ── Selection colour (applies to highlighted text) ──────────────── */}
+      <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
+
+      {/* Selection text colour */}
+      <div className="relative" ref={colorPicker === "sel-text" ? colorPickerRef : null}>
+        <button type="button"
+          onMouseDown={e => { e.preventDefault(); setColorPicker(p => p === "sel-text" ? null : "sel-text"); }}
+          className={`${btn} flex-col gap-0.5`}
+          title="Colour selected text">
+          <span className="text-[10px] font-black leading-none" style={{ color: "#c05621" }}>A</span>
+          <span className="w-4 h-0.5 rounded-full bg-[#c05621]" />
+        </button>
+        {colorPicker === "sel-text" && (
+          <ColorPopover
+            colors={TEXT_COLORS}
+            current={null}
+            onPick={c => {
+              document.execCommand("foreColor", false, c);
+              setColorPicker(null);
+            }}
+            label="Colour selection"
+            showTransparent={false}
+          />
+        )}
+      </div>
+
+      {/* Selection highlight */}
+      <div className="relative" ref={colorPicker === "sel-bg" ? colorPickerRef : null}>
+        <button type="button"
+          onMouseDown={e => { e.preventDefault(); setColorPicker(p => p === "sel-bg" ? null : "sel-bg"); }}
+          className={`${btn} flex-col gap-0.5`}
+          title="Highlight selected text">
+          <svg className="w-3.5 h-3.5 text-[#d4af37]" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
+        </button>
+        {colorPicker === "sel-bg" && (
+          <ColorPopover
+            colors={["#fef08a","#bbf7d0","#bae6fd","#f9a8d4","#fca5a5","#c4b5fd","#fdba74","#ffffff","transparent"]}
+            current={null}
+            onPick={c => {
+              if (c === "transparent") {
+                document.execCommand("removeFormat", false, null);
+              } else {
+                document.execCommand("hiliteColor", false, c);
+              }
+              setColorPicker(null);
+            }}
+            label="Highlight selection"
+            showTransparent={true}
+          />
+        )}
+      </div>
+
+      {/* Selection font size (applies px size to selected text via fontSize + post-process) */}
+      <select
+        title="Font size for selected text"
+        className="h-7 text-xs text-[#5a4a30] bg-white border border-[#e8e0d0] rounded px-1 hover:border-[#c9b090] focus:outline-none focus:border-[#d4af37] transition-all cursor-pointer w-16"
+        defaultValue=""
+        onChange={e => {
+          const px = e.target.value;
+          if (!px) return;
+          // execCommand fontSize only takes 1-7; use a span hack instead
+          const sel = window.getSelection();
+          if (!sel || sel.isCollapsed) { e.target.value = ""; return; }
+          const range = sel.getRangeAt(0);
+          const span = document.createElement("span");
+          span.style.fontSize = px;
+          range.surroundContents(span);
+          e.target.value = "";
+        }}
+      >
+        <option value="" disabled>px</option>
+        {FONT_SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+      </select>
+
       {/* ── Colour tools (hidden in feedback hub) ────────────────────── */}
       {showColorTools && (
         <>
@@ -578,7 +900,7 @@ export function RichToolbar({
 
           {/* Text colour */}
           <div className="relative" ref={colorPicker === "text" ? colorPickerRef : null}>
-            <button
+            <button type="button"
               onMouseDown={e => { e.preventDefault(); setColorPicker(p => p === "text" ? null : "text"); }}
               className={`${btn} flex-col gap-0.5`}
               title="Text colour">
@@ -598,7 +920,7 @@ export function RichToolbar({
 
           {/* Background colour */}
           <div className="relative" ref={colorPicker === "bg" ? colorPickerRef : null}>
-            <button
+            <button type="button"
               onMouseDown={e => { e.preventDefault(); setColorPicker(p => p === "bg" ? null : "bg"); }}
               className={`${btn} flex-col gap-0.5`}
               title="Highlight / background colour">
@@ -634,7 +956,7 @@ function ColorPopover({ colors, current, onPick, label, showTransparent }) {
       <p className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wider mb-2">{label}</p>
       <div className="flex flex-wrap gap-1.5">
         {showTransparent && (
-          <button
+          <button type="button"
             onMouseDown={e => { e.preventDefault(); onPick("transparent"); }}
             className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${current === "transparent" ? "border-[#d4af37]" : "border-[#e8e0d0] hover:border-[#c9b090]"}`}
             title="None / transparent"
@@ -642,7 +964,7 @@ function ColorPopover({ colors, current, onPick, label, showTransparent }) {
           />
         )}
         {colors.filter(c => c !== "transparent").map(c => (
-          <button
+          <button type="button"
             key={c}
             onMouseDown={e => { e.preventDefault(); onPick(c); }}
             className={`w-6 h-6 rounded-full border-2 transition-all ${current === c ? "border-[#d4af37] scale-110" : "border-[#e8e0d0] hover:border-[#c9b090]"}`}
@@ -660,6 +982,103 @@ function ColorPopover({ colors, current, onPick, label, showTransparent }) {
           className="w-full h-7 rounded cursor-pointer border border-[#e8e0d0]"
           title="Custom colour"
         />
+      </div>
+    </div>
+  );
+}
+
+// ─── Image size picker modal ──────────────────────────────────────────────────
+// Shows after image upload so the user can choose a display size before insert.
+
+const IMAGE_SIZE_PRESETS = [
+  { label: "Small",    value: "33%" },
+  { label: "Medium",   value: "60%" },
+  { label: "Large",    value: "90%" },
+  { label: "Full",     value: "100%" },
+];
+
+function ImageSizeModal({ url, savedRange, onInsert, onClose }) {
+  const [size, setSize] = useState("100%");
+  const [align, setAlign] = useState("center");
+
+  function handleInsert() {
+    onInsert({ url, size, align, savedRange });
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl border border-[#e8e0d0] p-6 w-80 space-y-4">
+        <h3 className="font-serif text-base text-[#1a1a2e]">Insert image</h3>
+
+        {/* Preview */}
+        <div className="rounded-xl overflow-hidden border border-[#e8e0d0] bg-[#faf7f2] flex items-center justify-center" style={{ height: "120px" }}>
+          <img src={url} alt="preview" style={{ maxHeight: "110px", maxWidth: "100%", objectFit: "contain", width: size }} />
+        </div>
+
+        {/* Size */}
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a8c7a] mb-2">Width</p>
+          <div className="flex gap-2 flex-wrap">
+            {IMAGE_SIZE_PRESETS.map(p => (
+              <button type="button"
+                key={p.value}
+                onClick={() => setSize(p.value)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                style={size === p.value
+                  ? { background: "#1a1a2e", color: "#fff", borderColor: "#1a1a2e" }
+                  : { background: "white", color: "#5a4a30", borderColor: "#e8e0d0" }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {/* Custom */}
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="range" min={20} max={100} value={parseInt(size)}
+              onChange={e => setSize(`${e.target.value}%`)}
+              className="flex-1 accent-[#d4af37]"
+            />
+            <span className="text-xs text-[#9a8c7a] w-10 text-right">{size}</span>
+          </div>
+        </div>
+
+        {/* Align */}
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a8c7a] mb-2">Alignment</p>
+          <div className="flex gap-2">
+            {[["left","Left"],["center","Centre"],["right","Right"]].map(([val, lbl]) => (
+              <button type="button"
+                key={val}
+                onClick={() => setAlign(val)}
+                className="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                style={align === val
+                  ? { background: "#1a1a2e", color: "#fff", borderColor: "#1a1a2e" }
+                  : { background: "white", color: "#5a4a30", borderColor: "#e8e0d0" }}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button type="button"
+            onClick={handleInsert}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+            style={{ background: "#1a1a2e" }}
+          >
+            Insert
+          </button>
+          <button type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium border text-[#6b5c4a] hover:bg-[#f5f3ef] transition-all"
+            style={{ borderColor: "#e8e0d0" }}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -692,6 +1111,7 @@ export function WriteEditor({
   const [lastSaved, setLastSaved] = useState(null);
   const [wordCount, setWordCount] = useState(0);
   const [editorFocused, setEditorFocused] = useState(false);
+  const [imagePick, setImagePick] = useState(null); // { url, savedRange }
 
   // Typography / colour state (persisted in draft HTML via wrapper div style)
   const [fontFamily,   setFontFamily]   = useState(FONT_FAMILIES[0].value);
@@ -787,6 +1207,41 @@ export function WriteEditor({
     editorRef.current?.focus();
   }
 
+  // ── Insert image after size is chosen ────────────────────────────────────
+  function insertImage({ url, size, align, savedRange }) {
+    const img = document.createElement("img");
+    img.src = url;
+    img.setAttribute("data-inline-image", "1");
+
+    const marginLeft  = align === "right"  ? "auto" : align === "center" ? "auto" : "0";
+    const marginRight = align === "left"   ? "auto" : align === "center" ? "auto" : "0";
+    img.style.cssText = `width:${size};max-width:100%;height:auto;display:block;margin:1em ${marginRight} 1em ${marginLeft};border-radius:8px;`;
+
+    const wrapper = document.createElement("div");
+    wrapper.style.textAlign = align;
+    wrapper.appendChild(img);
+
+    editorRef.current?.focus();
+    if (savedRange) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      const range = sel.getRangeAt(0);
+      range.insertNode(wrapper);
+      const after = document.createElement("div");
+      after.innerHTML = "<br>";
+      wrapper.parentNode.insertBefore(after, wrapper.nextSibling);
+      const nr = document.createRange();
+      nr.setStart(after, 0);
+      nr.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(nr);
+    } else {
+      editorRef.current?.appendChild(wrapper);
+    }
+    handleEditorInput();
+  }
+
   // ── Auto-save every 30 s ─────────────────────────────────────────────────
   useEffect(() => {
     autoSaveRef.current = setInterval(async () => {
@@ -859,6 +1314,7 @@ export function WriteEditor({
         onBgColor={setBgColor}
         currentTextColor={textColor}
         currentBgColor={bgColor}
+        onImagePicked={payload => setImagePick(payload)}
       />
 
       {/* Title */}
@@ -897,7 +1353,21 @@ export function WriteEditor({
       </div>
 
       {/* Sticky floating format bar — visible when editor is focused */}
-      <FloatingFormatBar onCommand={handleCommand} visible={editorFocused} />
+      <FloatingFormatBar
+        onCommand={handleCommand}
+        onImagePicked={payload => setImagePick(payload)}
+        visible={editorFocused}
+      />
+
+      {/* Image size / alignment picker modal */}
+      {imagePick && (
+        <ImageSizeModal
+          url={imagePick.url}
+          savedRange={imagePick.savedRange}
+          onInsert={insertImage}
+          onClose={() => setImagePick(null)}
+        />
+      )}
 
       <style>{`
         [contenteditable]:empty:before {

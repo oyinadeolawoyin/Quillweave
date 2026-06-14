@@ -587,21 +587,21 @@ export function ReEnterShopModal({ isOpen, onClose, onEnter, groupSprint }) {
 export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = false, linkedProject = null, sprintType = "WRITING" }) {
   const navigate = useNavigate();
   const [currentWords, setCurrentWords] = useState("");
-  const [context, setContext]           = useState("");
-  const [tags, setTags]                 = useState("");
-  const [mediaFile, setMediaFile]       = useState(null);
-  const [mediaPreview, setMediaPreview] = useState(null);
-  const [mediaType, setMediaType]       = useState(null);
   const [submitting, setSubmitting]     = useState(false);
   const [error, setError]               = useState("");
   const [capturedSprintId, setCapturedSprintId] = useState(null);
-  const fileInputRef = useRef(null);
+  const [dailyThreadId, setDailyThreadId] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
-      setCurrentWords(""); setContext(""); setTags(""); setError(""); setSubmitting(false);
-      setMediaFile(null); setMediaPreview(null); setMediaType(null);
+      setCurrentWords(""); setError(""); setSubmitting(false);
       if (sprintId) setCapturedSprintId(sprintId);
+
+      // Fetch the Daily Writing Challenge thread so we can link to it
+      fetch(`${API_URL}/threads/daily`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setDailyThreadId(d?.thread?.id ?? null))
+        .catch(() => setDailyThreadId(null));
     }
   }, [isOpen, sprintId]);
 
@@ -614,45 +614,21 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
   const effectiveId = capturedSprintId || sprintId;
   const isReadingSprint = sprintType === "READING";
 
-  function handleMediaChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    if (!isImage && !isVideo) { setError("Only images and videos are supported."); return; }
-    setMediaFile(file); setMediaType(isImage ? "image" : "video");
-    setMediaPreview(URL.createObjectURL(file)); setError("");
-  }
-
-  function removeMedia() {
-    setMediaFile(null); setMediaPreview(null); setMediaType(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
   async function handleSubmit() {
     const val = parseInt(currentWords, 10);
     if (!isReadingSprint && (isNaN(val) || val < 0)) { setError("Please enter a valid word count."); return; }
     if (!effectiveId) { setError("Still loading your session — please wait a moment."); return; }
     setSubmitting(true); setError("");
     try {
-      let snippetPromise = Promise.resolve(null);
-      if (context.trim()) {
-        const formData = new FormData();
-        formData.append("context", context.trim());
-        if (tags.trim()) formData.append("tags", tags.trim());
-        formData.append("sourceType", "POST_SPRINT");
-        if (mediaFile) formData.append("media", mediaFile);
-        snippetPromise = fetch(`${API_URL}/snippets`, { method: "POST", credentials: "include", body: formData });
-      }
-      const checkoutPromise = fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
+      const res = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
         body: JSON.stringify({ currentWordCount: isReadingSprint ? 0 : val }),
       });
-      const [res, snippetRes] = await Promise.all([checkoutPromise, snippetPromise]);
       if (!res.ok) throw new Error("Checkout failed");
-      if (snippetRes && !snippetRes.ok) { const e = await snippetRes.json().catch(() => ({})); throw new Error(e.message || "Snippet save failed"); }
       onSubmit();
-      if (!isEarly) navigate("/snippets", { state: { fromSprint: true } });
+      if (!isEarly) {
+        navigate(`/threads/${2}` , { state: { fromSprint: true } });
+      }
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -684,30 +660,21 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
           </Field>
         )}
 
-        <Field label={isReadingSprint ? "Any thoughts from your reading?" : "Share a reflection"} optional>
-          <textarea value={context} onChange={e => setContext(e.target.value)}
-            placeholder={isReadingSprint ? "What did you read? Any passages that stayed with you?" : "How was your writing today?"}
-            rows={3}
-            className="w-full text-[#2d3748] text-sm leading-relaxed placeholder-[#c4bdb4] resize-none border border-[#e8e0d0] rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/30 focus:border-[#d4af37] transition-all bg-[#faf7f2]"
-          />
-        </Field>
-
-        <div>
-          {mediaPreview ? (
-            <div className="relative rounded-xl overflow-hidden border border-[#e8e0d0]">
-              {mediaType === "image" ? <img src={mediaPreview} alt="Preview" className="w-full max-h-56 object-cover" /> : <video src={mediaPreview} controls className="w-full max-h-56 rounded-xl" />}
-              <button type="button" onClick={removeMedia} className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-all">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-          ) : (
-            <button type="button" onClick={() => fileInputRef.current?.click()}
-              className="w-full border border-dashed border-[#d6d0c8] rounded-xl py-4 flex items-center justify-center gap-2.5 text-[#9a8c7a] hover:border-[#d4af37] hover:text-[#d4af37] transition-all bg-[#faf7f2]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              <span className="text-sm">Attach an image or video</span>
-            </button>
-          )}
-          <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleMediaChange} className="hidden" />
+        <div className="px-4 py-4 rounded-xl bg-[#fffbf0] border border-[#f0e0bb] space-y-2">
+          <p className="text-sm text-[#2d3748] leading-relaxed">
+            {isReadingSprint
+              ? "Tell the community what you read today — drop it in the Daily Writing Challenge thread."
+              : "Tell the community what you're writing today — drop it in the Daily Writing Challenge thread."}
+          </p>
+          {/* <a
+            href={`/threads/${2}`}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#d4af37] hover:text-[#b8932c] transition-all"
+          >
+            Go to the Daily Writing Challenge
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </a> */}
         </div>
 
         {error && <p className="text-xs text-red-500">{error}</p>}
@@ -718,7 +685,7 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
           )}
           <button onClick={handleSubmit} disabled={submitting || (!isReadingSprint && !currentWords)}
             className="flex-1 py-3 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:bg-[#3d4f64] transition-all disabled:opacity-40">
-            {submitting ? "Saving…" : isEarly ? "Check out" : "Check out & share"}
+            {submitting ? "Saving…" : "Check out"}
           </button>
         </div>
       </div>

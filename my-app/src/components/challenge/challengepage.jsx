@@ -553,6 +553,7 @@ function MyStats({ participation }) {
   const total     = participation.totalLogged ?? 0;
   const streak    = participation.currentStreak ?? 0;
   const longest   = participation.longestStreak ?? 0;
+  const missed    = participation.missedDaysInRow ?? 0;
 
   // Streak emotion
   const streakEmoji = streak >= 14 ? "🔥" : streak >= 7 ? "🔥" : streak >= 3 ? "✦" : null;
@@ -621,6 +622,21 @@ function MyStats({ participation }) {
           </svg>
         </div>
       </div>
+
+      {/* ── Missed days warning — only shown if writer has missed at least 1 day ── */}
+      {missed > 0 && (
+        <div className="px-6 py-3 border-b border-[#f0ebe3] flex items-center gap-2.5" style={{ background: "#fdf6f0" }}>
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="#c2703d" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.34 3.94l-8.2 14.2A1.5 1.5 0 003.5 20.4h17a1.5 1.5 0 001.3-2.26l-8.2-14.2a1.5 1.5 0 00-2.6 0z" />
+          </svg>
+          <p className="text-[12px] text-[#a8552c]">
+            {missed} day{missed === 1 ? "" : "s"} missed in a row.{" "}
+            {missed >= 3
+              ? "Your current streak has been reset."
+              : `${3 - missed} more and your streak resets.`}
+          </p>
+        </div>
+      )}
 
       {/* ── Bottom: daily goal mini-ring ── */}
       <div className="px-6 py-4 flex items-center gap-4">

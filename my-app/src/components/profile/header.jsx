@@ -96,7 +96,7 @@ export default function Header() {
     // { to: "/snippets",  label: "Community" },
 
     // { to: "/thesaurus", label: "Thesaurus" },
-    { to: "/blog",      label: "Blog"      },
+    { to: "/communityNews",      label: "Community News"      },
   ];
 
   function isActive(to) {
@@ -116,7 +116,7 @@ export default function Header() {
             <Link to="/" className="flex items-center gap-1.5 shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37]" aria-hidden="true" />
               <span className="text-[22px] font-serif font-semibold tracking-wide text-[#2d3748]">
-                Quill<span className="text-[#b8860b]">weave</span>
+                Ink<span className="text-[#b8860b]">well</span>
               </span>
             </Link>
 
