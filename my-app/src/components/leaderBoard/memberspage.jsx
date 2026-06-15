@@ -85,14 +85,14 @@ function LeaderRow({ rank, user, stat, statLabel }) {
   );
 }
 
-function LeaderboardCard({ title, icon, color, rows, emptyMsg }) {
+function LeaderboardCard({ title, icon, color, rows, emptyMsg, eyebrow = "All-Time Best" }) {
   return (
     <div className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden">
       <div className="px-5 pt-5 pb-4 border-b border-[#f0ead8]">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">{icon}</span>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color }}>
-            All-Time Best
+            {eyebrow}
           </p>
         </div>
         <h3 className="font-serif text-[#1a1a2e] text-[17px] font-bold leading-tight">{title}</h3>
@@ -106,8 +106,14 @@ function LeaderboardCard({ title, icon, color, rows, emptyMsg }) {
               key={r.user?.id}
               rank={r.rank}
               user={r.user}
-              stat={r.critiqueCount ?? r.sprintCount ?? r.practiceCount ?? 0}
-              statLabel={r.critiqueCount != null ? "critiques" : r.sprintCount != null ? "sprints" : "entries"}
+              stat={r.critiqueCount ?? r.sprintCount ?? r.practiceCount ?? r.currentStreak ?? 0}
+              statLabel={
+                r.critiqueCount != null ? "critiques"
+                : r.sprintCount != null ? "sprints"
+                : r.practiceCount != null ? "entries"
+                : r.currentStreak != null ? (r.currentStreak === 1 ? "day streak" : "days streak")
+                : "entries"
+              }
             />
           ))
         )}
@@ -243,6 +249,7 @@ function SearchResultCard({ result, onClose }) {
 
 export default function MembersPage() {
   const [data, setData] = useState(null);
+  const [streakLeaders, setStreakLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -258,10 +265,19 @@ export default function MembersPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/leaderboard/members`, { credentials: "include" });
-        if (!res.ok) throw new Error("Failed to load");
-        const json = await res.json();
+        const [membersRes, challengeRes] = await Promise.all([
+          fetch(`${API_URL}/leaderboard/members`, { credentials: "include" }),
+          fetch(`${API_URL}/challenge/stats`),
+        ]);
+        if (!membersRes.ok) throw new Error("Failed to load");
+        const json = await membersRes.json();
         setData(json);
+
+        if (challengeRes.ok) {
+          const challengeJson = await challengeRes.json();
+          const leaders = (challengeJson.streakLeaders ?? []).map((r, i) => ({ ...r, rank: i + 1 }));
+          setStreakLeaders(leaders);
+        }
       } catch (e) {
         setError("Couldn't load member data. Please try again.");
       } finally {
@@ -408,7 +424,7 @@ export default function MembersPage() {
                   Hall of Fame
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 <LeaderboardCard
                   title="Critiquer"
                   icon="✍️"
@@ -429,6 +445,14 @@ export default function MembersPage() {
                   color="#059669"
                   rows={data.practiceWriters}
                   emptyMsg="No emotion cue practice yet."
+                />
+                <LeaderboardCard
+                  title="Writing Streak"
+                  icon="🔥"
+                  color="#dc2626"
+                  rows={streakLeaders}
+                  emptyMsg="No active streaks yet — join the daily challenge!"
+                  eyebrow="Current Streak"
                 />
               </div>
             </section>

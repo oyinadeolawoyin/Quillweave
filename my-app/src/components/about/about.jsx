@@ -71,7 +71,46 @@ function WriterAvatar({ writer, delay }) {
   );
 }
 
-// ── What you'll find here ─────────────────────────────────────────────────────
+// ── Community highlight card ──────────────────────────────────────────────────
+function HighlightCard({ label, icon, user, value, unit, delay }) {
+  const [ref, inView] = useInView(0.1);
+  if (!user) return null;
+  const initials = (user.username || "").slice(0, 2).toUpperCase();
+
+  return (
+    <div
+      ref={ref}
+      className="bg-white border border-[#e8e0d0] rounded-xl p-6 text-center hover:border-[#d4af37]/50 transition-colors duration-300"
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? "translateY(0)" : "translateY(20px)",
+        transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
+      }}
+    >
+      <div className="text-2xl mb-3">{icon}</div>
+      <p className="text-[11px] tracking-[0.25em] text-[#d4af37] uppercase mb-4">{label}</p>
+
+      {user.avatar ? (
+        <img
+          src={user.avatar}
+          alt={user.username}
+          className="w-14 h-14 rounded-full object-cover mx-auto mb-3 ring-2 ring-[#fffdf0]"
+        />
+      ) : (
+        <div className="w-14 h-14 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center text-lg font-semibold mx-auto mb-3 ring-2 ring-[#fffdf0]">
+          {initials}
+        </div>
+      )}
+
+      <p className="font-serif text-[#1a1a2e] text-base mb-1">@{user.username}</p>
+      <p className="text-[#9a8c7a] text-[13px]">
+        {value} {unit}
+      </p>
+    </div>
+  );
+}
+
+
 const WHAT_YOU_FIND = [
   {
     title: "Accountability",
@@ -98,6 +137,12 @@ const WHO_ITS_FOR = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function About() {
   const [writers, setWriters] = useState([]);
+  const [highlights, setHighlights] = useState({
+    streakLeader: null,
+    topCritiquer: null,
+    topSprinter: null,
+    topPracticeWriter: null,
+  });
 
   useEffect(() => {
     async function loadWriters() {
@@ -110,8 +155,43 @@ export default function About() {
         console.error("Failed to load writers:", err);
       }
     }
+
+    async function loadHighlights() {
+      try {
+        const [leaderboardRes, challengeRes] = await Promise.all([
+          fetch(`${API_URL}/leaderboard`),
+          fetch(`${API_URL}/challenge/stats`),
+        ]);
+
+        const leaderboard = leaderboardRes.ok ? await leaderboardRes.json() : null;
+        const challenge   = challengeRes.ok ? await challengeRes.json() : null;
+
+        const streakTop = challenge?.streakLeaders?.[0];
+
+        setHighlights({
+          streakLeader: streakTop
+            ? { user: streakTop.user, value: streakTop.currentStreak }
+            : null,
+          topCritiquer: leaderboard?.critiquers?.[0]
+            ? { user: leaderboard.critiquers[0].user, value: leaderboard.critiquers[0].critiqueCount }
+            : null,
+          topSprinter: leaderboard?.sprinters?.[0]
+            ? { user: leaderboard.sprinters[0].user, value: leaderboard.sprinters[0].sprintCount }
+            : null,
+          topPracticeWriter: leaderboard?.practiceWriters?.[0]
+            ? { user: leaderboard.practiceWriters[0].user, value: leaderboard.practiceWriters[0].practiceCount }
+            : null,
+        });
+      } catch (err) {
+        console.error("Failed to load community highlights:", err);
+      }
+    }
+
     loadWriters();
+    loadHighlights();
   }, []);
+
+  const hasHighlights = Object.values(highlights).some(Boolean);
 
   return (
     <div className="min-h-screen bg-[#f5f3ef]">
@@ -267,6 +347,57 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      {/* ── Community Highlights ─────────────────────────────────────────── */}
+      {hasHighlights && (
+        <section className="bg-[#fffdf0]">
+          <div className="max-w-4xl mx-auto px-6 py-20 sm:py-24">
+            <FadeIn>
+              <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5 text-center">
+                Community Highlights
+              </p>
+              <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-12 text-center">
+                Writers leading the way.
+              </h2>
+            </FadeIn>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+              <HighlightCard
+                label="Longest Streak"
+                icon="🔥"
+                user={highlights.streakLeader?.user}
+                value={highlights.streakLeader?.value}
+                unit={highlights.streakLeader?.value === 1 ? "day streak" : "day streak"}
+                delay={0}
+              />
+              <HighlightCard
+                label="Top Critiquer"
+                icon="✍️"
+                user={highlights.topCritiquer?.user}
+                value={highlights.topCritiquer?.value}
+                unit={highlights.topCritiquer?.value === 1 ? "critique" : "critiques"}
+                delay={80}
+              />
+              <HighlightCard
+                label="Top Sprinter"
+                icon="⏱️"
+                user={highlights.topSprinter?.user}
+                value={highlights.topSprinter?.value}
+                unit={highlights.topSprinter?.value === 1 ? "sprint" : "sprints"}
+                delay={160}
+              />
+              <HighlightCard
+                label="Emotion Practice"
+                icon="💛"
+                user={highlights.topPracticeWriter?.user}
+                value={highlights.topPracticeWriter?.value}
+                unit={highlights.topPracticeWriter?.value === 1 ? "session" : "sessions"}
+                delay={240}
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Writers already here ─────────────────────────────────────────── */}
       {writers.length > 0 && (
