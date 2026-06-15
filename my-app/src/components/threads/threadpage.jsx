@@ -279,6 +279,49 @@ function FormattedText({ content, className = "" }) {
 }
 
 
+// ─── Welcome nudge — shown to brand-new signups, points them to the daily challenge ──
+
+function WelcomeChallengeNudge({ onDismiss }) {
+  return (
+    <div
+      className="mb-6 rounded-2xl overflow-hidden border border-[#d4af37]/40 bg-gradient-to-r from-[#1a1a2e] to-[#2d2b4a] relative"
+      style={{ animation: "welcomeFadeIn 0.5s ease both" }}
+    >
+      <button
+        onClick={onDismiss}
+        className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+        aria-label="Dismiss"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <div className="px-6 py-6 sm:px-8 sm:py-7 sm:flex sm:items-center sm:justify-between gap-6">
+        <div className="pr-8">
+          <p className="text-[11px] tracking-[0.3em] text-[#d4af37] uppercase mb-2">Welcome to Inkwell</p>
+          <h3 className="font-serif text-white text-xl sm:text-2xl mb-2">
+            Glad you're here — say hi below 👋
+          </h3>
+          <p className="text-white/60 text-[13px] sm:text-[14px] leading-relaxed max-w-md">
+            While you're at it, why not start your streak today? Join the daily
+            writing challenge and show up alongside other writers.
+          </p>
+        </div>
+        <div className="mt-4 sm:mt-0 flex-shrink-0">
+          <Link
+            to="/challenge"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a1a2e] text-[13px] font-bold rounded-xl hover:bg-[#c9a42d] transition-colors whitespace-nowrap"
+          >
+            Join the daily challenge
+          </Link>
+        </div>
+      </div>
+      <style>{`@keyframes welcomeFadeIn { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }`}</style>
+    </div>
+  );
+}
+
+
 function LikeButton({ count, liked, onToggle, disabled, size = "md" }) {
   const [pop, setPop] = useState(false);
 
@@ -864,6 +907,19 @@ export default function ThreadPage() {
   const targetCommentId = searchParams.get("comment") ? Number(searchParams.get("comment")) : null;
   const targetReplyId   = searchParams.get("reply")   ? Number(searchParams.get("reply"))   : null;
 
+  // New-signup welcome nudge: shown when redirected here as ?welcome=1
+  const isWelcome = searchParams.get("welcome") === "1";
+  const [showWelcome, setShowWelcome] = useState(isWelcome);
+
+  function dismissWelcome() {
+    setShowWelcome(false);
+    // Clean the query param so a refresh doesn't re-trigger the nudge
+    const params = new URLSearchParams(location.search);
+    params.delete("welcome");
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }
+
+
   const load = useCallback(async () => {
     try {
       const [tRes, cRes] = await Promise.all([
@@ -1066,6 +1122,8 @@ export default function ThreadPage() {
 
       {/* ── Comments section ── */}
       <div className="max-w-4xl mx-auto px-4 sm:px-8 pb-20">
+
+        {showWelcome && <WelcomeChallengeNudge onDismiss={dismissWelcome} />}
 
         {/* Section header */}
         <div className="flex items-center justify-between mb-6">
