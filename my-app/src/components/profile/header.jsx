@@ -93,10 +93,10 @@ export default function Header() {
   const navItems = [
     { to: "/critique",  label: "Spotlight Critique" },
     { to: "/members",   label: "Members"   },
-    // { to: "/snippets",  label: "Community" },
 
     // { to: "/thesaurus", label: "Thesaurus" },
-    { to: "/communityNews",      label: "Community News"      },
+    { to: "/communityNews",      label: "Community News"},
+    { to: "/about",  label: "About" }
   ];
 
   function isActive(to) {

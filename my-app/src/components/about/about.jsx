@@ -62,21 +62,37 @@ function WriterAvatar({ writer, delay }) {
           className="w-12 h-12 rounded-full object-cover ring-2 ring-white shadow-soft"
         />
       ) : (
-        <div className="w-12 h-12 rounded-full bg-[#2d3748] text-white flex items-center justify-center text-sm font-semibold ring-2 ring-white shadow-soft">
+        <div className="w-12 h-12 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center text-sm font-semibold ring-2 ring-white shadow-soft">
           {initials}
         </div>
       )}
-      <span className="text-[11px] text-[#737373]">@{writer.username}</span>
+      <span className="text-[11px] text-[#9a8c7a]">@{writer.username}</span>
     </div>
   );
 }
 
+// ── What you'll find here ─────────────────────────────────────────────────────
+const WHAT_YOU_FIND = [
+  {
+    title: "Accountability",
+    body: "Show up to community sprints, track your progress, and build a writing habit that sticks — without pressure or guilt.",
+  },
+  {
+    title: "Critique",
+    body: "Share your work and get thoughtful feedback from other writers who want to see it improve, not just be praised.",
+  },
+  {
+    title: "Connection",
+    body: "Meet writers who understand the work — the slow days, the breakthroughs, and everything in between.",
+  },
+];
+
 // ── Who it's for list ─────────────────────────────────────────────────────────
 const WHO_ITS_FOR = [
-  "struggle to stay consistent",
+  "want consistency without pressure",
+  "are ready for honest feedback on their work",
   "feel lonely in their writing journey",
-  "want quiet accountability",
-  "want progress without pressure",
+  "want to be part of a community of writers",
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -98,20 +114,19 @@ export default function About() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#fafaf9]">
+    <div className="min-h-screen bg-[#f5f3ef]">
       <AppMetaTags
-        title="About Inkwell — A Place to Write"
-        description="Inkwell exists to give writers a place to find their rhythm and feel less alone in their creative journey."
+        title="About Inkwell — A Place to Write, Together"
+        description="Inkwell helps writers stay accountable, get meaningful critique, and connect with a community that takes the craft seriously."
       />
       <Header />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-[#fafaf9]">
-        {/* Decorative background ink-blot */}
+      <section className="relative overflow-hidden bg-[#1a1a2e] border-b border-white/10">
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
           style={{
-            background: "radial-gradient(circle, rgba(212,175,55,0.06) 0%, transparent 70%)",
+            background: "radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%)",
           }}
         />
 
@@ -124,12 +139,12 @@ export default function About() {
           </p>
 
           <h1
-            className="text-4xl sm:text-5xl md:text-[3.5rem] font-serif text-[#2d3748] leading-[1.2] mb-8"
+            className="text-4xl sm:text-5xl md:text-[3.5rem] font-serif text-white leading-[1.2] mb-8"
             style={{ animation: "inkFadeUp 0.9s ease 0.25s both" }}
           >
-            Writing is often
+            Writing gets better
             <br />
-            <em className="not-italic text-[#4a4a4a]">portrayed as solitary.</em>
+            <em className="not-italic text-[#d4af37]">when you don't do it alone.</em>
           </h1>
 
           <GoldLine
@@ -138,89 +153,87 @@ export default function About() {
           />
 
           <div style={{ animation: "inkFadeUp 0.9s ease 0.5s both" }}>
-            <p className="text-lg sm:text-xl text-[#4a4a4a] leading-[1.8] max-w-lg mx-auto">
-              But many writers don't need pressure.
+            <p className="text-lg sm:text-xl text-white/70 leading-[1.8] max-w-lg mx-auto">
+              Inkwell used to be a quiet place to write.
               <br />
-              They need a space where imperfect words
+              Now it's where writers show up, improve,
               <br />
-              are allowed to exist.
-            </p>
-            <p className="mt-8 text-2xl sm:text-3xl font-serif text-[#2d3748]">
-              Inkwell was created for that space.
+              and find people who get it.
             </p>
           </div>
         </div>
       </section>
 
-      {/* ── What Inkwell is ──────────────────────────────────────────────── */}
-      <section className="bg-white">
+      {/* ── What you'll find here ────────────────────────────────────────── */}
+      <section className="bg-[#fffdf0]">
         <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24">
           <FadeIn>
             <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
               What it is
             </p>
-            <h2 className="text-3xl sm:text-4xl font-serif text-[#2d3748] leading-snug mb-6">
-              A quiet writing environment.
+            <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-12">
+              Three things Inkwell gives you.
             </h2>
-            <p className="text-lg text-[#4a4a4a] leading-[1.8] mb-10">
-              Inkwell is where writers show up together, write at their own pace,
-              and build consistency without pressure.
-            </p>
           </FadeIn>
 
-          <FadeIn delay={150}>
-            <blockquote className="border-l-[3px] border-[#d4af37] pl-7 py-2 my-2">
-              <p className="text-2xl sm:text-3xl font-serif text-[#2d3748] italic leading-relaxed">
-                "No noise. No performance.
-                <br />
-                Just presence."
-              </p>
-            </blockquote>
-          </FadeIn>
-
-          <FadeIn delay={250}>
-            <p className="text-lg text-[#4a4a4a] leading-[1.8] mt-10">
-              It's not about writing more.
-              <br />
-              It's about returning to the page.
-            </p>
-          </FadeIn>
+          <div className="space-y-8">
+            {WHAT_YOU_FIND.map((item, i) => (
+              <FadeIn key={item.title} delay={i * 120}>
+                <div className="group bg-white border border-[#e8e0d0] rounded-xl p-6 sm:p-8 sm:flex sm:items-start sm:gap-6 hover:border-[#d4af37]/50 transition-colors duration-300">
+                  <div
+                    className="hidden sm:flex w-12 h-12 rounded-full items-center justify-center flex-shrink-0 font-serif text-lg"
+                    style={{ background: "#d4af37" + "1a", color: "#d4af37" }}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3 mb-3 sm:hidden">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
+                      <h3 className="text-xl font-serif text-[#1a1a2e]">{item.title}</h3>
+                    </div>
+                    <h3 className="hidden sm:block text-xl font-serif text-[#1a1a2e] mb-2">{item.title}</h3>
+                    <p className="text-[15px] text-[#6b5c4a] leading-[1.8]">{item.body}</p>
+                  </div>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ── Why it exists ────────────────────────────────────────────────── */}
-      <section className="bg-[#fafaf9]">
+      <section className="bg-[#f5f3ef]">
         <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24">
           <FadeIn>
             <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
               Why it exists
             </p>
-            <h2 className="text-3xl sm:text-4xl font-serif text-[#2d3748] leading-snug mb-8">
-              Consistency doesn't come from force.
+            <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-8">
+              Finishing your work takes more than willpower.
             </h2>
-            <p className="text-lg text-[#4a4a4a] leading-[1.8] mb-6">
-              It comes from feeling safe enough to begin again.
+            <p className="text-lg text-[#6b5c4a] leading-[1.8] mb-6">
+              It takes people who notice when you show up — and who'll tell you,
+              kindly and honestly, when something isn't working yet.
             </p>
-            <p className="text-lg text-[#4a4a4a] leading-[1.8]">
-              So we built a place where writers can write quietly together, track
-              progress gently, and rediscover the joy of showing up.
+            <p className="text-lg text-[#6b5c4a] leading-[1.8]">
+              That's what Inkwell is built around: regular sprints to keep you
+              consistent, a space to get real feedback, and a community of writers
+              who are doing the same thing you are.
             </p>
           </FadeIn>
         </div>
       </section>
 
       {/* ── Mission banner ───────────────────────────────────────────────── */}
-      <section className="bg-[#2d3748]">
+      <section className="bg-[#1a1a2e]">
         <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24 text-center">
           <FadeIn>
             <GoldLine className="mx-auto mb-10" />
             <p className="text-2xl sm:text-3xl md:text-4xl font-serif text-white leading-[1.6] mb-4">
-              To make writing more human
-              <br />
-              and more joyful
+              To help writers finish what they start
             </p>
-            <p className="text-lg text-gray-300 leading-relaxed">
-              by bringing writers together in quiet, supportive presence.
+            <p className="text-lg text-white/60 leading-relaxed">
+              through accountability, honest critique, and a community that cares about the craft.
             </p>
             <GoldLine className="mx-auto mt-10" />
           </FadeIn>
@@ -228,13 +241,13 @@ export default function About() {
       </section>
 
       {/* ── Who it's for ─────────────────────────────────────────────────── */}
-      <section className="bg-white">
+      <section className="bg-[#fffdf0]">
         <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24">
           <FadeIn>
             <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
               Who it's for
             </p>
-            <h2 className="text-3xl sm:text-4xl font-serif text-[#2d3748] leading-snug mb-12">
+            <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-12">
               Inkwell is for writers who —
             </h2>
           </FadeIn>
@@ -247,7 +260,7 @@ export default function About() {
                     className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{ background: "#d4af37" }}
                   />
-                  <p className="text-lg text-[#4a4a4a]">{item}</p>
+                  <p className="text-lg text-[#6b5c4a]">{item}</p>
                 </div>
               </FadeIn>
             ))}
@@ -257,18 +270,17 @@ export default function About() {
 
       {/* ── Writers already here ─────────────────────────────────────────── */}
       {writers.length > 0 && (
-        <section className="bg-[#fafaf9]">
+        <section className="bg-[#f5f3ef]">
           <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24 text-center">
             <FadeIn>
               <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
                 The community
               </p>
-              <h2 className="text-2xl sm:text-3xl font-serif text-[#2d3748] mb-3">
+              <h2 className="text-2xl sm:text-3xl font-serif text-[#1a1a2e] mb-3">
                 Writers are already here.
               </h2>
-              <p className="text-[#737373] mb-12 max-w-sm mx-auto">
-                Writing together in quiet sessions,
-                building their rhythm.
+              <p className="text-[#9a8c7a] mb-12 max-w-sm mx-auto">
+                Showing up to sprints, sharing their work, and helping each other improve.
               </p>
             </FadeIn>
 
@@ -281,35 +293,84 @@ export default function About() {
         </section>
       )}
 
-      {/* ── Write with us (Discord) ───────────────────────────────────────── */}
-      <section className="bg-white">
+      {/* ── Community Partners ───────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-[#1a1a2e]">
+        <div
+          className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/3"
+          style={{
+            background: "radial-gradient(circle, rgba(212,175,55,0.10) 0%, transparent 70%)",
+          }}
+        />
+        <div className="relative max-w-4xl mx-auto px-6 py-20 sm:py-28">
+          <FadeIn>
+            <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5 text-center">
+              With Gratitude
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-serif text-white leading-snug mb-6 text-center max-w-xl mx-auto">
+              A community that helps Inkwell grow.
+            </h2>
+            <p className="text-white/60 text-lg leading-[1.8] text-center max-w-lg mx-auto mb-14">
+              We're grateful to partner with Writers' Circle — a community that
+              shares Inkwell with its members and welcomes them into our
+              sprints, critique spaces, and writing sessions.
+            </p>
+          </FadeIn>
+
+          <FadeIn delay={140}>
+            <div className="bg-[#fffdf0] rounded-2xl overflow-hidden shadow-soft sm:flex sm:items-stretch">
+              {/* Partner image */}
+              <div className="sm:w-[42%] h-56 sm:h-auto relative">
+                <img
+                  src="writersCircle.png"
+                  alt="Writers' Circle"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a2e]/30 to-transparent sm:bg-gradient-to-r" />
+              </div>
+
+              {/* Partner content */}
+              <div className="flex-1 p-8 sm:p-10 flex flex-col justify-center">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
+                  <p className="text-[11px] tracking-[0.3em] text-[#d4af37] uppercase">Community Partner</p>
+                </div>
+                <h3 className="text-2xl font-serif text-[#1a1a2e] mb-4">Writers' Circle</h3>
+                <p className="text-[15px] text-[#6b5c4a] leading-[1.8]">
+                  Writers' Circle is a close-knit, supportive community of
+                  writers in its own right. As a partner, they generously
+                  share Inkwell's events and sessions with their members —
+                  contributing to our community and helping more writers
+                  find a space to write, get feedback, and grow. We're
+                  grateful for their support and the spirit they bring to it.
+                </p>
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ── Write with us (Inkwell Discord) ──────────────────────────────── */}
+      <section className="bg-[#f5f3ef]">
         <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24 text-center">
           <FadeIn>
             <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
               Write with us
             </p>
-            <h2 className="text-2xl sm:text-3xl font-serif text-[#2d3748] mb-4">
+            <h2 className="text-2xl sm:text-3xl font-serif text-[#1a1a2e] mb-4">
               You don't have to write alone.
             </h2>
-            <p className="text-[#737373] mb-10 max-w-md mx-auto leading-relaxed">
-              If you'd like to join occasional group sessions,
-              you can find the community here.
+            <p className="text-[#9a8c7a] mb-10 max-w-md mx-auto leading-relaxed">
+              Join sprint sessions, get feedback on your work, and find your people
+              in the Inkwell community.
             </p>
 
             <a
               href="https://discord.gg/DYHJK6EP"
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-3 px-8 py-4 border border-[#2d3748] text-[#2d3748] text-sm font-medium rounded-xl hover:bg-[#2d3748] hover:text-white transition-all duration-300"
+              className="group inline-flex items-center gap-3 px-8 py-4 border border-[#1a1a2e] text-[#1a1a2e] text-sm font-medium rounded-xl hover:bg-[#1a1a2e] hover:text-white transition-all duration-300"
             >
-              {/* Discord icon */}
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
               </svg>
               Join the community
@@ -319,21 +380,21 @@ export default function About() {
       </section>
 
       {/* ── Closing ──────────────────────────────────────────────────────── */}
-      <section className="bg-[#2d3748]">
+      <section className="bg-[#1a1a2e]">
         <div className="max-w-3xl mx-auto px-6 py-28 sm:py-36 text-center">
           <FadeIn>
             <GoldLine className="mx-auto mb-12" />
             <p className="text-4xl sm:text-5xl md:text-[3.25rem] font-serif text-white leading-[1.5]">
-              A place to write.
+              Show up.
               <br />
-              A place to return.
+              Get better.
               <br />
-              A place to belong.
+              Belong somewhere.
             </p>
             <GoldLine className="mx-auto mt-12 mb-14" />
             <Link
               to="/signup"
-              className="inline-block px-10 py-4 bg-[#d4af37] text-[#2d3748] text-sm font-semibold rounded-xl hover:opacity-90 transition-all duration-200 shadow-soft"
+              className="inline-block px-10 py-4 bg-[#d4af37] text-[#1a1a2e] text-sm font-semibold rounded-xl hover:opacity-90 transition-all duration-200 shadow-soft"
             >
               Start Writing Today
             </Link>
@@ -342,8 +403,8 @@ export default function About() {
       </section>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer className="bg-[#2d3748] border-t border-white/10 py-6 text-center">
-        <p className="text-sm text-gray-500">
+      <footer className="bg-[#1a1a2e] border-t border-white/10 py-6 text-center">
+        <p className="text-sm text-white/40">
           © {new Date().getFullYear()} Inkwell. Made with care for writers.
         </p>
       </footer>

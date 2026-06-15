@@ -229,7 +229,55 @@ function ImageSlideshow({ urls }) {
   );
 }
 
-// ─── Animated Like button ─────────────────────────────────────────────────────
+// ─── Formatted text — preserves paragraphs/line breaks, supports **bold** and *italic*/_italic_ ──
+
+// Splits a single line into text/bold/italic segments based on simple markdown.
+function parseInlineFormatting(line, keyPrefix) {
+  // Order matters: bold (**) before italic (* or _) so **x** isn't mistaken for italic.
+  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g;
+  const parts = line.split(pattern);
+  return parts.map((part, i) => {
+    if (!part) return null;
+    const key = `${keyPrefix}-${i}`;
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={key}>{part.slice(2, -2)}</strong>;
+    }
+    if (
+      (part.startsWith("*") && part.endsWith("*") && part.length > 2) ||
+      (part.startsWith("_") && part.endsWith("_") && part.length > 2)
+    ) {
+      return <em key={key}>{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+}
+
+// Renders text content with paragraphs preserved (blank-line separated),
+// single line breaks kept within a paragraph, and **bold**/*italic* support.
+function FormattedText({ content, className = "" }) {
+  if (!content) return null;
+
+  const paragraphs = content.split(/\n{2,}/);
+
+  return (
+    <div className={className}>
+      {paragraphs.map((para, pIdx) => {
+        const lines = para.split("\n");
+        return (
+          <p key={pIdx} className={pIdx > 0 ? "mt-3" : ""}>
+            {lines.map((line, lIdx) => (
+              <span key={lIdx}>
+                {parseInlineFormatting(line, `${pIdx}-${lIdx}`)}
+                {lIdx < lines.length - 1 && <br />}
+              </span>
+            ))}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 
 function LikeButton({ count, liked, onToggle, disabled, size = "md" }) {
   const [pop, setPop] = useState(false);
@@ -303,6 +351,29 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
     setFiles(prev => prev.filter((_, idx) => idx !== i));
   }
 
+  // Wraps the current text selection with marker characters (e.g. ** for bold, * for italic).
+  // If nothing is selected, inserts placeholder text wrapped in markers and selects it.
+  function wrapSelection(marker, placeholder) {
+    const el = textRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = value.slice(start, end);
+    const text = selected || placeholder;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const newValue = `${before}${marker}${text}${marker}${after}`;
+    setValue(newValue);
+
+    // Restore focus and selection around the inserted text
+    requestAnimationFrame(() => {
+      el.focus();
+      const selStart = start + marker.length;
+      const selEnd = selStart + text.length;
+      el.setSelectionRange(selStart, selEnd);
+    });
+  }
+
   async function handleSubmit() {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -320,6 +391,25 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
       className="rounded-xl border border-[#e8e0d0] bg-white overflow-hidden"
       style={{ boxShadow: "0 2px 14px rgba(26,26,46,0.07)" }}
     >
+      {/* Formatting toolbar */}
+      <div className="flex items-center gap-1 px-3 pt-2.5">
+        <button
+          type="button"
+          onClick={() => wrapSelection("**", "bold text")}
+          title="Bold (wrap selected text with **)"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-[13px] font-bold text-[#6b5c4a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors"
+        >
+          B
+        </button>
+        <button
+          type="button"
+          onClick={() => wrapSelection("*", "italic text")}
+          title="Italic (wrap selected text with *)"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-[13px] italic font-semibold text-[#6b5c4a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors"
+        >
+          I
+        </button>
+      </div>
       <textarea
         ref={textRef}
         value={value}
@@ -327,13 +417,13 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
         onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit(); }}
         placeholder={placeholder}
         rows={compact ? 2 : 3}
-        className="w-full px-5 pt-4 pb-2 text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none resize-none bg-white leading-relaxed"
+        className="w-full px-5 pt-1.5 pb-2 text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none resize-none bg-white leading-relaxed"
       />
       <MediaPreviewStrip files={files} onRemove={removeFile} />
       {err && <p className="text-[11px] text-[#c0392b] px-5 pt-1">{err}</p>}
       <div className="flex items-center justify-between px-5 pb-3.5 pt-2 bg-white border-t border-[#f4f1ec]">
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-[#c8b89a]">⌘+Enter to post</span>
+          <span className="text-[11px] text-[#c8b89a]">⌘+Enter to post · use **bold**, *italic*, blank line for new paragraph</span>
           {/* media attach */}
           <button
             type="button"
@@ -483,7 +573,7 @@ function ReplyRow({ reply, user, commentId, threadId, onLikeToggled, onReplyTo, 
             )}
             <span className="text-[11px] text-[#c8b89a]">{timeAgo(reply.createdAt)}</span>
           </div>
-          <p className="text-[14px] font-medium text-[#2d2416] leading-relaxed">{reply.content}</p>
+          <FormattedText content={reply.content} className="text-[14px] font-medium text-[#2d2416] leading-relaxed" />
           {/* media in reply */}
           {(() => {
             const urls = parseMediaUrls(reply.mediaUrls);
@@ -669,7 +759,7 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
               </button>
             )}
           </div>
-          <p className="text-[15px] text-[#2d2416] leading-relaxed">{comment.content}</p>
+          <FormattedText content={comment.content} className="text-[15px] text-[#2d2416] leading-relaxed" />
           {/* media in comment */}
           {(() => {
             const urls = parseMediaUrls(comment.mediaUrls);
@@ -949,9 +1039,7 @@ export default function ThreadPage() {
           })()}
 
           <div className="px-7 py-6">
-            <p className="text-[16px] text-[#2d2416] leading-[1.75] whitespace-pre-wrap">
-              {thread.context}
-            </p>
+            <FormattedText content={thread.context} className="text-[16px] text-[#2d2416] leading-[1.75]" />
 
             {thread.link && (
               <a
