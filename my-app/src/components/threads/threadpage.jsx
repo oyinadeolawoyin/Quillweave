@@ -251,10 +251,10 @@ function parseInlineFormatting(line, keyPrefix) {
     if (part.startsWith("@") && part.length > 1) {
       const username = part.slice(1);
       return (
-        <a key={key} href={`/profile-by-username/${username}`}
+        <Link key={key} to={`/profile/${username}`}
           className="font-semibold text-[#1a5fb4] hover:underline">
           {part}
-        </a>
+        </Link>
       );
     }
     return part;
@@ -1148,7 +1148,7 @@ export default function ThreadPage() {
           className="bg-white rounded-2xl border border-[#e8e0d0] overflow-hidden"
           style={{ boxShadow: "0 4px 24px rgba(26,26,46,0.09)" }}
         >
-          {/* Hero image — zoomable, full width, generous height */}
+          {/* Hero image — zoomable, full width, shown at its full natural height (no cropping) */}
           {thread.mediaUrl && (() => {
             const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(thread.mediaUrl);
             return (
@@ -1157,8 +1157,8 @@ export default function ThreadPage() {
                 onClick={() => setHeroLightbox(true)}
               >
                 {isVideo
-                  ? <video src={thread.mediaUrl} className="w-full object-cover" style={{ maxHeight: 480 }} muted />
-                  : <img src={thread.mediaUrl} alt="" className="w-full object-cover transition-transform duration-500 group-hover:scale-[1.01]" style={{ maxHeight: 480 }} />
+                  ? <video src={thread.mediaUrl} className="w-full h-auto" muted />
+                  : <img src={thread.mediaUrl} alt="" className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.01]" />
                 }
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/08 transition-all" />
                 <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/55 rounded-full p-2">
