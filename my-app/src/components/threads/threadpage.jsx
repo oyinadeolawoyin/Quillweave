@@ -231,10 +231,10 @@ function ImageSlideshow({ urls }) {
 
 // ─── Formatted text — preserves paragraphs/line breaks, supports **bold** and *italic*/_italic_ ──
 
-// Splits a single line into text/bold/italic segments based on simple markdown.
+// Splits a single line into text/bold/italic/@mention segments.
 function parseInlineFormatting(line, keyPrefix) {
-  // Order matters: bold (**) before italic (* or _) so **x** isn't mistaken for italic.
-  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g;
+  // Order: bold (**) → italic (* or _) → @mention
+  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_|@[a-zA-Z0-9_]+)/g;
   const parts = line.split(pattern);
   return parts.map((part, i) => {
     if (!part) return null;
@@ -247,6 +247,15 @@ function parseInlineFormatting(line, keyPrefix) {
       (part.startsWith("_") && part.endsWith("_") && part.length > 2)
     ) {
       return <em key={key}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith("@") && part.length > 1) {
+      const username = part.slice(1);
+      return (
+        <a key={key} href={`/profile-by-username/${username}`}
+          className="font-semibold text-[#1a5fb4] hover:underline">
+          {part}
+        </a>
+      );
     }
     return part;
   });
@@ -369,12 +378,20 @@ function LikeButton({ count, liked, onToggle, disabled, size = "md" }) {
 // ─── Compose box — with media upload ─────────────────────────────────────────
 
 function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, autoFocus = false, compact = false }) {
-  const [value, setValue]   = useState("");
-  const [files, setFiles]   = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr]       = useState("");
+  const [value, setValue]             = useState("");
+  const [files, setFiles]             = useState([]);
+  const [saving, setSaving]           = useState(false);
+  const [err, setErr]                 = useState("");
+  // @mention autocomplete state
+  const [mentionQuery, setMentionQuery]   = useState("");   // text after the last @
+  const [mentionResults, setMentionResults] = useState([]);
+  const [mentionIndex, setMentionIndex]   = useState(0);
+  const [mentionAnchor, setMentionAnchor] = useState(null); // caret position where @ was typed
+  const mentionTimer = useRef(null);
+
   const textRef = useRef(null);
   const fileRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     if (autoFocus && textRef.current) {
@@ -383,38 +400,92 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
     }
   }, [autoFocus]);
 
+  // Fetch member suggestions whenever mentionQuery changes
+  useEffect(() => {
+    if (!mentionQuery || mentionQuery.length < 2) { setMentionResults([]); return; }
+    clearTimeout(mentionTimer.current);
+    mentionTimer.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`${API_URL}/threads/members/search?q=${encodeURIComponent(mentionQuery)}`, { credentials: "include" });
+        if (r.ok) { const d = await r.json(); setMentionResults(d.users || []); setMentionIndex(0); }
+      } catch {}
+    }, 220);
+    return () => clearTimeout(mentionTimer.current);
+  }, [mentionQuery]);
+
   function addFiles(incoming) {
-    setFiles(prev => {
-      const combined = [...prev, ...incoming];
-      return combined.slice(0, MAX_IMAGES);
-    });
+    setFiles(prev => [...prev, ...incoming].slice(0, MAX_IMAGES));
   }
 
   function removeFile(i) {
     setFiles(prev => prev.filter((_, idx) => idx !== i));
   }
 
-  // Wraps the current text selection with marker characters (e.g. ** for bold, * for italic).
-  // If nothing is selected, inserts placeholder text wrapped in markers and selects it.
-  function wrapSelection(marker, placeholder) {
+  function wrapSelection(marker, ph) {
     const el = textRef.current;
     if (!el) return;
     const start = el.selectionStart;
-    const end = el.selectionEnd;
+    const end   = el.selectionEnd;
     const selected = value.slice(start, end);
-    const text = selected || placeholder;
-    const before = value.slice(0, start);
-    const after = value.slice(end);
-    const newValue = `${before}${marker}${text}${marker}${after}`;
+    const text = selected || ph;
+    const newValue = `${value.slice(0, start)}${marker}${text}${marker}${value.slice(end)}`;
     setValue(newValue);
-
-    // Restore focus and selection around the inserted text
     requestAnimationFrame(() => {
       el.focus();
-      const selStart = start + marker.length;
-      const selEnd = selStart + text.length;
-      el.setSelectionRange(selStart, selEnd);
+      el.setSelectionRange(start + marker.length, start + marker.length + text.length);
     });
+  }
+
+  // Called on every keystroke in the textarea — detects an active @mention
+  function handleChange(e) {
+    const newVal = e.target.value;
+    setValue(newVal);
+
+    const caret = e.target.selectionStart;
+    // Walk backwards from caret to find if we're inside a @word
+    const before = newVal.slice(0, caret);
+    const match  = before.match(/@([a-zA-Z0-9_]*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionAnchor(caret - match[0].length); // position of the @
+    } else {
+      setMentionQuery("");
+      setMentionResults([]);
+      setMentionAnchor(null);
+    }
+  }
+
+  // Insert the chosen username into the textarea, replacing the @partial text
+  function insertMention(username) {
+    const el = textRef.current;
+    if (!el || mentionAnchor === null) return;
+    const before = value.slice(0, mentionAnchor);
+    const after  = value.slice(el.selectionStart);
+    const inserted = `@${username} `;
+    const newVal = `${before}${inserted}${after}`;
+    setValue(newVal);
+    setMentionResults([]);
+    setMentionQuery("");
+    setMentionAnchor(null);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = mentionAnchor + inserted.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  function handleKeyDown(e) {
+    if (mentionResults.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, mentionResults.length - 1)); return; }
+      if (e.key === "ArrowUp")   { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        insertMention(mentionResults[mentionIndex].username);
+        return;
+      }
+      if (e.key === "Escape") { setMentionResults([]); setMentionQuery(""); return; }
+    }
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit();
   }
 
   async function handleSubmit() {
@@ -429,81 +500,86 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
     } finally { setSaving(false); }
   }
 
+  const showDropdown = mentionResults.length > 0;
+
   return (
-    <div
-      className="rounded-xl border border-[#e8e0d0] bg-white overflow-hidden"
-      style={{ boxShadow: "0 2px 14px rgba(26,26,46,0.07)" }}
-    >
-      {/* Formatting toolbar */}
-      <div className="flex items-center gap-1 px-3 pt-2.5">
-        <button
-          type="button"
-          onClick={() => wrapSelection("**", "bold text")}
-          title="Bold (wrap selected text with **)"
-          className="w-7 h-7 flex items-center justify-center rounded-md text-[13px] font-bold text-[#6b5c4a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors"
-        >
-          B
-        </button>
-        <button
-          type="button"
-          onClick={() => wrapSelection("*", "italic text")}
-          title="Italic (wrap selected text with *)"
-          className="w-7 h-7 flex items-center justify-center rounded-md text-[13px] italic font-semibold text-[#6b5c4a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors"
-        >
-          I
-        </button>
-      </div>
-      <textarea
-        ref={textRef}
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit(); }}
-        placeholder={placeholder}
-        rows={compact ? 2 : 3}
-        className="w-full px-5 pt-1.5 pb-2 text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none resize-none bg-white leading-relaxed"
-      />
-      <MediaPreviewStrip files={files} onRemove={removeFile} />
-      {err && <p className="text-[11px] text-[#c0392b] px-5 pt-1">{err}</p>}
-      <div className="flex items-center justify-between px-5 pb-3.5 pt-2 bg-white border-t border-[#f4f1ec]">
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-[#c8b89a]">⌘+Enter to post · use **bold**, *italic*, blank line for new paragraph</span>
-          {/* media attach */}
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={files.length >= MAX_IMAGES}
-            className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors disabled:opacity-30"
-            title={files.length >= MAX_IMAGES ? `Max ${MAX_IMAGES} images` : "Attach images"}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            className="hidden"
-            onChange={e => { const snapshot = Array.from(e.target.files); e.target.value = ""; addFiles(snapshot); }}
-          />
+    <div className="relative">
+      <div
+        className="rounded-xl border border-[#e8e0d0] bg-white overflow-hidden"
+        style={{ boxShadow: "0 2px 14px rgba(26,26,46,0.07)" }}
+      >
+        {/* Formatting toolbar */}
+        <div className="flex items-center gap-1 px-3 pt-2.5">
+          <button type="button" onClick={() => wrapSelection("**", "bold text")} title="Bold"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-[13px] font-bold text-[#6b5c4a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors">B</button>
+          <button type="button" onClick={() => wrapSelection("*", "italic text")} title="Italic"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-[13px] italic font-semibold text-[#6b5c4a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors">I</button>
+          <span className="w-px h-4 bg-[#e8e0d0] mx-1" />
+          <span className="text-[10px] text-[#c8b89a] font-medium">@ to mention a member</span>
         </div>
-        <div className="flex gap-2 items-center">
-          {onCancel && (
-            <button onClick={onCancel} className="px-3 py-1.5 text-[12px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors">
-              Cancel
+        <textarea
+          ref={textRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          rows={compact ? 2 : 3}
+          className="w-full px-5 pt-1.5 pb-2 text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none resize-none bg-white leading-relaxed"
+        />
+        <MediaPreviewStrip files={files} onRemove={removeFile} />
+        {err && <p className="text-[11px] text-[#c0392b] px-5 pt-1">{err}</p>}
+        <div className="flex items-center justify-between px-5 pb-3.5 pt-2 bg-white border-t border-[#f4f1ec]">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-[#c8b89a]">⌘+Enter to post</span>
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_IMAGES}
+              className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors disabled:opacity-30" title="Attach images">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
             </button>
-          )}
-          <button
-            onClick={handleSubmit}
-            disabled={!value.trim() || saving}
-            className="px-5 py-2 bg-[#1a1a2e] text-white text-[13px] font-semibold rounded-lg hover:bg-[#252545] transition-colors disabled:opacity-40"
-          >
-            {saving ? "Posting…" : "Post"}
-          </button>
+            <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="hidden"
+              onChange={e => { const s = Array.from(e.target.files); e.target.value = ""; addFiles(s); }} />
+          </div>
+          <div className="flex gap-2 items-center">
+            {onCancel && (
+              <button onClick={onCancel} className="px-3 py-1.5 text-[12px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors">Cancel</button>
+            )}
+            <button onClick={handleSubmit} disabled={!value.trim() || saving}
+              className="px-5 py-2 bg-[#1a1a2e] text-white text-[13px] font-semibold rounded-lg hover:bg-[#252545] transition-colors disabled:opacity-40">
+              {saving ? "Posting…" : "Post"}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* @mention dropdown */}
+      {showDropdown && (
+        <div
+          ref={dropdownRef}
+          className="absolute left-0 z-50 mt-1 w-64 bg-white border border-[#e8e0d0] rounded-xl shadow-xl overflow-hidden"
+          style={{ boxShadow: "0 8px 32px rgba(26,26,46,0.14)" }}
+        >
+          {mentionResults.map((u, i) => (
+            <button
+              key={u.id}
+              type="button"
+              onMouseDown={e => { e.preventDefault(); insertMention(u.username); }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                i === mentionIndex ? "bg-[#faf7f2]" : "hover:bg-[#faf7f2]"
+              }`}
+            >
+              {u.avatar
+                ? <img src={u.avatar} alt={u.username} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                : <div className="w-7 h-7 rounded-full bg-[#1a1a2e] flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
+                    {u.username.charAt(0).toUpperCase()}
+                  </div>
+              }
+              <span className="text-[13px] font-semibold text-[#1a1a2e]">@{u.username}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

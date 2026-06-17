@@ -193,6 +193,12 @@ export default function SubmitFeedback() {
   const [customGenre,    setCustomGenre]    = useState("");
   const [thesaurusOpen,  setThesaurusOpen]  = useState(false);
 
+  // "Stage Your Chapter for Feedback" flow — used when the writer doesn't
+  // have enough posting points yet. Their chapter is saved as a draft
+  // instead of lost, and this panel replaces the editor once that's done.
+  const [staged,         setStaged]         = useState(false);
+  const [stagingLoading, setStagingLoading] = useState(false);
+
   // Live word count from WriteEditor (driven by onWordsUpdate, always accurate)
   const [liveWordCount, setLiveWordCount] = useState(0);
 
@@ -245,6 +251,15 @@ export default function SubmitFeedback() {
   const selectedTier = TIERS.find(t => t.value === form.wordCountTier);
   const balance      = wallet?.postingBalance ?? 0;
   const isFreeEligible = !!(wallet?.freePostAvailable);
+  // Multi-chapter surcharge applies on top of the tier cost — mirrors
+  // pointService.calculatePostingCost on the backend, so what we show here
+  // matches what they'll actually be charged (or what's blocking them).
+  const surcharge     = (wallet?.activeChapterCount ?? 0) * (wallet?.MULTI_CHAPTER_SURCHARGE ?? 2);
+  const totalCost     = (selectedTier?.cost ?? 0) + surcharge;
+  // Whether this chapter can be posted live right now. When false (and not
+  // editing an existing submission), the form falls back to "Stage Your
+  // Chapter for Feedback" instead of blocking the writer outright.
+  const canAffordTier = isEditMode || isFreeEligible || balance >= totalCost;
   const tierMaxWords = { TIER_1000: 1000, TIER_2000: 2000, TIER_3000: 3000, TIER_4000: 4000, TIER_5000: 5000 };
   const maxWords     = tierMaxWords[form.wordCountTier] ?? 5000;
   const wordProgress = Math.min((wordCount / maxWords) * 100, 100);
@@ -291,6 +306,51 @@ export default function SubmitFeedback() {
     setSavingDraft(false);
   }
 
+  // ── Stage Your Chapter for Feedback (not enough points yet) ──────────────
+  // Saves the chapter — title, content, genre, summary, tier, etc. — as a
+  // draft tagged "staged for feedback" rather than letting the writer lose
+  // their work. They can post it in one click once they've earned enough
+  // points by critiquing other chapters in the Critique Hub.
+  async function handleStageForFeedback() {
+    setStagingLoading(true);
+    setError("");
+    try {
+      const editorEl = contentRef.current;
+      const innerText = editorEl?.innerText || "";
+      if (!innerText.trim()) {
+        setError("Write or paste your chapter before staging it.");
+        setStagingLoading(false);
+        return;
+      }
+      const content = editorEl?.innerHTML || "";
+
+      const res = await fetch(`${API_URL}/drafts/stage-for-feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          draftId:         savedDraftId,
+          title:           form.title || null,
+          content,
+          genre:           effectiveGenre,
+          summary:         form.summary,
+          wordCountTier:   form.wordCountTier,
+          draftStage:      form.draftStage,
+          contentWarnings: form.contentWarnings,
+          feedbackWanted:  form.feedbackWanted,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Couldn't save your chapter. Please try again.");
+      setSavedDraftId(data.draft?.id);
+      setStaged(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setError(e.message || "Something went wrong staging your chapter.");
+    }
+    setStagingLoading(false);
+  }
+
   // ── Step validation ───────────────────────────────────────────────────────
   function validateStep(s) {
     if (s === 0) {
@@ -309,8 +369,6 @@ export default function SubmitFeedback() {
       if (liveWordCount === 0) return "Please write or paste your chapter content.";
       const max = tierMaxWords[form.wordCountTier];
       if (max && liveWordCount > max) return `Your chapter is ${liveWordCount} words. Selected tier allows up to ${selectedTier?.label}.`;
-      if (!isEditMode && !isFreeEligible && balance < (selectedTier?.cost ?? 0))
-        return `Not enough points. You need ${selectedTier?.cost ?? 0} pts but have ${balance}.`;
       return "";
     }
     return "";
@@ -548,20 +606,24 @@ export default function SubmitFeedback() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {TIERS.map(t => {
-                  const affordable = balance >= t.cost || isFreeEligible;
-                  const isSelected = form.wordCountTier === t.value;
+                  const tierTotal   = t.cost + surcharge;
+                  const affordable  = isFreeEligible || balance >= tierTotal;
+                  const isSelected  = form.wordCountTier === t.value;
                   return (
                     <button key={t.value} type="button"
                       onClick={() => !isEditMode && set("wordCountTier", t.value)}
-                      disabled={isEditMode || (!affordable && !isFreeEligible)}
+                      disabled={isEditMode}
                       className={`px-4 py-3 rounded-xl border text-left transition-all ${
                         isSelected ? "bg-[#2d3748] text-white border-[#2d3748]"
-                          : isEditMode || !affordable ? "bg-[#faf7f2] text-[#b8a898] border-[#f0ebe3] cursor-not-allowed"
+                          : isEditMode ? "bg-[#faf7f2] text-[#b8a898] border-[#f0ebe3] cursor-not-allowed"
                           : "bg-white text-[#6b5c4a] border-[#e8e0d0] hover:border-[#2d3748]"
                       }`}>
                       <span className="block text-sm font-semibold">{t.label}</span>
-                      <span className={`text-xs mt-0.5 block ${isSelected ? "text-[#a8b4c4]" : "text-[#9a8c7a]"}`}>
-                        {isEditMode ? (isSelected ? "Current tier" : "—") : isFreeEligible ? "Free (first post)" : `Costs ${t.cost} pts`}
+                      <span className={`text-xs mt-0.5 block ${isSelected ? "text-[#a8b4c4]" : affordable ? "text-[#9a8c7a]" : "text-[#b8860b]"}`}>
+                        {isEditMode ? (isSelected ? "Current tier" : "—")
+                          : isFreeEligible ? "Free (first post)"
+                          : affordable ? `Costs ${tierTotal} pts`
+                          : `Costs ${tierTotal} pts — you can stage this if you're short`}
                       </span>
                     </button>
                   );
@@ -613,7 +675,55 @@ export default function SubmitFeedback() {
         )}
 
         {/* ── Step 2: Chapter content ───────────────────────────────────────── */}
-        {step === 2 && (
+        {step === 2 && (staged ? (
+          /* ── Staged for feedback: gentle, encouraging confirmation ───────── */
+          <div className="bg-white border border-[#e8e0d0] rounded-2xl p-8 sm:p-10 shadow-[0_2px_12px_rgba(45,35,20,0.05)] text-center">
+            <div className="w-14 h-14 mx-auto rounded-full bg-[#eef3ea] flex items-center justify-center mb-5">
+              <svg className="w-7 h-7 text-[#5e8c5e]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h2 className="font-serif text-2xl text-[#2d3748] mb-3">Your chapter is safe in your drafts</h2>
+            <p className="text-sm text-[#6b5c4a] leading-relaxed max-w-md mx-auto">
+              "{form.title || "Your chapter"}" is saved exactly as you wrote it — you're {Math.max(totalCost - balance, 0)} pts short of posting it to the Critique Hub right now, but nothing is lost.
+            </p>
+            <p className="text-sm text-[#6b5c4a] leading-relaxed max-w-md mx-auto mt-3">
+              The fastest way to unlock posting points is to read and critique a chapter from a fellow writer in the Spotlight. Every critique you give earns you points toward your own chapter going live — give feedback, unlock your post.
+            </p>
+
+            {/* Points needed by chapter length */}
+            <div className="max-w-sm mx-auto bg-[#faf7f2] border border-[#e8e0d0] rounded-xl p-4 text-left mt-6">
+              <p className="text-xs font-semibold text-[#2d3748] mb-2">Points needed by chapter length</p>
+              <div className="space-y-1.5">
+                {TIERS.map(t => (
+                  <div key={t.value} className={`flex justify-between text-xs ${t.value === form.wordCountTier ? "text-[#2d3748] font-semibold" : "text-[#9a8c7a]"}`}>
+                    <span>{t.label}</span>
+                    <span>{t.cost + surcharge} pts</span>
+                  </div>
+                ))}
+              </div>
+              {surcharge > 0 && (
+                <p className="text-[11px] text-[#9a8c7a] mt-3 pt-3 border-t border-[#e8e0d0]">
+                  Includes a {surcharge} pt multi-chapter surcharge — you already have {wallet?.activeChapterCount} active chapter{wallet?.activeChapterCount === 1 ? "" : "s"} in the Queue or Spotlight.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mt-7">
+              <Link to="/critique"
+                className="px-6 py-2.5 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:opacity-90 transition-all">
+                Critique a chapter in the Spotlight
+              </Link>
+              <Link to="/drafts"
+                className="px-6 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#6b5c4a] hover:border-[#2d3748] transition-all">
+                View my drafts
+              </Link>
+            </div>
+
+            <button type="button" onClick={() => setStaged(false)}
+              className="text-xs text-[#9a8c7a] hover:text-[#2d3748] underline mt-6">
+              Need to make changes? Keep editing
+            </button>
+          </div>
+        ) : (
           <div className="space-y-4">
             {/* Word count progress */}
             <div className="bg-white border border-[#e8e0d0] rounded-2xl px-6 py-4 shadow-[0_2px_12px_rgba(45,35,20,0.05)]">
@@ -670,8 +780,9 @@ export default function SubmitFeedback() {
                   ["Genre",  effectiveGenre || "—"],
                   ["Tier",   TIERS.find(t => t.value === form.wordCountTier)?.label ?? "—"],
                   ...(!isEditMode ? [
-                    ["Cost",           isFreeEligible ? "Free (first post)" : `${selectedTier?.cost ?? 0} pts`],
-                    ["Balance after",  isFreeEligible ? `${balance} pts`    : `${balance - (selectedTier?.cost ?? 0)} pts`],
+                    ["Cost",           isFreeEligible ? "Free (first post)" : `${totalCost} pts`],
+                    ["Balance after",  isFreeEligible ? `${balance} pts`    : canAffordTier ? `${balance - totalCost} pts` : `${balance} pts (not enough yet)`],
+                    ["Status",         canAffordTier ? "Ready to post" : "Will be staged in your drafts"],
                   ] : []),
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between text-[#6b5c4a]">
@@ -689,35 +800,54 @@ export default function SubmitFeedback() {
                 className="px-5 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#6b5c4a] hover:border-[#2d3748] transition-all">Back</button>
 
               <div className="flex items-center gap-3">
-                {/* Save as draft */}
-                {!isEditMode && (
-                  <button
-                    type="button"
-                    onClick={handleSaveAsDraft}
-                    disabled={savingDraft}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#6b5c4a] hover:border-[#2d3748] transition-all disabled:opacity-60">
-                    {savingDraft ? (
+                {isEditMode ? (
+                  /* Edit mode: just save changes — staging doesn't apply to live submissions */
+                  <button type="button" onClick={handleSubmit} disabled={submitting || wordOver}
+                    className="px-6 py-2.5 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                    {submitting ? (
+                      <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>Saving...</>
+                    ) : "Save changes"}
+                  </button>
+                ) : canAffordTier ? (
+                  <>
+                    {/* Save as draft */}
+                    <button
+                      type="button"
+                      onClick={handleSaveAsDraft}
+                      disabled={savingDraft}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#e8e0d0] text-sm text-[#6b5c4a] hover:border-[#2d3748] transition-all disabled:opacity-60">
+                      {savingDraft ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+                      ) : draftSaved ? (
+                        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                      )}
+                      {draftSaved ? "Saved!" : savingDraft ? "Saving…" : "Save as draft"}
+                    </button>
+
+                    {/* Submit */}
+                    <button type="button" onClick={handleSubmit} disabled={submitting || wordOver}
+                      className="px-6 py-2.5 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                      {submitting ? (
+                        <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>Submitting...</>
+                      ) : "Post chapter"}
+                    </button>
+                  </>
+                ) : (
+                  /* Not enough points — staging is the only path forward, so it's the only button shown */
+                  <button type="button" onClick={handleStageForFeedback} disabled={stagingLoading || wordOver}
+                    className="px-6 py-2.5 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                    {stagingLoading && (
                       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
-                    ) : draftSaved ? (
-                      <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                     )}
-                    {draftSaved ? "Saved!" : savingDraft ? "Saving…" : "Save as draft"}
+                    {stagingLoading ? "Saving…" : "Stage Your Chapter for Feedback"}
                   </button>
                 )}
-
-                {/* Submit */}
-                <button type="button" onClick={handleSubmit} disabled={submitting || wordOver}
-                  className="px-6 py-2.5 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-                  {submitting ? (
-                    <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>{isEditMode ? "Saving..." : "Submitting..."}</>
-                  ) : isEditMode ? "Save changes" : "Post chapter"}
-                </button>
               </div>
             </div>
           </div>
-        )}
+        ))}
       </main>
 
       {/* Thesaurus drawer — available on step 2 */}

@@ -495,7 +495,7 @@ function Toast({ message, type = "success", onClose }) {
 
 // ─── Draft card ───────────────────────────────────────────────────────────────
 
-function DraftCard({ draft, onEdit, onDelete, onPostToHub, onContinueSprint, onRepublish }) {
+function DraftCard({ draft, walletInfo, onEdit, onDelete, onPostToHub, onDirectPost, postingNow, onContinueSprint, onRepublish }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
@@ -509,6 +509,24 @@ function DraftCard({ draft, onEdit, onDelete, onPostToHub, onContinueSprint, onR
   const isLinked = !!draft.sourceSubmissionId;
   const genre = draft.sourceSubmission?.genre;
   const wc = draft.wordCount || 0;
+
+  // ── Staged-for-feedback chapters: already have genre/summary/tier/stage
+  // saved from the submission form, so posting needs no form at all — just
+  // a direct call. We still estimate cost/readiness here (mirroring
+  // pointService.calculatePostingCost) purely so the card can show an
+  // honest "ready" vs "needs X more pts" hint; the server is always the
+  // final word on whether the post actually succeeds.
+  const isStaged      = !isLinked && !!draft.isStagedForFeedback;
+  const stagedTier     = TIERS.find(t => t.value === draft.stagedWordCountTier);
+  const tierCostsMap   = walletInfo?.TIER_COSTS || {};
+  const stagedBaseCost = tierCostsMap[draft.stagedWordCountTier] ?? stagedTier?.cost ?? 0;
+  const surcharge       = (walletInfo?.activeChapterCount ?? 0) * (walletInfo?.MULTI_CHAPTER_SURCHARGE ?? 2);
+  const stagedCost      = stagedBaseCost + surcharge;
+  const balance          = walletInfo?.postingBalance ?? 0;
+  const isFree            = !!walletInfo?.freePostAvailable;
+  const stagedReady       = isFree || balance >= stagedCost;
+  const stagedShortfall   = Math.max(stagedCost - balance, 0);
+  const isPostingThis      = postingNow === draft.id;
 
   return (
     <div className="group bg-white rounded-2xl border border-[#e8e0d0] hover:border-[#d4af37]/50 hover:shadow-md transition-all duration-200">
@@ -530,6 +548,12 @@ function DraftCard({ draft, onEdit, onDelete, onPostToHub, onContinueSprint, onR
               )}
               {genre && (
                 <span className="text-[10px] font-medium px-2 py-0.5 bg-[#f4f1ec] text-[#7a6a50] rounded-full border border-[#e8e0d0]">{genre}</span>
+              )}
+              {isStaged && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 bg-[#eef3ea] border border-[#cfe3c8] text-[#3f6b3f] rounded-full">
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  staged for feedback
+                </span>
               )}
             </div>
             <h3 className="font-serif font-semibold text-[#2d3748] leading-snug text-base truncate" style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
@@ -565,11 +589,19 @@ function DraftCard({ draft, onEdit, onDelete, onPostToHub, onContinueSprint, onR
                   </button>
                 )}
                 {!isLinked && (
-                  <button onClick={() => { setMenuOpen(false); onPostToHub(draft); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#2d3748] hover:bg-[#faf7f2] transition-colors">
-                    <svg className="w-4 h-4 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                    Post to feedback
-                  </button>
+                  isStaged ? (
+                    <button onClick={() => { setMenuOpen(false); onDirectPost(draft); }} disabled={isPostingThis}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#2d3748] hover:bg-[#faf7f2] transition-colors disabled:opacity-50">
+                      <svg className="w-4 h-4 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                      {isPostingThis ? "Posting…" : "Post now"}
+                    </button>
+                  ) : (
+                    <button onClick={() => { setMenuOpen(false); onPostToHub(draft); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#2d3748] hover:bg-[#faf7f2] transition-colors">
+                      <svg className="w-4 h-4 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                      Post to feedback
+                    </button>
+                  )
                 )}
                 <div className="border-t border-[#f0ebe3]" />
                 <button onClick={() => { setMenuOpen(false); onDelete(draft); }}
@@ -598,6 +630,14 @@ function DraftCard({ draft, onEdit, onDelete, onPostToHub, onContinueSprint, onR
               {draft.sourceSubmission._count?.responses || 0} critique{(draft.sourceSubmission._count?.responses || 0) !== 1 ? "s" : ""}
             </span>
           )}
+          {isStaged && (
+            <span className={`flex items-center gap-1 font-medium ${stagedReady ? "text-[#5e8c5e]" : "text-[#b8860b]"}`}>
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+              </svg>
+              {stagedReady ? `Ready · ${stagedCost} pts` : `Needs ${stagedShortfall} more pt${stagedShortfall === 1 ? "" : "s"}`}
+            </span>
+          )}
         </div>
 
         {/* Primary actions */}
@@ -613,11 +653,23 @@ function DraftCard({ draft, onEdit, onDelete, onPostToHub, onContinueSprint, onR
             Sprint
           </button>
           {!isLinked && (
-            <button onClick={() => onPostToHub(draft)}
-              className="flex-1 py-2 text-sm font-medium text-white bg-[#2d3748] border border-[#2d3748] rounded-xl hover:bg-[#3d4f64] transition-all flex items-center justify-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-              Post
-            </button>
+            isStaged ? (
+              <button onClick={() => onDirectPost(draft)} disabled={isPostingThis}
+                className="flex-1 py-2 text-sm font-medium text-white bg-[#2d3748] border border-[#2d3748] rounded-xl hover:bg-[#3d4f64] transition-all flex items-center justify-center gap-1.5 disabled:opacity-60">
+                {isPostingThis ? <><Spinner size={3.5} /> Posting…</> : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                    Post now
+                  </>
+                )}
+              </button>
+            ) : (
+              <button onClick={() => onPostToHub(draft)}
+                className="flex-1 py-2 text-sm font-medium text-white bg-[#2d3748] border border-[#2d3748] rounded-xl hover:bg-[#3d4f64] transition-all flex items-center justify-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                Post
+              </button>
+            )
           )}
           {isLinked && (
             <button onClick={() => onRepublish(draft)}
@@ -641,6 +693,10 @@ export default function DraftsPage() {
   const [drafts, setDrafts]               = useState([]);
   const [loading, setLoading]             = useState(true);
   const [wallet, setWallet]               = useState(null);
+  // Full wallet payload (TIER_COSTS, activeChapterCount, surcharge, etc.) —
+  // kept alongside the plain `wallet` balance number so staged-draft cost
+  // estimates on the cards match the backend's real math exactly.
+  const [walletInfo, setWalletInfo]       = useState(null);
   const [toast, setToast]                 = useState(null);
 
   // Modals
@@ -648,6 +704,8 @@ export default function DraftsPage() {
   const [deleteLoading, setDeleteLoading]   = useState(false);
   const [postingDraft, setPostingDraft]     = useState(null);
   const [sprintDraft, setSprintDraft]       = useState(null); // triggers StartGroupSprintModal
+  // id of the staged draft currently being posted directly (no modal) — drives the spinner on its card
+  const [directPosting, setDirectPosting]   = useState(null);
 
   // Fetch drafts
   const fetchDrafts = useCallback(async () => {
@@ -668,6 +726,7 @@ export default function DraftsPage() {
       if (res.ok) {
         const data = await res.json();
         setWallet(data.postingBalance ?? null);
+        setWalletInfo(data);
       }
     } catch {}
   }, []);
@@ -705,6 +764,34 @@ export default function DraftsPage() {
     setDrafts(d => d.filter(x => x.id !== postingDraft?.id));
     showToast(`"${submission.title}" is now live in the Feedback Hub!`);
     fetchWallet();
+  }
+
+  // ── Direct post for staged-for-feedback drafts ────────────────────────────
+  // These already carry their genre/summary/tier/draft stage from when they
+  // were staged on the submission form, so there's no need to reopen
+  // PostToHubModal and ask the writer to fill it all in again — just post.
+  async function handleDirectPost(draft) {
+    setDirectPosting(draft.id);
+    try {
+      const res = await fetch(`${API_URL}/drafts/${draft.id}/post-to-hub`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}), // server falls back to this draft's staged genre/summary/tier/etc.
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.message || "Couldn't post. Please try again.", "error");
+        return;
+      }
+      setDrafts(d => d.filter(x => x.id !== draft.id));
+      showToast(`"${data.submission?.title || draft.title || "Your chapter"}" is now live in the Feedback Hub!`);
+      fetchWallet();
+    } catch {
+      showToast("Couldn't reach the server.", "error");
+    } finally {
+      setDirectPosting(null);
+    }
   }
 
   async function handleRepublish(draft) {
@@ -798,9 +885,12 @@ export default function DraftsPage() {
                   {drafts.filter(d => d.sourceSubmissionId).map(d => (
                     <DraftCard
                       key={d.id} draft={d}
+                      walletInfo={walletInfo}
                       onEdit={draft => navigate(`/write/${draft.id}`)}
                       onDelete={setDeletingDraft}
                       onPostToHub={setPostingDraft}
+                      onDirectPost={handleDirectPost}
+                      postingNow={directPosting}
                       onContinueSprint={setSprintDraft}
                       onRepublish={handleRepublish}
                     />
@@ -819,9 +909,12 @@ export default function DraftsPage() {
                   {drafts.filter(d => !d.sourceSubmissionId).map(d => (
                     <DraftCard
                       key={d.id} draft={d}
+                      walletInfo={walletInfo}
                       onEdit={draft => navigate(`/write/${draft.id}`)}
                       onDelete={setDeletingDraft}
                       onPostToHub={setPostingDraft}
+                      onDirectPost={handleDirectPost}
+                      postingNow={directPosting}
                       onContinueSprint={setSprintDraft}
                     />
                   ))}

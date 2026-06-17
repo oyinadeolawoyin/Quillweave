@@ -104,7 +104,7 @@ function ProfileBar({ user, wallet, streaks, discussionCount = 0 }) {
 
   return (
     <div className="bg-white border-b-2 border-[#d4af37]/30" style={{ borderTop: "3px solid #d4af37" }}>
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-7">
+      <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-7">
         <div className="flex items-start gap-4 sm:gap-6">
           {/* Avatar */}
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-md flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-bold text-2xl ring-2 ring-[#d4af37]/60"
@@ -262,7 +262,7 @@ function GuestHero() {
   const navigate = useNavigate();
   return (
     <div className="bg-[#1a1a2e] mb-0">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8 flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-10">
+      <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-10">
         <div className="flex-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-2">Inkwell</p>
           <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">Write more. Together.</h1>
@@ -286,19 +286,38 @@ function GuestHero() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// RIGHT — MY SUBMISSIONS
+// MY SUBMISSIONS — full-width CTA strip above the grid
+// States:
+//   guest         → sign up prompt
+//   no subs, can post  → "Submit your first chapter" CTA
+//   no subs, can't post → shouldn't happen on first visit (seed pts cover tier 1)
+//   has subs, can post  → list + "Submit your next chapter" CTA
+//   has subs, can't post → list + draft-saved nudge → go critique to unlock
 // ═════════════════════════════════════════════════════════════════════════════
 function MySubmissions({ user, wallet }) {
-  const [subs, setSubs]       = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [subs, setSubs]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  // The writer's actual "staged for feedback" chapter, if any — fetched from
+  // /drafts/staged. We never guess whether one exists; the nudge below is
+  // built entirely from this, so a writer with no staged chapter (because
+  // they never staged one, or already unlocked and posted it) sees an
+  // honest message instead of a leftover "your draft is waiting" line.
+  const [stagedDraft, setStagedDraft] = useState(null);
+  const [stagedLoading, setStagedLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
+    if (!user) { setLoading(false); setStagedLoading(false); return; }
     fetch(`${API_URL}/feedback/submissions/mine?limit=6`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => setSubs(d?.items ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    fetch(`${API_URL}/drafts/staged`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setStagedDraft(d?.draft ?? null))
+      .catch(() => {})
+      .finally(() => setStagedLoading(false));
   }, [user]);
 
   const costs     = wallet?.TIER_COSTS ?? {};
@@ -306,98 +325,188 @@ function MySubmissions({ user, wallet }) {
   const surcharge = wallet?.MULTI_CHAPTER_SURCHARGE ?? 2;
   const active    = wallet?.activeChapterCount ?? 0;
   const isFree    = !!(wallet?.freePostAvailable);
-  const cheapest  = Math.min(...Object.values(costs).map(Number), Infinity) + active * surcharge;
+  const cheapest  = Object.keys(costs).length > 0
+    ? Math.min(...Object.values(costs).map(Number)) + active * surcharge
+    : 10;
   const canPost   = isFree || (Object.keys(costs).length > 0 && bal >= cheapest);
+  const hasPosted = subs.length > 0;
+
+  // Exact points still needed for the staged chapter's chosen tier (falls
+  // back to the cheapest tier if no tier was picked yet) — real numbers
+  // pulled from this writer's actual staged chapter, never a placeholder.
+  const stagedTierCost  = stagedDraft?.stagedWordCountTier
+    ? (costs[stagedDraft.stagedWordCountTier] ?? 0) + active * surcharge
+    : cheapest;
+  const stagedShortfall = Math.max(stagedTierCost - bal, 0);
+  const dataLoading     = loading || stagedLoading;
 
   return (
-    <div className="bg-white border border-[#e8e0d0] rounded-xl p-5 mb-5">
-      <SectionTitle>My submissions</SectionTitle>
+    <div className="bg-white border border-[#e8e0d0] rounded-xl overflow-hidden mb-6">
 
+      {/* ── GUEST ── */}
       {!user && (
-        <>
-          <p className="text-sm text-[#6b5c4a] mb-3">
-            Critique a chapter to earn points, then use those points to post your own work.
-          </p>
-          <div className="border border-[#e8e0d0] rounded-lg overflow-hidden mb-4 text-sm">
-            <div className="grid grid-cols-2 bg-[#1a1a2e] px-3 py-2 border-b border-[#e8e0d0] text-[10px] font-semibold text-white/70 uppercase tracking-wide">
-              <span>Chapter length</span>
-              <span className="text-right">Cost to post</span>
-            </div>
-            {TIER_COSTS.map(({ tier, label, pts }) => (
-              <div key={tier} className="grid grid-cols-2 px-3 py-2 border-b border-[#f0ebe3] last:border-0 text-sm">
-                <span className="text-[#4a3f35] text-[12px]">{label}</span>
-                <span className="text-right font-semibold text-[#1a1a2e] text-[12px]">{pts} pts</span>
-              </div>
-            ))}
+        <div className="px-6 py-7 flex flex-col sm:flex-row sm:items-center gap-5">
+          <div className="flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#d4af37] mb-1">Critique Hub</p>
+            <h2 className="font-serif text-[#1a1a2e] text-lg font-bold leading-snug mb-1">
+              Your story deserves readers.
+            </h2>
+            <p className="text-[13px] text-[#6b5c4a] leading-relaxed">
+              Post a chapter and get real feedback from fellow writers. Read and critique others to earn posting points.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link to="/signup" className="flex-1 text-center py-2 bg-[#d4af37] text-[#1a1a2e] text-xs font-bold rounded-lg hover:bg-[#c9a42d] transition-all">
-              Get started — it's free
-            </Link>
-          </div>
-        </>
+          <Link to="/signup"
+            className="flex-shrink-0 px-5 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-lg hover:bg-[#c9a42d] transition-all text-center">
+            Get started free
+          </Link>
+        </div>
       )}
 
-      {user && loading && (
-        <div className="space-y-3">
+      {/* ── LOADING ── */}
+      {user && dataLoading && (
+        <div className="px-6 py-6 space-y-3">
           {[1, 2].map(i => (
-            <div key={i} className="space-y-2 py-2 border-b border-[#f4f1ec] last:border-0">
+            <div key={i} className="space-y-2">
               <Bone w="w-2/3" h="h-3" /><Bone w="w-1/2" h="h-2.5" />
             </div>
           ))}
         </div>
       )}
 
-      {user && !loading && subs.length === 0 && (
-        <>
-          <p className="text-xs text-[#6b5c4a] mb-3">
-            {canPost
-              ? "You have enough points to submit a chapter."
-              : `You need ${cheapest} pts to post. Critique a chapter to earn points.`}
-          </p>
-          <Link to="/critique/submit" className="block text-center py-2 bg-[#d4af37] text-[#1a1a2e] text-xs font-bold rounded-lg hover:bg-[#c9a42d] transition-all">
-            Submit a chapter
-          </Link>
-        </>
+      {/* ── LOGGED IN, NO SUBMISSIONS YET ── */}
+      {user && !dataLoading && !hasPosted && (
+        <div className="px-6 py-7">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#d4af37] mb-1">Critique Hub</p>
+          {stagedDraft ? (
+            /* They've already written and staged a chapter — don't repeat
+               the "first chapter" pitch, point them at unlocking it instead. */
+            <>
+              <h2 className="font-serif text-[#1a1a2e] text-lg font-bold leading-snug mb-2">
+                "{stagedDraft.title || "Your first chapter"}" is staged and ready to go.
+              </h2>
+              <p className="text-[13px] text-[#6b5c4a] leading-relaxed mb-5">
+                You're {stagedShortfall} pt{stagedShortfall === 1 ? "" : "s"} away from posting it. Critique a chapter in the Spotlight to earn posting points and unlock it.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link to="/critique"
+                  className="inline-block px-6 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-lg hover:bg-[#c9a42d] transition-all">
+                  Critique a chapter
+                </Link>
+                <Link to="/drafts"
+                  className="inline-block px-6 py-2.5 border border-[#e8e0d0] text-[#6b5c4a] text-sm font-semibold rounded-lg hover:border-[#d4af37] transition-all">
+                  View my drafts
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="font-serif text-[#1a1a2e] text-lg font-bold leading-snug mb-2">
+                Ready to share your first chapter?
+              </h2>
+              <p className="text-[13px] text-[#6b5c4a] leading-relaxed mb-5">
+                Post a chapter and get thoughtful feedback from real writers in the community. Your words are worth reading.
+              </p>
+              <Link to="/critique/submit"
+                className="inline-block px-6 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-lg hover:bg-[#c9a42d] transition-all">
+                Submit your first chapter
+              </Link>
+            </>
+          )}
+        </div>
       )}
 
-      {user && !loading && subs.length > 0 && (
+      {/* ── LOGGED IN, HAS SUBMISSIONS ── */}
+      {user && !dataLoading && hasPosted && (
         <>
-          <div className="divide-y divide-[#f4f1ec]">
-            {subs.map(sub => {
-              const critiqueCount = sub.critiqueCount ?? sub._count?.responses ?? 0;
-              const commentCount  = sub._count?.paragraphComments ?? 0;
-              return (
-                <div key={sub.id} className="py-2.5 first:pt-0 flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <Link to={`/critique/${sub.id}`}
-                        className="font-semibold text-[13px] text-[#1a1a2e] hover:text-[#b8860b] transition-colors leading-snug truncate">
-                        {sub.title}
-                      </Link>
-                      <StatusPill status={sub.status} />
+          {/* Submission list */}
+          <div className="px-5 pt-4 pb-1">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-serif text-[#1a1a2e] text-base font-semibold pl-3"
+                style={{ borderLeft: "3px solid #d4af37" }}>
+                My chapters
+              </h2>
+              <Link to={`/profile/${user?.id}`} className="text-[11px] text-[#9a8c7a] hover:text-[#b8860b] transition-colors">
+                View all
+              </Link>
+            </div>
+            <div className="divide-y divide-[#f4f1ec]">
+              {subs.map(sub => {
+                const critiqueCount = sub.critiqueCount ?? sub._count?.responses ?? 0;
+                const commentCount  = sub._count?.paragraphComments ?? 0;
+                return (
+                  <div key={sub.id} className="py-2.5 first:pt-0 flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        <Link to={`/critique/${sub.id}`}
+                          className="font-semibold text-[13px] text-[#1a1a2e] hover:text-[#b8860b] transition-colors leading-snug truncate">
+                          {sub.title}
+                        </Link>
+                        <StatusPill status={sub.status} />
+                      </div>
+                      <p className="text-[11px] text-[#9a8c7a]">
+                        {sub.genre}<span className="mx-1">·</span>{TIER_WORD_LABELS[sub.wordCountTier]}
+                        {commentCount > 0 && <><span className="mx-1">·</span>{commentCount} discussion{commentCount !== 1 ? "s" : ""}</>}
+                      </p>
+                      {sub.status !== "ARCHIVE" ? <CritBar count={critiqueCount} /> : null}
                     </div>
-                    <p className="text-[11px] text-[#9a8c7a]">
-                      {sub.genre}<span className="mx-1">·</span>{TIER_WORD_LABELS[sub.wordCountTier]}
-                      {commentCount > 0 && <><span className="mx-1">·</span>{commentCount} discussion{commentCount !== 1 ? "s" : ""}</>}
-                    </p>
-                    {sub.status !== "ARCHIVE" ? <CritBar count={critiqueCount} /> : null}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-[#f4f1ec] flex items-center justify-between">
-            <Link to={`/profile/${user?.id}`} className="text-[11px] text-[#1a5fb4] hover:underline font-semibold">
-              View all my submissions
-            </Link>
-            <Link to="/critique/submit"
-              className={`text-[11px] font-semibold px-2.5 py-1 rounded transition-all ${
-                canPost ? "bg-[#d4af37] text-[#1a1a2e] hover:bg-[#c9a42d]" : "text-[#9a8c7a] border border-[#e8e0d0]"
-              }`}>
-              {isFree ? "Free post" : canPost ? "Submit chapter" : `Need ${cheapest} pts`}
-            </Link>
-          </div>
+
+          {/* Footer CTA — adapts based on whether they can post */}
+          {canPost ? (
+            <div className="px-5 py-4 border-t border-[#f4f1ec] flex items-center justify-between gap-3">
+              <p className="text-[12px] text-[#6b5c4a]">Keep the momentum going.</p>
+              <Link to="/critique/submit"
+                className="flex-shrink-0 px-4 py-2 bg-[#d4af37] text-[#1a1a2e] text-[12px] font-bold rounded-lg hover:bg-[#c9a42d] transition-all whitespace-nowrap">
+                {isFree ? "Free post available" : "Submit next chapter"}
+              </Link>
+            </div>
+          ) : stagedDraft ? (
+            /* Draft-saved nudge — backed by a real staged chapter, so the
+               numbers and the "it's waiting" claim are both true. */
+            <div className="mx-5 mb-5 mt-2 rounded-lg border border-[#e8e0d0] bg-[#faf7f2] px-4 py-4">
+              <p className="text-[13px] font-semibold text-[#1a1a2e] mb-1">
+                "{stagedDraft.title || "Your next chapter"}" is staged and waiting in your drafts.
+              </p>
+              <p className="text-[12px] text-[#6b5c4a] leading-relaxed mb-3">
+                You're {stagedShortfall} pt{stagedShortfall === 1 ? "" : "s"} short of posting it — and the way to earn them is by reading and critiquing a chapter in the Spotlight. It's the next step: give feedback, unlock your post.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Link to="/critique"
+                  className="flex-1 text-center py-2 bg-[#1a1a2e] text-white text-[12px] font-bold rounded-lg hover:bg-[#2d2d4a] transition-all">
+                  Read a chapter in the Spotlight
+                </Link>
+                <Link to="/drafts"
+                  className="flex-1 text-center py-2 border border-[#e8e0d0] text-[#6b5c4a] text-[12px] font-semibold rounded-lg hover:border-[#d4af37] transition-all">
+                  View my drafts
+                </Link>
+              </div>
+            </div>
+          ) : (
+            /* Low balance, but nothing is actually staged — don't claim a
+               draft is "waiting" when there isn't one. */
+            <div className="mx-5 mb-5 mt-2 rounded-lg border border-[#e8e0d0] bg-[#faf7f2] px-4 py-4">
+              <p className="text-[13px] font-semibold text-[#1a1a2e] mb-1">
+                Your posting balance is running low.
+              </p>
+              <p className="text-[12px] text-[#6b5c4a] leading-relaxed mb-3">
+                You'll need {stagedShortfall} more pt{stagedShortfall === 1 ? "" : "s"} to post your next chapter. Critique a chapter in the Spotlight to earn points — or start writing now and we'll save it for you until you're ready to post.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Link to="/critique"
+                  className="flex-1 text-center py-2 bg-[#1a1a2e] text-white text-[12px] font-bold rounded-lg hover:bg-[#2d2d4a] transition-all">
+                  Read a chapter in the Spotlight
+                </Link>
+                <Link to="/critique/submit"
+                  className="flex-1 text-center py-2 border border-[#e8e0d0] text-[#6b5c4a] text-[12px] font-semibold rounded-lg hover:border-[#d4af37] transition-all">
+                  Write your next chapter
+                </Link>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -936,7 +1045,6 @@ function AccountabilitySection({ user, onStartSprint }) {
       <LastGroupSprintRecap />
       <ActiveSprintBanner />
       <AlarmClockSprintCard onStartSprint={onStartSprint} />
-      <RecentBlogPosts />
 
       <div className="mt-3 pt-3 border-t border-[#f0ebe3] flex items-center justify-center">
         <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer"
@@ -1039,26 +1147,23 @@ export default function Homepage() {
 
       {user ? <ProfileBar user={user} wallet={wallet} streaks={streaks} discussionCount={discussionCount} /> : <GuestHero />}
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 pt-7 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-6 items-start">
+      <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-16">
 
-          {/* ── LEFT COLUMN ── */}
-          <div>
-            <DailyChallengeBanner
-              onJoin={() => setShowJoinChallenge(true)}
-              isParticipating={isParticipating}
-              progress={streaks}
-            />
-            <ThreadsPreview />
-            <AccountabilitySection user={user} onStartSprint={handleStartSprint} />
-          </div>
+        {/* ── SUBMISSIONS — full-width primary CTA ── */}
+        <MySubmissions user={user} wallet={wallet} />
 
-          {/* ── RIGHT COLUMN ── */}
-          <div>
-            <MySubmissions user={user} wallet={wallet} />
-          </div>
+        {/* ── DAILY WRITING CHALLENGE ── */}
+        <DailyChallengeBanner
+          onJoin={() => setShowJoinChallenge(true)}
+          isParticipating={isParticipating}
+          progress={streaks}
+        />
 
-        </div>
+        {/* ── THREADS ── */}
+        <ThreadsPreview />
+
+        {/* ── COMMUNITY SPRINTS ── */}
+        <AccountabilitySection user={user} onStartSprint={handleStartSprint} />
       </div>
 
       {showSprint && (
