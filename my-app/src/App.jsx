@@ -265,9 +265,9 @@ function GuestHero() {
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-10">
         <div className="flex-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-2">Inkwell</p>
-          <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">Write more. Together.</h1>
+          <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">A home for writers with more ideas than finished drafts.</h1>
           <p className="text-white/55 text-sm leading-relaxed max-w-md">
-            Sprint alongside writers, get feedback on your chapters, and show up every week until the draft is done.
+            Turn your sparks into stories through daily writing challenges, collaborative critique swaps, and a community that keeps moving forward together.
           </p>
         </div>
         <div className="flex gap-3 flex-shrink-0">
@@ -552,7 +552,7 @@ function DailyChallengeBanner({ onJoin, isParticipating, progress }) {
 
       <div className="px-5 py-4">
         <p className="text-[12px] text-[#6b5c4a] leading-relaxed mb-3">
-          Set a daily goal — words, chapters, minutes — and keep a streak going. Even 15 words or 15 minutes a day is progress. One commitment, every day.
+          The draft doesn't care how inspired you feel. Set a small daily goal — words, minutes, scenes — and just show up. That's how stories actually get finished.
         </p>
 
         {/* Writer count row */}
@@ -681,7 +681,7 @@ function JoinChallengeModal({ onClose, onJoined }) {
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-1">Daily Challenge</p>
             <h3 className="font-serif text-[#1a1a2e] text-lg font-bold leading-tight">Set your daily goal</h3>
             <p className="text-[12px] text-[#9a8c7a] mt-1 leading-relaxed">
-              Choose what you'll commit to each day. You can adjust it anytime.
+              Small and consistent beats big and sporadic. Pick something you can actually do every day — you can change it anytime.
             </p>
           </div>
           <button onClick={onClose} className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors ml-3 flex-shrink-0 mt-1" aria-label="Close">
@@ -696,7 +696,7 @@ function JoinChallengeModal({ onClose, onJoined }) {
           {!user && (
             <div className="text-center py-2">
               <p className="text-[13px] text-[#6b5c4a] mb-4 leading-relaxed">
-                Sign in to start your streak.
+                Sign in to start building the habit that gets stories finished.
               </p>
               <div className="flex flex-col gap-2">
                 <button onClick={() => navigate("/signup")}
@@ -864,25 +864,35 @@ function ThreadsPreview() {
       .then(d => {
         const all = d.threads ?? [];
 
-        // Separate pinned-keyword threads (in defined order) from the rest
-        const pinned = [];
+        // All pinned threads surface first (the API already orders pinned first,
+        // but we re-sort here to be explicit). Within pinned threads, keyword
+        // threads ("introduce yourself", "daily writing challenge") go first in
+        // the defined order; other pinned threads follow by recency.
+        const keywordPinned = [];
         PINNED_THREAD_KEYWORDS.forEach(kw => {
           const found = all.find(t =>
-            t.title?.toLowerCase().includes(kw.toLowerCase()) && !pinned.includes(t)
+            t.isPinned &&
+            t.title?.toLowerCase().includes(kw.toLowerCase()) &&
+            !keywordPinned.includes(t)
           );
-          if (found) pinned.push(found);
+          if (found) keywordPinned.push(found);
         });
 
-        // Remaining threads sorted by most recent comment activity
-        const rest = all
-          .filter(t => !pinned.includes(t))
+        // Other pinned threads not matched by keywords
+        const otherPinned = all.filter(
+          t => t.isPinned && !keywordPinned.includes(t)
+        );
+
+        // Unpinned threads sorted by most recent activity
+        const unpinned = all
+          .filter(t => !t.isPinned)
           .sort((a, b) => {
             const aTime = new Date(a.lastCommentAt ?? a.updatedAt ?? a.createdAt).getTime();
             const bTime = new Date(b.lastCommentAt ?? b.updatedAt ?? b.createdAt).getTime();
             return bTime - aTime;
           });
 
-        setThreads([...pinned, ...rest].slice(0, 5));
+        setThreads([...keywordPinned, ...otherPinned, ...unpinned].slice(0, 5));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -912,8 +922,7 @@ function ThreadsPreview() {
         )}
 
         {!loading && threads.map((thread, i) => {
-          const isPinnedSlot = i < PINNED_THREAD_KEYWORDS.length &&
-            PINNED_THREAD_KEYWORDS.some(kw => thread.title?.toLowerCase().includes(kw.toLowerCase()));
+          const isPinnedSlot = thread.isPinned;
           const commentCount   = thread._count?.comments ?? 0;
           const newCount       = thread.newCommentCount ?? 0;
 
@@ -967,57 +976,6 @@ function ThreadsPreview() {
         })}
       </div>
 
-    </div>
-  );
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// LEFT — RECENT BLOG POSTS (tucked inside Community Sprints)
-// ═════════════════════════════════════════════════════════════════════════════
-function RecentBlogPosts() {
-  const [posts, setPosts]     = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`${API_URL}/blog?limit=2`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setPosts(d?.posts ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (!loading && posts.length === 0) return null;
-
-  return (
-    <div className="mt-3 pt-3 border-t border-[#f0ebe3]">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-[#9a8c7a] mb-2">Latest Community News</p>
-
-      {loading && (
-        <div className="space-y-2">
-          {[1, 2].map(i => (
-            <div key={i} className="space-y-1.5">
-              <Bone w="w-2/3" h="h-3" /><Bone w="w-1/3" h="h-2.5" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!loading && (
-        <div className="space-y-2.5">
-          {posts.map(post => (
-            <Link key={post.id} to={`/blog/${post.id}`} className="block group">
-              <p className="text-[13px] font-semibold text-[#1a1a2e] group-hover:text-[#b8860b] transition-colors leading-snug truncate">
-                {post.title || "Untitled post"}
-              </p>
-              <p className="text-[10px] text-[#9a8c7a] mt-0.5">
-                {timeAgo(post.createdAt)}
-                <span className="mx-1">·</span>{post._count?.likes ?? 0} like{(post._count?.likes ?? 0) !== 1 ? "s" : ""}
-                <span className="mx-1">·</span>{post._count?.comments ?? 0} comment{(post._count?.comments ?? 0) !== 1 ? "s" : ""}
-              </p>
-            </Link>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

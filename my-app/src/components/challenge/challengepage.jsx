@@ -1590,7 +1590,7 @@ function InviteCard() {
       {/* Text */}
       <div className="flex-1 min-w-0">
         <p className="text-[12px] font-bold text-[#1a1a2e]">Invite a friend to the challenge</p>
-        <p className="text-[11px] text-[#9a8c7a] mt-0.5">Writing alongside others keeps the streak alive.</p>
+        <p className="text-[11px] text-[#9a8c7a] mt-0.5">Writers who show up together finish more. Bring someone in.</p>
       </div>
 
       {/* Copy button */}
@@ -1733,7 +1733,7 @@ export default function ChallengePage() {
               {!user && (
                 <div className="bg-white border border-[#e8e0d0] rounded-2xl p-8 text-center" style={{ borderTop: "4px solid #d4af37" }}>
                   <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-2">Daily Writing Challenge</p>
-                  <h2 className="font-serif text-[#1a1a2e] text-2xl font-bold mb-2 leading-tight">Show up every day.</h2>
+                  <h2 className="font-serif text-[#1a1a2e] text-2xl font-bold mb-2 leading-tight">Every word gets your draft closer to done.</h2>
                   <p className="text-[13px] text-[#9a8c7a] mb-6 max-w-sm mx-auto leading-relaxed">
                     One daily goal. A streak that grows every time you show up.
                   </p>

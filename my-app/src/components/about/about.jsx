@@ -110,28 +110,29 @@ function HighlightCard({ label, icon, user, value, unit, delay }) {
   );
 }
 
-
+// ── What you'll find ──────────────────────────────────────────────────────────
 const WHAT_YOU_FIND = [
   {
-    title: "Accountability",
-    body: "Show up to community sprints, track your progress, and build a writing habit that sticks — without pressure or guilt.",
+    title: "Daily Writing Challenges",
+    body: "Show up every day with a goal that's yours — words, chapters, scenes, or time. Build a streak. Miss a day and keep going anyway. The challenge is always there when you come back.",
   },
   {
-    title: "Critique",
-    body: "Share your work and get thoughtful feedback from other writers who want to see it improve, not just be praised.",
+    title: "Critique Swaps",
+    body: "Share your work and get feedback from writers who've read enough to know what they're looking at. Not cheerleading — honest, craft-level notes that actually help your draft move forward.",
   },
   {
-    title: "Connection",
-    body: "Meet writers who understand the work — the slow days, the breakthroughs, and everything in between.",
+    title: "A Community That Keeps Moving",
+    body: "Sprint alongside other writers, celebrate milestones together, and find people who understand the slow days as much as the breakthroughs. You stop feeling like you're writing into a void.",
   },
 ];
 
-// ── Who it's for list ─────────────────────────────────────────────────────────
+// ── Who it's for ─────────────────────────────────────────────────────────────
 const WHO_ITS_FOR = [
-  "want consistency without pressure",
-  "are ready for honest feedback on their work",
-  "feel lonely in their writing journey",
-  "want to be part of a community of writers",
+  "have more ideas than finished drafts",
+  "keep starting things and losing momentum halfway through",
+  "want feedback that pushes their work forward, not just praise",
+  "feel isolated in their writing journey and want people who get it",
+  "are ready to write consistently — not perfectly, just regularly",
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -196,21 +197,24 @@ export default function About() {
   return (
     <div className="min-h-screen bg-[#f5f3ef]">
       <AppMetaTags
-        title="About Inkwell — A Place to Write, Together"
-        description="Inkwell helps writers stay accountable, get meaningful critique, and connect with a community that takes the craft seriously."
+        title="About Inkwell — A Home for Writers with More Ideas Than Finished Drafts"
+        description="Inkwell helps writers turn sparks into stories through daily writing challenges, collaborative critique swaps, and a community that keeps moving forward together."
       />
       <Header />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-[#1a1a2e] border-b border-white/10">
+        {/* ambient glow */}
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full pointer-events-none"
           style={{
-            background: "radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%)",
+            background: "radial-gradient(ellipse, rgba(212,175,55,0.09) 0%, transparent 68%)",
           }}
         />
+        {/* gold hairline at bottom of hero */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/30 to-transparent" />
 
-        <div className="relative max-w-3xl mx-auto px-6 pt-24 pb-20 sm:pt-32 sm:pb-28 text-center">
+        <div className="relative max-w-3xl mx-auto px-6 pt-24 pb-24 sm:pt-32 sm:pb-32 text-center">
           <p
             className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-6"
             style={{ animation: "inkFadeUp 0.8s ease 0.1s both" }}
@@ -219,26 +223,21 @@ export default function About() {
           </p>
 
           <h1
-            className="text-4xl sm:text-5xl md:text-[3.5rem] font-serif text-white leading-[1.2] mb-8"
+            className="text-4xl sm:text-5xl md:text-[3.25rem] font-serif text-white leading-[1.25] mb-6"
             style={{ animation: "inkFadeUp 0.9s ease 0.25s both" }}
           >
-            Writing gets better
+            A home for writers with
             <br />
-            <em className="not-italic text-[#d4af37]">when you don't do it alone.</em>
+            <em className="not-italic text-[#d4af37]">more ideas than finished drafts.</em>
           </h1>
 
-          <GoldLine
-            className="mx-auto mb-8"
-            style={{ animation: "inkFadeUp 0.7s ease 0.4s both" }}
-          />
+          <GoldLine className="mx-auto mb-8" />
 
           <div style={{ animation: "inkFadeUp 0.9s ease 0.5s both" }}>
-            <p className="text-lg sm:text-xl text-white/70 leading-[1.8] max-w-lg mx-auto">
-              Inkwell used to be a quiet place to write.
-              <br />
-              Now it's where writers show up, improve,
-              <br />
-              and find people who get it.
+            <p className="text-lg sm:text-xl text-white/65 leading-[1.85] max-w-xl mx-auto">
+              Turn your sparks into stories through daily writing challenges,
+              collaborative critique swaps, and a community that keeps
+              moving forward together.
             </p>
           </div>
         </div>
@@ -249,10 +248,10 @@ export default function About() {
         <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24">
           <FadeIn>
             <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
-              What it is
+              What's here
             </p>
             <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-12">
-              Three things Inkwell gives you.
+              Three ways Inkwell keeps you moving.
             </h2>
           </FadeIn>
 
@@ -262,7 +261,7 @@ export default function About() {
                 <div className="group bg-white border border-[#e8e0d0] rounded-xl p-6 sm:p-8 sm:flex sm:items-start sm:gap-6 hover:border-[#d4af37]/50 transition-colors duration-300">
                   <div
                     className="hidden sm:flex w-12 h-12 rounded-full items-center justify-center flex-shrink-0 font-serif text-lg"
-                    style={{ background: "#d4af37" + "1a", color: "#d4af37" }}
+                    style={{ background: "#d4af371a", color: "#d4af37" }}
                   >
                     {String(i + 1).padStart(2, "0")}
                   </div>
@@ -289,16 +288,18 @@ export default function About() {
               Why it exists
             </p>
             <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-8">
-              Finishing your work takes more than willpower.
+              The spark is never the problem.
             </h2>
-            <p className="text-lg text-[#6b5c4a] leading-[1.8] mb-6">
-              It takes people who notice when you show up — and who'll tell you,
-              kindly and honestly, when something isn't working yet.
+            <p className="text-lg text-[#6b5c4a] leading-[1.85] mb-6">
+              Most writers don't run out of ideas. They run out of momentum. The draft
+              that felt so alive at 3,000 words goes quiet. The story that felt urgent
+              sits in a folder, half-done, waiting.
             </p>
-            <p className="text-lg text-[#6b5c4a] leading-[1.8]">
-              That's what Inkwell is built around: regular sprints to keep you
-              consistent, a space to get real feedback, and a community of writers
-              who are doing the same thing you are.
+            <p className="text-lg text-[#6b5c4a] leading-[1.85]">
+              Inkwell exists to close that gap — between the idea and the draft,
+              between the draft and the finished thing. Daily challenges keep you showing
+              up. Critique swaps keep your work honest. And the community reminds you
+              that the slow patches are part of the process, not a sign you should stop.
             </p>
           </FadeIn>
         </div>
@@ -312,8 +313,9 @@ export default function About() {
             <p className="text-2xl sm:text-3xl md:text-4xl font-serif text-white leading-[1.6] mb-4">
               To help writers finish what they start
             </p>
-            <p className="text-lg text-white/60 leading-relaxed">
-              through accountability, honest critique, and a community that cares about the craft.
+            <p className="text-lg text-white/55 leading-relaxed">
+              through daily challenges, honest critique, and a community
+              that keeps moving forward together.
             </p>
             <GoldLine className="mx-auto mt-10" />
           </FadeIn>
@@ -335,12 +337,12 @@ export default function About() {
           <div className="space-y-6">
             {WHO_ITS_FOR.map((item, i) => (
               <FadeIn key={item} delay={i * 100}>
-                <div className="flex items-center gap-5">
+                <div className="flex items-start gap-5">
                   <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    className="w-2 h-2 rounded-full flex-shrink-0 mt-[10px]"
                     style={{ background: "#d4af37" }}
                   />
-                  <p className="text-lg text-[#6b5c4a]">{item}</p>
+                  <p className="text-lg text-[#6b5c4a] leading-relaxed">{item}</p>
                 </div>
               </FadeIn>
             ))}
@@ -367,7 +369,7 @@ export default function About() {
                 icon="🔥"
                 user={highlights.streakLeader?.user}
                 value={highlights.streakLeader?.value}
-                unit={highlights.streakLeader?.value === 1 ? "day streak" : "day streak"}
+                unit="day streak"
                 delay={0}
               />
               <HighlightCard
@@ -411,7 +413,7 @@ export default function About() {
                 Writers are already here.
               </h2>
               <p className="text-[#9a8c7a] mb-12 max-w-sm mx-auto">
-                Showing up to sprints, sharing their work, and helping each other improve.
+                Showing up to challenges, sharing drafts, and helping each other finish.
               </p>
             </FadeIn>
 
@@ -443,13 +445,12 @@ export default function About() {
             <p className="text-white/60 text-lg leading-[1.8] text-center max-w-lg mx-auto mb-14">
               We're grateful to partner with Writers' Circle — a community that
               shares Inkwell with its members and welcomes them into our
-              sprints, critique spaces, and writing sessions.
+              challenges, critique spaces, and writing sessions.
             </p>
           </FadeIn>
 
           <FadeIn delay={140}>
             <div className="bg-[#fffdf0] rounded-2xl overflow-hidden shadow-soft sm:flex sm:items-stretch">
-              {/* Partner image */}
               <div className="sm:w-[42%] h-56 sm:h-auto relative">
                 <img
                   src="writersCircle.png"
@@ -459,7 +460,6 @@ export default function About() {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a2e]/30 to-transparent sm:bg-gradient-to-r" />
               </div>
 
-              {/* Partner content */}
               <div className="flex-1 p-8 sm:p-10 flex flex-col justify-center">
                 <div className="flex items-center gap-3 mb-4">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
@@ -480,7 +480,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* ── Write with us (Inkwell Discord) ──────────────────────────────── */}
+      {/* ── Write with us ────────────────────────────────────────────────── */}
       <section className="bg-[#f5f3ef]">
         <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24 text-center">
           <FadeIn>
@@ -491,8 +491,8 @@ export default function About() {
               You don't have to write alone.
             </h2>
             <p className="text-[#9a8c7a] mb-10 max-w-md mx-auto leading-relaxed">
-              Join sprint sessions, get feedback on your work, and find your people
-              in the Inkwell community.
+              Join the challenge, find accountability partners, and get feedback
+              on your work in the Inkwell community.
             </p>
 
             <a
@@ -516,11 +516,9 @@ export default function About() {
           <FadeIn>
             <GoldLine className="mx-auto mb-12" />
             <p className="text-4xl sm:text-5xl md:text-[3.25rem] font-serif text-white leading-[1.5]">
-              Show up.
+              Start the spark.
               <br />
-              Get better.
-              <br />
-              Belong somewhere.
+              <em className="not-italic text-[#d4af37]">Finish the story.</em>
             </p>
             <GoldLine className="mx-auto mt-12 mb-14" />
             <Link

@@ -104,7 +104,7 @@ export default function Signup() {
               Welcome to Inkwell
             </h1>
             <p className="text-ink-gray text-base sm:text-lg">
-              Your writing community
+              A home for writers with more ideas than finished drafts.
             </p>
           </div>
 
