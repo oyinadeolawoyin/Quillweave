@@ -937,28 +937,62 @@ function ThreadRowSkeleton() {
 
 // Tab ids
 const THREAD_TABS = [
-  { id: "pinned",  label: "Pinned & Latest" },
-  { id: "active",  label: "Active (2d)"     },
+  { id: "pinned", label: "Pinned" },
+  { id: "latest", label: "Latest" },
+  { id: "active", label: "Active (2d)" },
 ];
+
+const THREAD_TAB_COPY = {
+  pinned: {
+    subtitle: "Must-read threads, pinned by the team",
+    empty: "No pinned threads yet — check back soon.",
+  },
+  latest: {
+    subtitle: "What's new across the community",
+    empty: "No threads yet — be the first to post.",
+  },
+  active: {
+    subtitle: "Threads with activity in the last 48 hours",
+    empty: "No threads had activity in the last 48 hours.",
+  },
+};
 
 function PinnedTodayThreads() {
   const [tab, setTab]               = useState("pinned");
+
   const [pinnedThreads, setPinned]  = useState([]);
+  const [latestThreads, setLatest]  = useState([]);
   const [activeThreads, setActive]  = useState([]);
+
   const [loadingPinned, setLoadP]   = useState(true);
+  const [loadingLatest, setLoadL]   = useState(false);
   const [loadingActive, setLoadA]   = useState(false);
+
+  const [fetchedLatest, setFetchedL] = useState(false);
   const [fetchedActive, setFetchedA] = useState(false);
 
-  // Always fetch pinned+latest on mount
+  // Always fetch pinned threads on mount
   useEffect(() => {
-    fetch(`${API_URL}/threads/pinned-and-today?limit=10`)
+    fetch(`${API_URL}/threads/pinned?limit=10`)
       .then(r => r.ok ? r.json() : { threads: [] })
       .then(d => setPinned(d.threads ?? []))
       .catch(() => {})
       .finally(() => setLoadP(false));
   }, []);
 
-  // Fetch active threads lazily the first time the tab is selected
+  // Fetch latest threads lazily the first time that tab is selected
+  useEffect(() => {
+    if (tab !== "latest" || fetchedLatest) return;
+    setLoadL(true);
+    setFetchedL(true);
+    fetch(`${API_URL}/threads/latest?limit=20`)
+      .then(r => r.ok ? r.json() : { threads: [] })
+      .then(d => setLatest(d.threads ?? []))
+      .catch(() => {})
+      .finally(() => setLoadL(false));
+  }, [tab, fetchedLatest]);
+
+  // Fetch active threads lazily the first time that tab is selected
   useEffect(() => {
     if (tab !== "active" || fetchedActive) return;
     setLoadA(true);
@@ -970,18 +1004,21 @@ function PinnedTodayThreads() {
       .finally(() => setLoadA(false));
   }, [tab, fetchedActive]);
 
-  const threads = tab === "pinned" ? pinnedThreads : activeThreads;
-  const loading = tab === "pinned" ? loadingPinned : loadingActive;
+  const threadsByTab = { pinned: pinnedThreads, latest: latestThreads, active: activeThreads };
+  const loadingByTab = { pinned: loadingPinned, latest: loadingLatest, active: loadingActive };
+
+  const threads = threadsByTab[tab];
+  const loading = loadingByTab[tab];
 
   return (
     <div className="bg-white border border-[#e8e0d0] rounded-xl overflow-hidden mb-6">
       {/* Header */}
-      <div className="px-5 pt-4 pb-0 border-b border-[#f0ebe3]">
+      <div className="px-4 sm:px-5 pt-4 pb-0 border-b border-[#f0ebe3]">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
+          <div className="min-w-0">
             <h2 className="font-serif text-[#1a1a2e] text-base font-semibold">Community Threads</h2>
-            <p className="text-[11px] text-[#9a8c7a] mt-0.5">
-              {tab === "pinned" ? "Must-reads, pinned first — then what's new today" : "Threads with activity in the last 48 hours"}
+            <p className="text-[11px] text-[#9a8c7a] mt-0.5 truncate">
+              {THREAD_TAB_COPY[tab].subtitle}
             </p>
           </div>
           <Link to="/forum" className="text-[11px] text-[#9a8c7a] hover:text-[#d4af37] transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0">
@@ -992,13 +1029,13 @@ function PinnedTodayThreads() {
           </Link>
         </div>
 
-        {/* Tab nav */}
-        <div className="flex gap-0 -mb-px">
+        {/* Tab nav — horizontally scrollable on mobile so 3 tabs never get crushed */}
+        <div className="flex gap-0 -mb-px overflow-x-auto scrollbar-none">
           {THREAD_TABS.map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-[10.5px] sm:text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                 tab === id
                   ? "border-[#d4af37] text-[#b8860b]"
                   : "border-transparent text-[#9a8c7a] hover:text-[#1a1a2e]"
@@ -1014,11 +1051,9 @@ function PinnedTodayThreads() {
         {loading && [1,2,3].map(i => <ThreadRowSkeleton key={i} />)}
 
         {!loading && threads.length === 0 && (
-          <div className="px-5 py-6 text-center">
+          <div className="px-4 sm:px-5 py-6 text-center">
             <p className="text-[12px] text-[#9a8c7a]">
-              {tab === "pinned"
-                ? "No pinned threads or new threads today yet — check back soon."
-                : "No threads had activity in the last 48 hours."}
+              {THREAD_TAB_COPY[tab].empty}
             </p>
           </div>
         )}
