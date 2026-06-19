@@ -848,62 +848,71 @@ function timeAgo(dateStr) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// LEFT — DISCUSSION CATEGORIES
+// LEFT — PINNED, LATEST & ACTIVE THREADS
 // ═════════════════════════════════════════════════════════════════════════════
 
-// A little variety in the accent dot so the list doesn't feel like a flat table.
 const CATEGORY_ACCENTS = ["#d4af37", "#b8860b", "#1a5fb4", "#b8622a", "#6b5c4a", "#c0392b"];
 
-function CategoryRow({ category, index }) {
-  const accent = CATEGORY_ACCENTS[index % CATEGORY_ACCENTS.length];
-  const hasPosts = category.totalPosts > 0;
-  const isLively = category.activePosts > 0;
+function PinnedTodayThreadRow({ thread, index }) {
+  const accent = thread.category
+    ? CATEGORY_ACCENTS[thread.category.id % CATEGORY_ACCENTS.length]
+    : CATEGORY_ACCENTS[index % CATEGORY_ACCENTS.length];
+  const commentCount = thread._count?.comments ?? 0;
+  const likeCount    = thread._count?.likes    ?? 0;
 
   return (
     <Link
-      to={`/forum?category=${category.slug}`}
+      to={`/threads/${thread.id}`}
       className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#faf7f2] transition-colors group"
     >
-      {/* Initial badge */}
-      <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 font-serif font-bold text-[14px]"
-        style={{ background: `${accent}1a`, color: accent }}
-      >
-        {category.name?.charAt(0).toUpperCase()}
-      </div>
+      {thread.author?.avatar ? (
+        <img
+          src={thread.author.avatar}
+          alt={thread.author.username}
+          className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+        />
+      ) : (
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 font-serif font-bold text-[14px]"
+          style={{ background: `${accent}1a`, color: accent }}
+        >
+          {thread.author?.username?.charAt(0).toUpperCase() ?? "?"}
+        </div>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-[13px] font-semibold text-[#1a1a2e] leading-snug group-hover:text-[#b8860b] transition-colors">
-            {category.name}
-          </p>
-          {isLively && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-              style={{ background: "#fffdf0", color: "#b8860b", border: "1px solid #d4af37" }}>
-              active
+          {thread.isPinned && (
+            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border"
+              style={{ color: "#b8860b", background: "#fffdf0", borderColor: "#d4af37" }}>
+              Pinned
             </span>
           )}
+          <p className="text-[13px] font-semibold text-[#1a1a2e] leading-snug group-hover:text-[#b8860b] transition-colors truncate">
+            {thread.title}
+          </p>
         </div>
 
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className="text-[10px] text-[#9a8c7a]">
-            {category.totalPosts} {category.totalPosts === 1 ? "post" : "posts"}
+          <span className="text-[10px] text-[#9a8c7a] font-medium">
+            {thread.author?.username ?? "Member"}
           </span>
-          {hasPosts ? (
+          <span className="text-[#e8e0d0]">·</span>
+          <span className="text-[10px] text-[#9a8c7a]">{timeAgo(thread.createdAt)}</span>
+          {thread.category && (
             <>
               <span className="text-[#e8e0d0]">·</span>
-              <span className="text-[10px] text-[#9a8c7a]">
-                {category.activePosts} active this month
-              </span>
-              <span className="text-[#e8e0d0]">·</span>
-              <span className="text-[10px] text-[#b8a070]">last post {timeAgo(category.lastPostAt)}</span>
-            </>
-          ) : (
-            <>
-              <span className="text-[#e8e0d0]">·</span>
-              <span className="text-[10px] text-[#b8860b] font-medium">be the first to post</span>
+              <span className="text-[10px] text-[#b8a070]">{thread.category.name}</span>
             </>
           )}
+          <span className="text-[#e8e0d0]">·</span>
+          <span className="text-[10px] text-[#9a8c7a]">
+            {commentCount} {commentCount === 1 ? "comment" : "comments"}
+          </span>
+          <span className="text-[#e8e0d0]">·</span>
+          <span className="text-[10px] text-[#9a8c7a]">
+            {likeCount} {likeCount === 1 ? "like" : "likes"}
+          </span>
         </div>
       </div>
 
@@ -914,55 +923,110 @@ function CategoryRow({ category, index }) {
   );
 }
 
-function DiscussionCategories() {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+function ThreadRowSkeleton() {
+  return (
+    <div className="px-5 py-3.5 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-lg bg-[#ece8e1] animate-pulse flex-shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 w-1/2 bg-[#ece8e1] rounded animate-pulse" />
+        <div className="h-2.5 w-2/3 bg-[#ece8e1] rounded animate-pulse" />
+      </div>
+    </div>
+  );
+}
 
+// Tab ids
+const THREAD_TABS = [
+  { id: "pinned",  label: "Pinned & Latest" },
+  { id: "active",  label: "Active (2d)"     },
+];
+
+function PinnedTodayThreads() {
+  const [tab, setTab]               = useState("pinned");
+  const [pinnedThreads, setPinned]  = useState([]);
+  const [activeThreads, setActive]  = useState([]);
+  const [loadingPinned, setLoadP]   = useState(true);
+  const [loadingActive, setLoadA]   = useState(false);
+  const [fetchedActive, setFetchedA] = useState(false);
+
+  // Always fetch pinned+latest on mount
   useEffect(() => {
-    fetch(`${API_URL}/threads/categories`)
-      .then(r => r.ok ? r.json() : { categories: [] })
-      .then(d => setCategories(d.categories ?? []))
+    fetch(`${API_URL}/threads/pinned-and-today?limit=10`)
+      .then(r => r.ok ? r.json() : { threads: [] })
+      .then(d => setPinned(d.threads ?? []))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => setLoadP(false));
   }, []);
+
+  // Fetch active threads lazily the first time the tab is selected
+  useEffect(() => {
+    if (tab !== "active" || fetchedActive) return;
+    setLoadA(true);
+    setFetchedA(true);
+    fetch(`${API_URL}/threads/active?limit=20`)
+      .then(r => r.ok ? r.json() : { threads: [] })
+      .then(d => setActive(d.threads ?? []))
+      .catch(() => {})
+      .finally(() => setLoadA(false));
+  }, [tab, fetchedActive]);
+
+  const threads = tab === "pinned" ? pinnedThreads : activeThreads;
+  const loading = tab === "pinned" ? loadingPinned : loadingActive;
 
   return (
     <div className="bg-white border border-[#e8e0d0] rounded-xl overflow-hidden mb-6">
-      <div className="px-5 pt-4 pb-3 border-b border-[#f0ebe3] flex items-center justify-between gap-3">
-        <div>
-          <h2 className="font-serif text-[#1a1a2e] text-base font-semibold">Discussion Categories</h2>
-          <p className="text-[11px] text-[#9a8c7a] mt-0.5">Find your people — every conversation starts somewhere</p>
+      {/* Header */}
+      <div className="px-5 pt-4 pb-0 border-b border-[#f0ebe3]">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 className="font-serif text-[#1a1a2e] text-base font-semibold">Community Threads</h2>
+            <p className="text-[11px] text-[#9a8c7a] mt-0.5">
+              {tab === "pinned" ? "Must-reads, pinned first — then what's new today" : "Threads with activity in the last 48 hours"}
+            </p>
+          </div>
+          <Link to="/forum" className="text-[11px] text-[#9a8c7a] hover:text-[#d4af37] transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0">
+            Visit forum
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </Link>
         </div>
-        <Link to="/forum" className="text-[11px] text-[#9a8c7a] hover:text-[#d4af37] transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0">
-          Visit forum
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
-        </Link>
+
+        {/* Tab nav */}
+        <div className="flex gap-0 -mb-px">
+          {THREAD_TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors ${
+                tab === id
+                  ? "border-[#d4af37] text-[#b8860b]"
+                  : "border-transparent text-[#9a8c7a] hover:text-[#1a1a2e]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="divide-y divide-[#f4f1ec]">
-        {loading && [1,2,3].map(i => (
-          <div key={i} className="px-5 py-3.5 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#ece8e1] animate-pulse flex-shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="h-3 w-1/2 bg-[#ece8e1] rounded animate-pulse" />
-              <div className="h-2.5 w-2/3 bg-[#ece8e1] rounded animate-pulse" />
-            </div>
-          </div>
-        ))}
+        {loading && [1,2,3].map(i => <ThreadRowSkeleton key={i} />)}
 
-        {!loading && categories.length === 0 && (
+        {!loading && threads.length === 0 && (
           <div className="px-5 py-6 text-center">
-            <p className="text-[12px] text-[#9a8c7a]">No categories yet — check back soon.</p>
+            <p className="text-[12px] text-[#9a8c7a]">
+              {tab === "pinned"
+                ? "No pinned threads or new threads today yet — check back soon."
+                : "No threads had activity in the last 48 hours."}
+            </p>
           </div>
         )}
 
-        {!loading && categories.map((category, i) => (
-          <CategoryRow key={category.id} category={category} index={i} />
+        {!loading && threads.map((thread, i) => (
+          <PinnedTodayThreadRow key={thread.id} thread={thread} index={i} />
         ))}
       </div>
-
     </div>
   );
 }
@@ -1105,8 +1169,8 @@ export default function Homepage() {
           progress={streaks}
         />
 
-        {/* ── DISCUSSION CATEGORIES ── */}
-        <DiscussionCategories />
+        {/* ── PINNED & TODAY'S THREADS ── */}
+        <PinnedTodayThreads />
 
         {/* ── COMMUNITY SPRINTS ── */}
         <AccountabilitySection user={user} onStartSprint={handleStartSprint} />

@@ -28,6 +28,8 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
 
   const isEdit = !!initial;
 
+  const selectedCategory = categories.find(c => String(c.id) === String(categoryId));
+
   function handleFile(e) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -153,7 +155,9 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
             ))}
           </select>
           <p className="text-[11px] text-[#9a8c7a] mt-1.5">
-            Pick the category that best fits — it helps other members find your thread.
+            {selectedCategory?.description
+              ? selectedCategory.description
+              : "Pick the category that best fits — it helps other members find your thread."}
           </p>
         </div>
 

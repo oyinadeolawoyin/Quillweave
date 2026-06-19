@@ -1077,7 +1077,7 @@ export default function ThreadPage() {
 
           {/* Breadcrumb */}
           <Link
-            to="/"
+            to="/forum"
             className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/40 hover:text-[#d4af37] transition-colors mb-6"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
