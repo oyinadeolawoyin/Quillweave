@@ -43,6 +43,8 @@ import DraftsPage from './components/drafts/draftspage';
 import WritePage from './components/drafts/writePage';
 import ChallengePage from './components/challenge/challengepage';
 import ThreadPage from './components/threads/threadpage';
+import ForumPage from './components/threads/forumpage';
+import ThreadFormPage from './components/threads/threadformpage';
 import AdminThreadsPage from './components/threads/adminthreadspage';
 
 if ("serviceWorker" in navigator) {
@@ -136,8 +138,20 @@ const router = createBrowserRouter([
     element: <ChallengePage />
   },
   {
+    path: "/forum",
+    element: <ForumPage />
+  },
+  {
     path: "/threads/:threadId",
     element: <ThreadPage />
+  },
+  {
+    path: "/threads/submit",
+    element: <ThreadFormPage />
+  },
+  {
+    path: "/threads/:threadId/edit",
+    element: <ThreadFormPage />
   },
   {
     path: "/admin/threads",

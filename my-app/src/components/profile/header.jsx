@@ -92,6 +92,7 @@ export default function Header() {
 
   const navItems = [
     { to: "/critique",  label: "Spotlight Critique" },
+    { to: "/forum",     label: "Forum" },
     { to: "/members",   label: "Members"   },
 
     // { to: "/thesaurus", label: "Thesaurus" },

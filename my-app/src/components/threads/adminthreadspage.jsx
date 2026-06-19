@@ -1,8 +1,11 @@
 // src/components/admin/adminThreadsPage.jsx
-// Admin-only page for managing community threads.
+// Admin-only page for moderating community threads and managing categories.
+// Thread creation/editing now lives on the member-facing /threads/submit and
+// /threads/:threadId/edit pages (threadFormPage.jsx) — any member can use those.
+// This page keeps: category CRUD, pin/unpin, and delete-any-thread moderation.
 // Route guard: redirects non-admins to "/" immediately.
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
@@ -60,49 +63,56 @@ function Toast({ message, type = "success", onDone }) {
   );
 }
 
-// ─── Thread form (create + edit) ─────────────────────────────────────────────
+// ─── Category form (create + edit) ───────────────────────────────────────────
 
-function ThreadForm({ initial = null, onSave, onCancel }) {
-  const [title,     setTitle]     = useState(initial?.title    ?? "");
-  const [context,   setContext]   = useState(initial?.context  ?? "");
-  const [link,      setLink]      = useState(initial?.link     ?? "");
-  const [isPinned,  setIsPinned]  = useState(initial?.isPinned ?? false);
-  const [mediaFile, setMediaFile] = useState(null);
-  const [preview,   setPreview]   = useState(initial?.mediaUrl ?? null);
-  const [saving,    setSaving]    = useState(false);
-  const [err,       setErr]       = useState("");
-  const fileRef = useRef(null);
+function slugify(str) {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function CategoryForm({ initial = null, onSave, onCancel }) {
+  const [name,        setName]        = useState(initial?.name        ?? "");
+  const [slug,        setSlug]        = useState(initial?.slug        ?? "");
+  const [slugTouched, setSlugTouched] = useState(!!initial); // don't auto-slug when editing
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [sortOrder,   setSortOrder]   = useState(initial?.sortOrder   ?? 0);
+  const [saving,      setSaving]      = useState(false);
+  const [err,         setErr]         = useState("");
 
   const isEdit = !!initial;
 
-  function handleFile(e) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setMediaFile(f);
-    setPreview(URL.createObjectURL(f));
+  function handleNameChange(value) {
+    setName(value);
+    if (!slugTouched) setSlug(slugify(value));
   }
 
   async function handleSubmit() {
-    if (!title.trim())   { setErr("Title is required."); return; }
-    if (!context.trim()) { setErr("Context is required."); return; }
+    if (!name.trim()) { setErr("Name is required."); return; }
+    if (!slug.trim()) { setErr("Slug is required."); return; }
     setErr("");
     setSaving(true);
 
     try {
-      const body = new FormData();
-      body.append("title",    title.trim());
-      body.append("context",  context.trim());
-      body.append("isPinned", String(isPinned));
-      if (link.trim())  body.append("link", link.trim());
-      if (mediaFile)    body.append("media", mediaFile);
-
-      const url    = isEdit ? `${API_URL}/threads/${initial.id}` : `${API_URL}/threads`;
+      const url    = isEdit ? `${API_URL}/threads/categories/${initial.id}` : `${API_URL}/threads/categories`;
       const method = isEdit ? "PUT" : "POST";
 
-      const r = await fetch(url, { method, credentials: "include", body });
+      const r = await fetch(url, {
+        method,
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          slug: slugify(slug),
+          description: description.trim() || null,
+          sortOrder: Number(sortOrder) || 0,
+        }),
+      });
       const d = await r.json();
       if (!r.ok) { setErr(d.message ?? "Something went wrong."); return; }
-      onSave(d.thread);
+      onSave(d.category);
     } catch {
       setErr("Network error — please try again.");
     } finally {
@@ -113,16 +123,16 @@ function ThreadForm({ initial = null, onSave, onCancel }) {
   return (
     <div
       className="bg-white rounded-2xl border border-[#e8e0d0] overflow-hidden"
-      style={{ boxShadow: "0 4px 24px rgba(26,26,46,0.10)", borderTop: "4px solid #d4af37" }}
+      style={{ boxShadow: "0 4px 24px rgba(26,26,46,0.10)", borderTop: "4px solid #1a5fb4" }}
     >
       {/* Form header */}
       <div className="px-6 pt-5 pb-4 border-b border-[#f4f1ec] flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-0.5">
-            {isEdit ? "Edit thread" : "New thread"}
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#1a5fb4] mb-0.5">
+            {isEdit ? "Edit category" : "New category"}
           </p>
           <h2 className="font-serif text-[#1a1a2e] text-lg font-bold leading-tight">
-            {isEdit ? "Update this thread" : "Start a conversation"}
+            {isEdit ? "Update this category" : "Create a discussion category"}
           </h2>
         </div>
         {onCancel && (
@@ -140,114 +150,60 @@ function ThreadForm({ initial = null, onSave, onCancel }) {
 
       <div className="px-6 py-5 space-y-5">
 
-        {/* Title */}
+        {/* Name */}
         <div>
           <label className="block text-[11px] font-bold text-[#6b5c4a] uppercase tracking-wide mb-1.5">
-            Title <span className="text-[#c0392b]">*</span>
+            Name <span className="text-[#c0392b]">*</span>
           </label>
           <input
             type="text"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Introduce yourself"
-            className="w-full px-4 py-2.5 border border-[#e8e0d0] rounded-xl text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none focus:border-[#d4af37] bg-white transition-colors"
+            value={name}
+            onChange={e => handleNameChange(e.target.value)}
+            placeholder="e.g. Writing Craft"
+            className="w-full px-4 py-2.5 border border-[#e8e0d0] rounded-xl text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none focus:border-[#1a5fb4] bg-white transition-colors"
           />
         </div>
 
-        {/* Context */}
+        {/* Slug */}
         <div>
           <label className="block text-[11px] font-bold text-[#6b5c4a] uppercase tracking-wide mb-1.5">
-            Context <span className="text-[#c0392b]">*</span>
-          </label>
-          <textarea
-            value={context}
-            onChange={e => setContext(e.target.value)}
-            placeholder="What is this thread about? Give members enough to know how to engage…"
-            rows={5}
-            className="w-full px-4 py-3 border border-[#e8e0d0] rounded-xl text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none focus:border-[#d4af37] bg-white transition-colors resize-none leading-relaxed"
-          />
-        </div>
-
-        {/* Optional link */}
-        <div>
-          <label className="block text-[11px] font-bold text-[#6b5c4a] uppercase tracking-wide mb-1.5">
-            Link <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— optional</span>
+            Slug <span className="text-[#c0392b]">*</span>
+            <span className="text-[#9a8c7a] font-normal normal-case tracking-normal"> — used in the forum URL</span>
           </label>
           <input
-            type="url"
-            value={link}
-            onChange={e => setLink(e.target.value)}
-            placeholder="https://…"
-            className="w-full px-4 py-2.5 border border-[#e8e0d0] rounded-xl text-[13px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none focus:border-[#d4af37] bg-white transition-colors"
+            type="text"
+            value={slug}
+            onChange={e => { setSlugTouched(true); setSlug(e.target.value); }}
+            placeholder="writing-craft"
+            className="w-full px-4 py-2.5 border border-[#e8e0d0] rounded-xl text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none focus:border-[#1a5fb4] bg-white transition-colors font-mono"
           />
         </div>
 
-        {/* Media upload */}
+        {/* Description */}
         <div>
           <label className="block text-[11px] font-bold text-[#6b5c4a] uppercase tracking-wide mb-1.5">
-            Image <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— optional</span>
+            Description <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— optional</span>
           </label>
-
-          {preview ? (
-            <div className="relative rounded-xl overflow-hidden border border-[#e8e0d0]">
-              <img src={preview} alt="Preview" className="w-full max-h-48 object-cover" />
-              <button
-                onClick={() => { setPreview(null); setMediaFile(null); if (fileRef.current) fileRef.current.value = ""; }}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#1a1a2e]/70 text-white flex items-center justify-center hover:bg-[#1a1a2e] transition-colors"
-                title="Remove image"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="w-full flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-[#e8e0d0] rounded-xl text-[#9a8c7a] hover:border-[#d4af37] hover:text-[#b8860b] hover:bg-[#fffdf4] transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
-              <span className="text-[12px] font-medium">Click to upload an image</span>
-            </button>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="What kind of threads belong here?"
+            rows={3}
+            className="w-full px-4 py-3 border border-[#e8e0d0] rounded-xl text-[14px] text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none focus:border-[#1a5fb4] bg-white transition-colors resize-none leading-relaxed"
+          />
         </div>
 
-        {/* Pin toggle */}
-        <div
-          className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all cursor-pointer ${
-            isPinned
-              ? "bg-[#fffdf0] border-[#d4af37]"
-              : "bg-[#faf7f2] border-[#e8e0d0] hover:border-[#d4af37]/50"
-          }`}
-          onClick={() => setIsPinned(p => !p)}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isPinned ? "bg-[#d4af37]" : "bg-[#e8e0d0]"}`}>
-              <svg className={`w-4 h-4 ${isPinned ? "text-[#1a1a2e]" : "text-[#9a8c7a]"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
-              </svg>
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-[#1a1a2e]">Pin this thread</p>
-              <p className="text-[11px] text-[#9a8c7a]">Pinned threads always appear at the top of the list</p>
-            </div>
-          </div>
-
-          {/* Toggle pill */}
-          <div
-            className={`w-10 h-5.5 rounded-full transition-colors flex-shrink-0 relative ${isPinned ? "bg-[#d4af37]" : "bg-[#e8e0d0]"}`}
-            style={{ width: 40, height: 22 }}
-          >
-            <div
-              className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
-              style={{ transform: isPinned ? "translateX(20px)" : "translateX(2px)", margin: "1px 0" }}
-            />
-          </div>
+        {/* Sort order */}
+        <div>
+          <label className="block text-[11px] font-bold text-[#6b5c4a] uppercase tracking-wide mb-1.5">
+            Sort order <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— lower shows first</span>
+          </label>
+          <input
+            type="number"
+            value={sortOrder}
+            onChange={e => setSortOrder(e.target.value)}
+            className="w-full sm:w-32 px-4 py-2.5 border border-[#e8e0d0] rounded-xl text-[14px] text-[#1a1a2e] focus:outline-none focus:border-[#1a5fb4] bg-white transition-colors"
+          />
         </div>
 
         {err && (
@@ -264,9 +220,9 @@ function ThreadForm({ initial = null, onSave, onCancel }) {
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="flex-1 py-3 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-xl hover:bg-[#c9a42d] transition-colors disabled:opacity-50"
+            className="flex-1 py-3 bg-[#1a5fb4] text-white text-sm font-bold rounded-xl hover:bg-[#164e94] transition-colors disabled:opacity-50"
           >
-            {saving ? (isEdit ? "Saving…" : "Publishing…") : (isEdit ? "Save changes" : "Publish thread")}
+            {saving ? (isEdit ? "Saving…" : "Creating…") : (isEdit ? "Save changes" : "Create category")}
           </button>
           {onCancel && (
             <button
@@ -282,9 +238,92 @@ function ThreadForm({ initial = null, onSave, onCancel }) {
   );
 }
 
+// ─── Category list row ────────────────────────────────────────────────────────
+
+function CategoryRow({ category, onEdit, onDelete }) {
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!window.confirm(
+      `Delete "${category.name}"? Threads in this category will be moved to Uncategorized.`
+    )) return;
+    setDeleting(true);
+    try {
+      const r = await fetch(`${API_URL}/threads/categories/${category.id}`, {
+        method: "DELETE", credentials: "include",
+      });
+      if (r.ok) onDelete(category.id);
+    } finally { setDeleting(false); }
+  }
+
+  return (
+    <div
+      className="flex items-start gap-4 px-5 py-4 bg-white rounded-xl border border-[#e8e0d0]"
+      style={{ boxShadow: "0 1px 4px rgba(26,26,46,0.05)" }}
+    >
+      <div className="w-9 h-9 rounded-lg bg-[#e8f0fb] text-[#1a5fb4] flex items-center justify-center flex-shrink-0 font-serif font-bold text-[14px] mt-0.5">
+        {category.name?.charAt(0).toUpperCase()}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+          <p className="font-serif text-[14px] font-bold text-[#1a1a2e] leading-snug">{category.name}</p>
+          <span className="text-[10px] font-mono text-[#9a8c7a] bg-[#f4f1ec] px-1.5 py-0.5 rounded">/{category.slug}</span>
+        </div>
+
+        {category.description && (
+          <p className="text-[12px] text-[#9a8c7a] line-clamp-1 mb-2">{category.description}</p>
+        )}
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-[11px] text-[#9a8c7a]">
+            {category.totalPosts ?? 0} {category.totalPosts === 1 ? "post" : "posts"}
+          </span>
+          <span className="text-[11px] text-[#9a8c7a]">
+            {category.activePosts ?? 0} active this month
+          </span>
+          <span className="text-[11px] text-[#c8b89a]">Sort order {category.sortOrder ?? 0}</span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <button
+          onClick={() => onEdit(category)}
+          title="Edit category"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9a8c7a] hover:bg-[#faf7f2] hover:text-[#1a1a2e] transition-all"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+          </svg>
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          title="Delete category"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9a8c7a] hover:bg-red-50 hover:text-[#c0392b] transition-all disabled:opacity-40"
+        >
+          {deleting ? (
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Thread list row ──────────────────────────────────────────────────────────
 
-function ThreadRow({ thread, onEdit, onDelete, onTogglePin }) {
+function ThreadRow({ thread, onDelete, onTogglePin }) {
   const [deleting,  setDeleting]  = useState(false);
   const [pinning,   setPinning]   = useState(false);
 
@@ -359,6 +398,11 @@ function ThreadRow({ thread, onEdit, onDelete, onTogglePin }) {
               Pinned
             </span>
           )}
+          {thread.category && (
+            <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#f4f1ec] text-[#6b5c4a]">
+              {thread.category.name}
+            </span>
+          )}
         </div>
 
         <p className="text-[12px] text-[#9a8c7a] line-clamp-1 mb-2">{thread.context}</p>
@@ -398,8 +442,8 @@ function ThreadRow({ thread, onEdit, onDelete, onTogglePin }) {
         </button>
 
         {/* Edit */}
-        <button
-          onClick={() => onEdit(thread)}
+        <Link
+          to={`/threads/${thread.id}/edit`}
           title="Edit thread"
           className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9a8c7a] hover:bg-[#faf7f2] hover:text-[#1a1a2e] transition-all"
         >
@@ -407,7 +451,7 @@ function ThreadRow({ thread, onEdit, onDelete, onTogglePin }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
           </svg>
-        </button>
+        </Link>
 
         {/* View */}
         <Link
@@ -454,9 +498,10 @@ export default function AdminThreadsPage() {
   const navigate    = useNavigate();
 
   const [threads,     setThreads]   = useState([]);
+  const [categories,  setCategories] = useState([]);
   const [loading,     setLoading]   = useState(true);
-  const [showForm,    setShowForm]  = useState(false);
-  const [editTarget,  setEditTarget] = useState(null); // thread being edited
+  const [showCatForm, setShowCatForm] = useState(false);
+  const [editCatTarget, setEditCatTarget] = useState(null); // category being edited
   const [toast,       setToast]     = useState(null);  // { message, type }
 
   // ── Guard — redirect non-admins immediately ──────────────────────────────
@@ -467,6 +512,19 @@ export default function AdminThreadsPage() {
   useEffect(() => {
     if (user && user.role !== "ADMIN") navigate("/");
   }, [user, navigate]);
+
+  // ── Load categories ────────────────────────────────────────────────────────
+  const loadCategories = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_URL}/threads/categories`);
+      if (r.ok) {
+        const d = await r.json();
+        setCategories(d.categories ?? []);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadCategories(); }, [loadCategories]);
 
   // ── Load threads ──────────────────────────────────────────────────────────
   const loadThreads = useCallback(async () => {
@@ -490,18 +548,6 @@ export default function AdminThreadsPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  function handleCreated(thread) {
-    setThreads(prev => {
-      const updated = [thread, ...prev];
-      return updated.sort((a, b) => {
-        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-    });
-    setShowForm(false);
-    showToast("Thread published.");
-  }
-
   function handleUpdated(thread) {
     setThreads(prev =>
       prev.map(t => t.id === thread.id ? thread : t).sort((a, b) => {
@@ -509,7 +555,6 @@ export default function AdminThreadsPage() {
         return new Date(b.createdAt) - new Date(a.createdAt);
       })
     );
-    setEditTarget(null);
     showToast("Thread updated.");
   }
 
@@ -521,6 +566,29 @@ export default function AdminThreadsPage() {
   function handlePinToggled(thread) {
     handleUpdated(thread);
     showToast(thread.isPinned ? "Thread pinned." : "Thread unpinned.");
+  }
+
+  function handleCategoryCreated(category) {
+    setCategories(prev => [...prev, category].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+    setShowCatForm(false);
+    showToast("Category created.");
+  }
+
+  function handleCategoryUpdated(category) {
+    setCategories(prev =>
+      prev.map(c => c.id === category.id ? { ...c, ...category } : c)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    );
+    setEditCatTarget(null);
+    showToast("Category updated.");
+  }
+
+  function handleCategoryDeleted(categoryId) {
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    // Threads that belonged to this category are now uncategorized — refresh
+    // the thread list so the admin table reflects that immediately.
+    loadThreads();
+    showToast("Category deleted. Threads moved to Uncategorized.");
   }
 
   function showToast(message, type = "success") {
@@ -558,19 +626,19 @@ export default function AdminThreadsPage() {
                 Manage Threads
               </h1>
               <p className="text-[13px] text-white/40 mt-1.5">
-                Create and manage community forum threads.
+                Moderate threads and manage discussion categories.
               </p>
             </div>
 
-            <button
-              onClick={() => { setShowForm(true); setEditTarget(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            <Link
+              to="/threads/submit"
               className="flex items-center gap-2 px-5 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-xl hover:bg-[#c9a42d] transition-colors flex-shrink-0"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
               </svg>
               New thread
-            </button>
+            </Link>
           </div>
 
           {/* Stats row */}
@@ -594,14 +662,68 @@ export default function AdminThreadsPage() {
       {/* ── Main content ── */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-6">
 
-        {/* Create / edit form */}
-        {(showForm || editTarget) && (
-          <ThreadForm
-            initial={editTarget}
-            onSave={editTarget ? handleUpdated : handleCreated}
-            onCancel={() => { setShowForm(false); setEditTarget(null); }}
-          />
-        )}
+
+        {/* Categories management */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-serif text-[#1a1a2e] text-base font-bold">
+                Discussion Categories {!loading && categories.length > 0 && `(${categories.length})`}
+              </h2>
+              <p className="text-[12px] text-[#9a8c7a] mt-0.5">
+                These power the homepage list and the forum filter.
+              </p>
+            </div>
+            <button
+              onClick={() => { setShowCatForm(true); setEditCatTarget(null); }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#1a5fb4] text-white text-[12px] font-bold rounded-xl hover:bg-[#164e94] transition-colors flex-shrink-0"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
+              </svg>
+              New category
+            </button>
+          </div>
+
+          {(showCatForm || editCatTarget) && (
+            <div className="mb-4">
+              <CategoryForm
+                initial={editCatTarget}
+                onSave={editCatTarget ? handleCategoryUpdated : handleCategoryCreated}
+                onCancel={() => { setShowCatForm(false); setEditCatTarget(null); }}
+              />
+            </div>
+          )}
+
+          {categories.length === 0 && !showCatForm ? (
+            <div
+              className="bg-white rounded-xl border border-[#e8e0d0] py-10 text-center"
+              style={{ borderTop: "3px solid #1a5fb4" }}
+            >
+              <p className="font-serif text-[#1a1a2e] text-base font-bold mb-1">No categories yet</p>
+              <p className="text-[12px] text-[#9a8c7a] mb-4">Create one to start organizing threads on the homepage and forum.</p>
+              <button
+                onClick={() => setShowCatForm(true)}
+                className="px-5 py-2.5 bg-[#1a5fb4] text-white text-sm font-bold rounded-xl hover:bg-[#164e94] transition-colors"
+              >
+                Create first category
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {categories.map(category => (
+                <CategoryRow
+                  key={category.id}
+                  category={category}
+                  onEdit={c => { setEditCatTarget(c); setShowCatForm(false); }}
+                  onDelete={handleCategoryDeleted}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-[#e8e0d0]" />
 
         {/* Thread list */}
         <div>
@@ -627,7 +749,7 @@ export default function AdminThreadsPage() {
           )}
 
           {/* Empty */}
-          {!loading && threads.length === 0 && !showForm && (
+          {!loading && threads.length === 0 && (
             <div
               className="bg-white rounded-xl border border-[#e8e0d0] py-12 text-center"
               style={{ borderTop: "3px solid #d4af37" }}
@@ -640,12 +762,12 @@ export default function AdminThreadsPage() {
               </div>
               <p className="font-serif text-[#1a1a2e] text-base font-bold mb-1">No threads yet</p>
               <p className="text-[12px] text-[#9a8c7a] mb-4">Start with an "Introduce yourself" thread to get the community going.</p>
-              <button
-                onClick={() => setShowForm(true)}
-                className="px-5 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-xl hover:bg-[#c9a42d] transition-colors"
+              <Link
+                to="/threads/submit"
+                className="inline-block px-5 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-sm font-bold rounded-xl hover:bg-[#c9a42d] transition-colors"
               >
                 Create first thread
-              </button>
+              </Link>
             </div>
           )}
 
@@ -656,7 +778,6 @@ export default function AdminThreadsPage() {
                 <ThreadRow
                   key={thread.id}
                   thread={thread}
-                  onEdit={t => { setEditTarget(t); setShowForm(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   onDelete={handleDeleted}
                   onTogglePin={handlePinToggled}
                 />

@@ -10,10 +10,6 @@ import LastGroupSprintRecap from "./components/sprint/lastgroupsprintrecap";
 
 const DISCORD_INVITE = "https://discord.gg/TntmfbkxB";
 
-// Pinned thread keywords — threads whose titles contain these (case-insensitive)
-// are surfaced first in the homepage preview, in this order.
-const PINNED_THREAD_KEYWORDS = ["introduce yourself", "daily writing challenge"];
-
 const TIER_META = {
   Bronze:   { color: "#b8622a", bg: "#fdf3e8" },
   Silver:   { color: "#6b7280", bg: "#f3f4f6" },
@@ -190,7 +186,7 @@ function ProfileBar({ user, wallet, streaks, discussionCount = 0 }) {
               </div>
 
               {/* Discussions — comments posted across threads */}
-              <Link to="/threads" className="flex items-center gap-2 group">
+              <Link to="/forum" className="flex items-center gap-2 group">
                 <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: "#fdf9ed" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b8860b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
@@ -852,133 +848,125 @@ function timeAgo(dateStr) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// LEFT — THREADS PREVIEW
+// LEFT — DISCUSSION CATEGORIES
 // ═════════════════════════════════════════════════════════════════════════════
-function ThreadsPreview() {
-  const [threads, setThreads] = useState([]);
+
+// A little variety in the accent dot so the list doesn't feel like a flat table.
+const CATEGORY_ACCENTS = ["#d4af37", "#b8860b", "#1a5fb4", "#b8622a", "#6b5c4a", "#c0392b"];
+
+function CategoryRow({ category, index }) {
+  const accent = CATEGORY_ACCENTS[index % CATEGORY_ACCENTS.length];
+  const hasPosts = category.totalPosts > 0;
+  const isLively = category.activePosts > 0;
+
+  return (
+    <Link
+      to={`/forum?category=${category.slug}`}
+      className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#faf7f2] transition-colors group"
+    >
+      {/* Initial badge */}
+      <div
+        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 font-serif font-bold text-[14px]"
+        style={{ background: `${accent}1a`, color: accent }}
+      >
+        {category.name?.charAt(0).toUpperCase()}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[13px] font-semibold text-[#1a1a2e] leading-snug group-hover:text-[#b8860b] transition-colors">
+            {category.name}
+          </p>
+          {isLively && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{ background: "#fffdf0", color: "#b8860b", border: "1px solid #d4af37" }}>
+              active
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-[10px] text-[#9a8c7a]">
+            {category.totalPosts} {category.totalPosts === 1 ? "post" : "posts"}
+          </span>
+          {hasPosts ? (
+            <>
+              <span className="text-[#e8e0d0]">·</span>
+              <span className="text-[10px] text-[#9a8c7a]">
+                {category.activePosts} active this month
+              </span>
+              <span className="text-[#e8e0d0]">·</span>
+              <span className="text-[10px] text-[#b8a070]">last post {timeAgo(category.lastPostAt)}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-[#e8e0d0]">·</span>
+              <span className="text-[10px] text-[#b8860b] font-medium">be the first to post</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <svg className="w-3 h-3 text-[#c8b89a] group-hover:text-[#d4af37] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/>
+      </svg>
+    </Link>
+  );
+}
+
+function DiscussionCategories() {
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/threads?limit=20`)
-      .then(r => r.ok ? r.json() : { threads: [] })
-      .then(d => {
-        const all = d.threads ?? [];
-
-        // All pinned threads surface first (the API already orders pinned first,
-        // but we re-sort here to be explicit). Within pinned threads, keyword
-        // threads ("introduce yourself", "daily writing challenge") go first in
-        // the defined order; other pinned threads follow by recency.
-        const keywordPinned = [];
-        PINNED_THREAD_KEYWORDS.forEach(kw => {
-          const found = all.find(t =>
-            t.isPinned &&
-            t.title?.toLowerCase().includes(kw.toLowerCase()) &&
-            !keywordPinned.includes(t)
-          );
-          if (found) keywordPinned.push(found);
-        });
-
-        // Other pinned threads not matched by keywords
-        const otherPinned = all.filter(
-          t => t.isPinned && !keywordPinned.includes(t)
-        );
-
-        // Unpinned threads sorted by most recent activity
-        const unpinned = all
-          .filter(t => !t.isPinned)
-          .sort((a, b) => {
-            const aTime = new Date(a.lastCommentAt ?? a.updatedAt ?? a.createdAt).getTime();
-            const bTime = new Date(b.lastCommentAt ?? b.updatedAt ?? b.createdAt).getTime();
-            return bTime - aTime;
-          });
-
-        setThreads([...keywordPinned, ...otherPinned, ...unpinned].slice(0, 5));
-      })
+    fetch(`${API_URL}/threads/categories`)
+      .then(r => r.ok ? r.json() : { categories: [] })
+      .then(d => setCategories(d.categories ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   return (
     <div className="bg-white border border-[#e8e0d0] rounded-xl overflow-hidden mb-6">
-      <div className="px-5 pt-4 pb-3 border-b border-[#f0ebe3]">
-        <h2 className="font-serif text-[#1a1a2e] text-base font-semibold">Threads</h2>
-        <p className="text-[11px] text-[#9a8c7a] mt-0.5">Recent conversations from the community</p>
+      <div className="px-5 pt-4 pb-3 border-b border-[#f0ebe3] flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-serif text-[#1a1a2e] text-base font-semibold">Discussion Categories</h2>
+          <p className="text-[11px] text-[#9a8c7a] mt-0.5">Find your people — every conversation starts somewhere</p>
+        </div>
+        <Link to="/forum" className="text-[11px] text-[#9a8c7a] hover:text-[#d4af37] transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0">
+          Visit forum
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </Link>
       </div>
 
       <div className="divide-y divide-[#f4f1ec]">
         {loading && [1,2,3].map(i => (
           <div key={i} className="px-5 py-3.5 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[#ece8e1] animate-pulse flex-shrink-0" />
             <div className="flex-1 space-y-2">
-              <div className="h-3 w-3/4 bg-[#ece8e1] rounded animate-pulse" />
-              <div className="h-2.5 w-1/2 bg-[#ece8e1] rounded animate-pulse" />
+              <div className="h-3 w-1/2 bg-[#ece8e1] rounded animate-pulse" />
+              <div className="h-2.5 w-2/3 bg-[#ece8e1] rounded animate-pulse" />
             </div>
           </div>
         ))}
 
-        {!loading && threads.length === 0 && (
+        {!loading && categories.length === 0 && (
           <div className="px-5 py-6 text-center">
-            <p className="text-[12px] text-[#9a8c7a]">No threads yet — check back soon.</p>
+            <p className="text-[12px] text-[#9a8c7a]">No categories yet — check back soon.</p>
           </div>
         )}
 
-        {!loading && threads.map((thread, i) => {
-          const isPinnedSlot = thread.isPinned;
-          const commentCount   = thread._count?.comments ?? 0;
-          const newCount       = thread.newCommentCount ?? 0;
-
-          return (
-            <Link
-              key={thread.id}
-              to={`/threads/${thread.id}`}
-              className="flex items-start gap-3 px-5 py-3.5 hover:bg-[#faf7f2] transition-colors group"
-            >
-              <div className="flex-shrink-0 mt-1">
-                {isPinnedSlot ? (
-                  <div className="w-2 h-2 rounded-full" style={{ background: "#d4af37" }} />
-                ) : newCount > 0 ? (
-                  <span className="relative flex w-2 h-2">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-[#d4af37] opacity-60 animate-ping" />
-                    <span className="relative inline-flex rounded-full w-2 h-2 bg-[#d4af37]" />
-                  </span>
-                ) : (
-                  <div className="w-2 h-2 rounded-full bg-[#e8e0d0]" />
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-[#1a1a2e] leading-snug truncate group-hover:text-[#b8860b] transition-colors">
-                  {thread.title}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-[10px] text-[#9a8c7a]">
-                    {commentCount} {commentCount === 1 ? "comment" : "comments"}
-                  </span>
-                  {thread.lastCommentAt && (
-                    <>
-                      <span className="text-[#e8e0d0]">·</span>
-                      <span className="text-[10px] text-[#b8a070]">active {timeAgo(thread.lastCommentAt)}</span>
-                    </>
-                  )}
-                  {newCount > 0 && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                      style={{ background: "#fffdf0", color: "#b8860b", border: "1px solid #d4af37" }}>
-                      +{newCount} new
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <svg className="w-3 h-3 text-[#c8b89a] group-hover:text-[#d4af37] transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7"/>
-              </svg>
-            </Link>
-          );
-        })}
+        {!loading && categories.map((category, i) => (
+          <CategoryRow key={category.id} category={category} index={i} />
+        ))}
       </div>
 
     </div>
   );
 }
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LEFT — ACCOUNTABILITY / SPRINT SECTION
@@ -1117,8 +1105,8 @@ export default function Homepage() {
           progress={streaks}
         />
 
-        {/* ── THREADS ── */}
-        <ThreadsPreview />
+        {/* ── DISCUSSION CATEGORIES ── */}
+        <DiscussionCategories />
 
         {/* ── COMMUNITY SPRINTS ── */}
         <AccountabilitySection user={user} onStartSprint={handleStartSprint} />
