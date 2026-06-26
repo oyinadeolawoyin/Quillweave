@@ -9,8 +9,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
-
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr) {
@@ -604,7 +602,6 @@ export default function AdminThreadsPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f3ef]">
-      <Header />
 
       {/* ── Page header ── */}
       <div style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #212140 100%)" }}>

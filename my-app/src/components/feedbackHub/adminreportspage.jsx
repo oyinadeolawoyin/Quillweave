@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -370,7 +369,6 @@ export default function AdminReportsPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f3ef]">
-      <Header />
 
       {/* Resolve modal */}
       {resolving && (

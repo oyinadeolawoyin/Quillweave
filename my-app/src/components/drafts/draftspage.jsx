@@ -8,7 +8,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
 import { StartGroupSprintModal } from "../sprint/groupSprintModal";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -822,8 +821,6 @@ export default function DraftsPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen" style={{ background: "#f5f0e8" }}>
-      <Header />
-
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
 
         {/* Page header */}

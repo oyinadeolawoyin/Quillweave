@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { useAuth } from "../auth/authContext";
-import Header from "./header";
 import API_URL from "@/config/api";
 import NotificationSettings from "./notificationsettings";
 
@@ -86,11 +85,7 @@ export default function Settings() {
     e.preventDefault();
     setProfileError("");
     setProfileSuccess("");
-
-    if (bioCharCount > 400) {
-      return setProfileError("Bio must not exceed 400 characters.");
-    }
-
+    if (bioCharCount > 400) return setProfileError("Bio must not exceed 400 characters.");
     setProfileLoading(true);
     try {
       const body = new FormData();
@@ -98,7 +93,6 @@ export default function Settings() {
       body.append("bio",         profileForm.bio.trim());
       body.append("dateOfBirth", profileForm.dateOfBirth || "");
       if (avatarFile) body.append("avatar", avatarFile);
-
       const res = await fetch(`${API_URL}/users/updateUser`, {
         method: "POST",
         credentials: "include",
@@ -121,20 +115,17 @@ export default function Settings() {
     e.preventDefault();
     setSocialError("");
     setSocialSuccess("");
-
     const urlRegex = /^https?:\/\/.+/i;
     for (const link of socialLinks) {
       if (link.url.trim() && !urlRegex.test(link.url.trim())) {
         return setSocialError(`"${link.url}" must start with http:// or https://`);
       }
     }
-
     setSocialLoading(true);
     try {
       const cleaned = socialLinks.filter(l => l.platform.trim() && l.url.trim());
       const body = new FormData();
       body.append("socialLinks", JSON.stringify(cleaned));
-
       const res = await fetch(`${API_URL}/users/updateUser`, {
         method: "POST",
         credentials: "include",
@@ -151,7 +142,7 @@ export default function Settings() {
     }
   }
 
-  // ─── Discord unlink handler ───────────────────────────────────
+  // ─── Discord unlink ───────────────────────────────────────────
   async function handleUnlinkDiscord() {
     setDiscordError("");
     setDiscordSuccess("");
@@ -172,12 +163,11 @@ export default function Settings() {
     }
   }
 
-  // ─── Password change handler ──────────────────────────────────
+  // ─── Password change ──────────────────────────────────────────
   async function handleChangePassword(e) {
     e.preventDefault();
     setPasswordError("");
     setPasswordSuccess("");
-
     if (passwords.newPassword !== passwords.confirmPassword) {
       return setPasswordError("New passwords don't match.");
     }
@@ -187,7 +177,6 @@ export default function Settings() {
     if (!isDiscordOnly && !passwords.currentPassword) {
       return setPasswordError("Please enter your current password.");
     }
-
     setPasswordLoading(true);
     try {
       const res = await fetch(`${API_URL}/auth/changePassword`, {
@@ -215,18 +204,16 @@ export default function Settings() {
     }
   }
 
-  // ─── Email save handler ───────────────────────────────────────
+  // ─── Email save ───────────────────────────────────────────────
   async function handleSaveEmail(e) {
     e.preventDefault();
     setEmailError("");
     setEmailSuccess("");
-
     const trimmed = email.trim();
     if (!trimmed) return setEmailError("Please enter an email address.");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       return setEmailError("Please enter a valid email address.");
     }
-
     setEmailLoading(true);
     try {
       const res = await fetch(`${API_URL}/users/updateUser`, {
@@ -246,11 +233,10 @@ export default function Settings() {
     }
   }
 
-  // ─── Delete account handler ───────────────────────────────────
+  // ─── Delete account ───────────────────────────────────────────
   async function handleDeleteAccount() {
     setDeleteError("");
     if (deleteConfirmText.toLowerCase() !== DELETE_PHRASE) return;
-
     setDeleteLoading(true);
     try {
       const res = await fetch(`${API_URL}/users/me`, {
@@ -262,9 +248,7 @@ export default function Settings() {
         setDeleteError(data.message || "Failed to delete account. Please try again.");
         return;
       }
-      // Log the user out on the client side
       if (logout) logout();
-      // Redirect to home / landing page
       window.location.href = "/";
     } catch {
       setDeleteError("Something went wrong. Please try again.");
@@ -274,16 +258,15 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-cream">
-      <Header />
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-2xl mx-auto">
 
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
+      {/* Page header */}
+      <div className="mb-8">
+        <h1 className="text-3xl sm:text-4xl font-serif text-ink-primary mb-2">Settings</h1>
+        <p className="text-ink-gray text-sm">Manage your profile and account</p>
+      </div>
 
-        {/* Page header */}
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-serif text-ink-primary mb-2">Settings</h1>
-          <p className="text-ink-gray text-sm">Manage your profile and account</p>
-        </div>
+      <div className="space-y-6">
 
         {/* ─── Profile section ──────────────────────────────────── */}
         <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
@@ -296,14 +279,11 @@ export default function Settings() {
             </div>
             <div>
               <h2 className="text-lg font-serif text-ink-primary">Profile</h2>
-              <p className="text-sm text-ink-gray mt-0.5">
-                Your public-facing identity on Inkwell
-              </p>
+              <p className="text-sm text-ink-gray mt-0.5">Your public-facing identity on Inkwell</p>
             </div>
           </div>
 
           <form onSubmit={handleSaveProfile} className="space-y-5">
-
             {/* Avatar */}
             <div>
               <label className="block text-sm font-medium text-ink-primary mb-3">
@@ -357,124 +337,95 @@ export default function Settings() {
                 id="settingsUsername"
                 type="text"
                 value={profileForm.username}
-                onChange={(e) => { setProfileForm(p => ({ ...p, username: e.target.value })); setProfileError(""); setProfileSuccess(""); }}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
+                onChange={(e) => { setProfileForm({ ...profileForm, username: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
+                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
                 disabled={profileLoading}
               />
             </div>
 
             {/* Bio */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="settingsBio" className="block text-sm font-medium text-ink-primary">
-                  Bio
-                </label>
-                <span className={`text-xs font-medium tabular-nums ${
-                  bioCharCount > 400 ? "text-red-500" : bioCharCount > 350 ? "text-amber-500" : "text-[#b8a898]"
-                }`}>
-                  {bioCharCount} / 400
-                </span>
-              </div>
+              <label htmlFor="settingsBio" className="block text-sm font-medium text-ink-primary mb-2">
+                Bio <span className="text-ink-lightgray font-normal">({bioCharCount}/400)</span>
+              </label>
               <textarea
                 id="settingsBio"
-                value={profileForm.bio}
-                onChange={(e) => { setProfileForm(p => ({ ...p, bio: e.target.value })); setProfileError(""); setProfileSuccess(""); }}
                 rows={3}
-                placeholder="A few words about you and your writing…"
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray resize-none leading-relaxed"
+                value={profileForm.bio}
+                onChange={(e) => { setProfileForm({ ...profileForm, bio: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
+                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray resize-none"
                 disabled={profileLoading}
               />
             </div>
 
             {/* Date of Birth */}
             <div>
-              <label htmlFor="settingsDob" className="block text-sm font-medium text-ink-primary mb-1">
-                Date of birth <span className="font-normal text-[#9a8c7a]">(optional)</span>
+              <label htmlFor="settingsDob" className="block text-sm font-medium text-ink-primary mb-2">
+                Date of Birth <span className="text-ink-lightgray font-normal">(optional)</span>
               </label>
-              <p className="text-xs text-[#9a8c7a] mb-2">
-                🎂 We'll send you a birthday notification — writers deserve to feel seen.
-              </p>
               <input
                 id="settingsDob"
                 type="date"
                 value={profileForm.dateOfBirth}
-                max={new Date().toISOString().split("T")[0]}
-                onChange={(e) => { setProfileForm(p => ({ ...p, dateOfBirth: e.target.value })); setProfileError(""); setProfileSuccess(""); }}
-                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray text-sm focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
+                onChange={(e) => { setProfileForm({ ...profileForm, dateOfBirth: e.target.value }); setProfileError(""); setProfileSuccess(""); }}
+                className="w-full px-4 py-3 rounded-lg border border-ink-lightgray focus:ring-2 focus:ring-ink-gold focus:border-ink-gold transition-all text-ink-gray"
                 disabled={profileLoading}
               />
             </div>
 
-            {profileError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-red-800">{profileError}</p>
-              </div>
-            )}
-            {profileSuccess && (
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-green-800">{profileSuccess}</p>
-              </div>
-            )}
+            {profileError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3"><p className="text-sm text-red-800">{profileError}</p></div>}
+            {profileSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3"><p className="text-sm text-green-800">{profileSuccess}</p></div>}
 
             <button
               type="submit"
-              disabled={profileLoading || bioCharCount > 400}
-              className="w-full py-3 px-6 bg-ink-primary text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={profileLoading}
+              className="px-5 py-2 rounded-xl bg-[#2d3748] text-white text-sm font-semibold hover:bg-[#1e2a38] transition-colors disabled:opacity-50"
             >
-              {profileLoading ? "Saving..." : "Save profile"}
+              {profileLoading ? "Saving…" : "Save profile"}
             </button>
           </form>
         </section>
 
-        {/* ─── Social links section ─────────────────────────────── */}
+        {/* ─── Social Links ─────────────────────────────────────── */}
         <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
           <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#eff6ff" }}>
-              <svg className="w-5 h-5" style={{ color: "#2563eb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            <div className="w-10 h-10 rounded-xl bg-[#2d3748] flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
             </div>
             <div>
-              <h2 className="text-base font-semibold text-ink-primary">Social links</h2>
-              <p className="text-sm text-[#9a8c7a] mt-0.5">Add up to 2 links to your profile — Twitter, Instagram, a personal site, anything.</p>
+              <h2 className="text-lg font-serif text-ink-primary">Social Links</h2>
+              <p className="text-sm text-ink-gray mt-0.5">Add up to 2 links to your profile</p>
             </div>
           </div>
 
           <form onSubmit={handleSaveSocialLinks} className="space-y-4">
             {socialLinks.map((link, i) => (
-              <div key={i} className="flex gap-3 items-start">
-                <div className="w-36 flex-shrink-0">
-                  <label className="block text-xs font-medium text-ink-primary mb-1">
-                    Platform
-                  </label>
-                  <input
-                    type="text"
-                    value={link.platform}
-                    onChange={(e) => {
-                      const updated = socialLinks.map((l, idx) => idx === i ? { ...l, platform: e.target.value } : l);
-                      setSocialLinks(updated);
-                      setSocialError(""); setSocialSuccess("");
-                    }}
-                    placeholder="e.g. Twitter"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-ink-primary mb-1">
-                    URL
-                  </label>
-                  <input
-                    type="url"
-                    value={link.url}
-                    onChange={(e) => {
-                      const updated = socialLinks.map((l, idx) => idx === i ? { ...l, url: e.target.value } : l);
-                      setSocialLinks(updated);
-                      setSocialError(""); setSocialSuccess("");
-                    }}
-                    placeholder="https://twitter.com/yourhandle"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray input-focus bg-white text-ink-gray placeholder-gray-400 transition-all"
-                  />
-                </div>
+              <div key={i} className="grid grid-cols-[140px_1fr] gap-3">
+                <input
+                  type="text"
+                  value={link.platform}
+                  onChange={(e) => {
+                    const updated = socialLinks.map((l, idx) => idx === i ? { ...l, platform: e.target.value } : l);
+                    setSocialLinks(updated);
+                    setSocialError(""); setSocialSuccess("");
+                  }}
+                  placeholder="Platform name"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray bg-white text-ink-gray placeholder-gray-400 transition-all focus:ring-2 focus:ring-ink-gold focus:border-ink-gold"
+                />
+                <input
+                  type="url"
+                  value={link.url}
+                  onChange={(e) => {
+                    const updated = socialLinks.map((l, idx) => idx === i ? { ...l, url: e.target.value } : l);
+                    setSocialLinks(updated);
+                    setSocialError(""); setSocialSuccess("");
+                  }}
+                  placeholder="https://twitter.com/yourhandle"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-ink-lightgray bg-white text-ink-gray placeholder-gray-400 transition-all focus:ring-2 focus:ring-ink-gold focus:border-ink-gold"
+                />
               </div>
             ))}
 
@@ -491,7 +442,7 @@ export default function Settings() {
           </form>
         </section>
 
-        {/* ─── Discord section — status + unlink only, no link form ─ */}
+        {/* ─── Discord section ───────────────────────────────────── */}
         {isDiscordLinked && (
           <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
             <div className="flex items-start gap-4 mb-6">
@@ -516,16 +467,8 @@ export default function Settings() {
               </div>
             </div>
 
-            {discordError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3">
-                <p className="text-sm text-red-800">{discordError}</p>
-              </div>
-            )}
-            {discordSuccess && (
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-3">
-                <p className="text-sm text-green-800">{discordSuccess}</p>
-              </div>
-            )}
+            {discordError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3"><p className="text-sm text-red-800">{discordError}</p></div>}
+            {discordSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-3"><p className="text-sm text-green-800">{discordSuccess}</p></div>}
 
             <button
               onClick={handleUnlinkDiscord}
@@ -537,7 +480,7 @@ export default function Settings() {
           </section>
         )}
 
-        {/* ─── Recovery Email ───────────────────────────────────────── */}
+        {/* ─── Recovery Email ───────────────────────────────────── */}
         <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
           <div className="flex items-start gap-4 mb-6">
             <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shrink-0">
@@ -548,9 +491,7 @@ export default function Settings() {
             </div>
             <div>
               <h2 className="text-lg font-serif text-ink-primary">Recovery Email</h2>
-              <p className="text-sm text-ink-gray mt-0.5">
-                Update your Email
-              </p>
+              <p className="text-sm text-ink-gray mt-0.5">Update your email</p>
             </div>
           </div>
 
@@ -570,16 +511,8 @@ export default function Settings() {
               />
             </div>
 
-            {emailError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-red-800">{emailError}</p>
-              </div>
-            )}
-            {emailSuccess && (
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-green-800">{emailSuccess}</p>
-              </div>
-            )}
+            {emailError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3"><p className="text-sm text-red-800">{emailError}</p></div>}
+            {emailSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3"><p className="text-sm text-green-800">{emailSuccess}</p></div>}
 
             <button
               type="submit"
@@ -591,7 +524,7 @@ export default function Settings() {
           </form>
         </section>
 
-        {/* ─── Password section ─────────────────────────────────── */}
+        {/* ─── Password section ──────────────────────────────────── */}
         <section className="bg-white rounded-2xl shadow-soft p-6 sm:p-8">
           <div className="flex items-start gap-4 mb-6">
             <div className="w-10 h-10 rounded-xl bg-[#2d3748] flex items-center justify-center shrink-0">
@@ -664,35 +597,23 @@ export default function Settings() {
               />
             </div>
 
-            {passwordError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-red-800">{passwordError}</p>
-              </div>
-            )}
-            {passwordSuccess && (
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                <p className="text-sm text-green-800">{passwordSuccess}</p>
-              </div>
-            )}
+            {passwordError   && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3"><p className="text-sm text-red-800">{passwordError}</p></div>}
+            {passwordSuccess && <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3"><p className="text-sm text-green-800">{passwordSuccess}</p></div>}
 
             <button
               type="submit"
               disabled={passwordLoading}
               className="w-full py-3 px-6 bg-ink-primary text-white text-sm font-medium rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {passwordLoading
-                ? "Saving..."
-                : isDiscordOnly
-                ? "Set Password"
-                : "Update Password"}
+              {passwordLoading ? "Saving..." : isDiscordOnly ? "Set Password" : "Update Password"}
             </button>
           </form>
         </section>
 
-        {/* ─── Notification section ─────────────────────────────────── */}
+        {/* ─── Notification Preferences ──────────────────────────── */}
         <NotificationSettings />
 
-        {/* ─── Danger Zone ──────────────────────────────────────────── */}
+        {/* ─── Danger Zone ───────────────────────────────────────── */}
         <section className="rounded-2xl border-2 border-red-200 bg-white p-6 sm:p-8">
           <div className="flex items-start gap-4 mb-6">
             <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0">
@@ -726,21 +647,16 @@ export default function Settings() {
           </div>
         </section>
 
-      </main>
+      </div>
 
-      {/* ─── Delete account confirmation modal ───────────────────── */}
+      {/* ─── Delete account confirmation modal ─────────────────── */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => { if (!deleteLoading) setShowDeleteModal(false); }}
           />
-
-          {/* Modal */}
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-5">
-
-            {/* Header */}
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -754,7 +670,6 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* What gets deleted vs preserved */}
             <div className="space-y-3 text-sm">
               <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 space-y-1">
                 <p className="font-medium text-red-700 mb-1">Permanently deleted</p>
@@ -774,7 +689,6 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Confirmation input */}
             <div>
               <label htmlFor="deleteConfirm" className="block text-sm font-medium text-ink-primary mb-2">
                 Type <span className="font-mono font-semibold text-red-600">{DELETE_PHRASE}</span> to confirm
@@ -797,7 +711,6 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex gap-3 pt-1">
               <button
                 onClick={() => setShowDeleteModal(false)}

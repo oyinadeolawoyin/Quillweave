@@ -2,32 +2,26 @@ import { useEffect, useState } from "react";
 import { Bell, Inbox, Mail, Smartphone, Check, Loader2, AlertCircle } from "lucide-react";
 import API_URL from "@/config/api";
 
-// ─── Notification categories matching your backend ────────────────────────────
+// ─── Notification categories ──────────────────────────────────────────────────
 
 const CATEGORIES = [
   {
-    section: "Discovery",
+    section: "Community Updates",
     items: [
-      { key: "discovery_story_approved", label: "Your story is approved & live" },
-      { key: "discovery_new_story", label: "A new story is added to Discovery" },
-      { key: "discovery_story_liked", label: "Someone liked your story" },
+      { key: "community_new_post", label: "A new community post is published" },
+      { key: "community_comment", label: "Someone commented on a community post" },
+      { key: "community_reply", label: "Someone replied to your comment" },
     ],
   },
   {
-    section: "Community (Snippets)",
+    section: "Threads",
     items: [
-      { key: "snippet_comment", label: "Someone commented on your snippet" },
-      { key: "snippet_comment_liked", label: "Someone liked your comment" },
-      { key: "snippet_reply", label: "Someone replied to your comment" },
-      { key: "snippet_reply_liked", label: "Someone liked your reply" },
-    ],
-  },
-  {
-    section: "Blog",
-    items: [
-      { key: "blog_new_post", label: "A new blog post is published" },
-      { key: "blog_comment", label: "Someone commented on a blog post" },
-      { key: "blog_reply", label: "Someone replied to your comment" },
+      { key: "thread_new", label: "A new thread is posted" },
+      { key: "thread_comment", label: "Someone commented on your thread" },
+      { key: "thread_comment_like", label: "Someone liked your thread comment" },
+      { key: "thread_reply", label: "Someone replied to your thread comment" },
+      { key: "thread_reply_like", label: "Someone liked your reply" },
+      { key: "thread_mention", label: "You were mentioned in a thread" },
     ],
   },
   {
@@ -38,24 +32,10 @@ const CATEGORIES = [
     ],
   },
   {
-    section: "Events",
+    section: "Draft Plan",
     items: [
-      { key: "event_started", label: "An event has started" },
-      { key: "event_ended", label: "An event has ended or been cancelled" },
-    ],
-  },
-  {
-    section: "Craft Learning",
-    items: [
-      { key: "emotion_new", label: "A new daily emotion & cues is published" },
-      { key: "emotion_comment_pinned", label: "Your practice sentence is pinned" },
-      { key: "emotion_comment_liked", label: "Someone liked your practice sentence" },
-    ],
-  },
-  {
-    section: "Announcements",
-    items: [
-      { key: "announcement_new", label: "A new announcement is published" },
+      { key: "draftplan_progress_logged", label: "A member logs progress on their draft" },
+      { key: "draftplan_draft_completed", label: "A member finishes their draft" },
     ],
   },
   {
@@ -95,7 +75,6 @@ export default function NotificationSettings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch existing preferences
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -106,12 +85,11 @@ export default function NotificationSettings() {
         if (res.ok) {
           const data = await res.json();
           if (data.preferences) {
-            // Merge saved prefs over defaults (so new keys still default to true)
             setPrefs((prev) => ({ ...prev, ...data.preferences }));
           }
         }
       } catch (_) {
-        // Silently fall back to defaults if endpoint doesn't exist yet
+        // Silently fall back to defaults
       } finally {
         setLoading(false);
       }
@@ -127,7 +105,6 @@ export default function NotificationSettings() {
     setSaved(false);
   }
 
-  // Toggle an entire row (all channels for one notification type)
   function toggleRow(key) {
     const current = prefs[key];
     const allOn = CHANNELS.every((c) => current[c.key]);
@@ -138,7 +115,6 @@ export default function NotificationSettings() {
     setSaved(false);
   }
 
-  // Toggle an entire column (one channel for all types)
   function toggleColumn(channel) {
     const allOn = CATEGORIES.flatMap((s) => s.items).every(
       ({ key }) => prefs[key][channel]
@@ -246,14 +222,12 @@ export default function NotificationSettings() {
         {/* Sections */}
         {CATEGORIES.map(({ section, items }, si) => (
           <div key={section}>
-            {/* Section label */}
             <div className="px-5 py-2 bg-ink-cream/50">
               <span className="text-[11px] font-semibold text-ink-gold uppercase tracking-widest">
                 {section}
               </span>
             </div>
 
-            {/* Rows */}
             {items.map(({ key, label }, ri) => {
               const isLast = si === CATEGORIES.length - 1 && ri === items.length - 1;
               return (
@@ -296,7 +270,6 @@ export default function NotificationSettings() {
         ))}
       </div>
 
-      {/* Legend */}
       <p className="text-xs text-ink-gray text-center">
         Click a column header to toggle all notifications for that channel. Click a row label to toggle all channels for that notification.
       </p>

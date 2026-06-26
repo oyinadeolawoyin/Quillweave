@@ -9,8 +9,6 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
-
 // ─── Thread form (create + edit) ──────────────────────────────────────────────
 
 function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
@@ -359,34 +357,25 @@ export default function ThreadFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f3ef]">
-      <Header />
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-2xl mx-auto">
 
-      {/* ── Page header ── */}
-      <div style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #212140 100%)" }}>
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-8 pb-8">
-          <div className="flex items-center gap-2 text-[11px] text-white/30 mb-5">
-            <Link to="/" className="hover:text-[#d4af37] transition-colors">Home</Link>
-            <span>/</span>
-            <Link to="/forum" className="hover:text-[#d4af37] transition-colors">Forum</Link>
-            <span>/</span>
-            <span className="text-[#d4af37]">{isEdit ? "Edit thread" : "New thread"}</span>
-          </div>
-
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37]/70 mb-1">Community</p>
-          <h1 className="font-serif text-white text-2xl sm:text-3xl font-bold leading-tight">
-            {isEdit ? "Edit your thread" : "Start a thread"}
-          </h1>
-          <p className="text-[13px] text-white/40 mt-1.5 max-w-md">
-            {isEdit
-              ? "Update the details below — changes are visible to everyone immediately."
-              : "Ask a question, share something you're working on, or kick off a conversation. Every member who hasn't opted out will hear about it."}
-          </p>
-        </div>
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-[12px] text-[#9a8c7a] mb-5">
+        <Link to="/forum" className="hover:text-[#b8860b] transition-colors">Forum</Link>
+        <span>/</span>
+        <span className="text-[#1a1a2e] font-semibold">{isEdit ? "Edit thread" : "New thread"}</span>
       </div>
 
+      <h1 className="font-serif text-2xl font-bold text-[#1a1a2e] mb-1">
+        {isEdit ? "Edit your thread" : "Start a thread"}
+      </h1>
+      <p className="text-[13px] text-[#9a8c7a] mb-6">
+        {isEdit
+          ? "Update the details below — changes are visible to everyone immediately."
+          : "Ask a question, share something you're working on, or kick off a conversation."}
+      </p>
+
       {/* ── Main content ── */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
         {loading ? (
           <div className="bg-white rounded-2xl border border-[#e8e0d0] p-10 text-center">
             <svg className="w-6 h-6 text-[#d4af37] animate-spin mx-auto" fill="none" viewBox="0 0 24 24">
@@ -419,7 +408,6 @@ export default function ThreadFormPage() {
             onDelete={handleDeleted}
           />
         )}
-      </div>
     </div>
   );
 }

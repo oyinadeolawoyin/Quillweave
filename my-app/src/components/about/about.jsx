@@ -1,549 +1,1007 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import Header from "../profile/header";
-import { AppMetaTags } from "../utilis/metatags";
-import API_URL from "@/config/api";
+// src/components/about/about.jsx
+//
+// Public-facing homepage — designed to attract new users and showcase community activity.
+// White & gold theme (#ffffff, #d4af37, #1a1a2e) matching the rest of the site.
+// Routes are React Router links; API calls hit the existing endpoints.
+//
+// LAYOUT NOTE: the body is a fixed two-column layout (main feed + a
+// persistent right sidebar) rather than a stack of sections that each
+// individually decide whether to exist. With a small/young community,
+// letting every section vanish when empty made the page collapse into
+// something visibly sparse. The sidebar widgets (newcomers, logged-today,
+// top critiquers) now always render in the same shape — capped at 5 rows
+// with a "See all" link when there's more, and a single friendly
+// empty-state line when there's none — so a quiet day and a busy day look
+// like the same site, just with different content inside the same frame.
 
-// ── Scroll-triggered fade-in ──────────────────────────────────────────────────
-function useInView(threshold = 0.12) {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
-      { threshold }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [threshold]);
-  return [ref, inView];
+import { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import API_URL from "@/config/api";
+import { useAuth } from "../auth/authContext";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function stripHtml(html = "") {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function FadeIn({ children, delay = 0, className = "" }) {
-  const [ref, inView] = useInView();
+function getExcerpt(content = "", length = 120) {
+  const text = stripHtml(content);
+  return text.length > length ? text.slice(0, length) + "…" : text;
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+// ─── Avatar (navigable to profile) ───────────────────────────────────────────
+
+function Avatar({ user, size = 8, onClick }) {
+  if (!user) return null;
+  const cls = `w-${size} h-${size} rounded-full object-cover flex-shrink-0 border-2 border-white`;
+  const initials = (user.username || "?")[0].toUpperCase();
+
+  const inner = user.avatar ? (
+    <img src={user.avatar} alt={user.username} className={cls} />
+  ) : (
+    <div
+      className={`${cls} flex items-center justify-center text-xs font-bold text-[#1a1a2e]`}
+      style={{ background: "linear-gradient(135deg, #d4af37, #f0d060)" }}
+    >
+      {initials}
+    </div>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <Link to={`/profile/${user.id}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+      {inner}
+    </Link>
+  );
+}
+
+// ─── Sign-up nudge modal ──────────────────────────────────────────────────────
+
+function SignupNudge({ message, onClose, onSignup }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(26,26,46,0.55)" }}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center">
+        <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}>
+          <span className="text-[#1a1a2e] text-xl">✦</span>
+        </div>
+        <h3 className="font-serif text-xl text-[#1a1a2e] mb-2">Join to continue</h3>
+        <p className="text-[14px] text-[#6b5c4a] mb-6 leading-relaxed">{message}</p>
+        <button
+          onClick={onSignup}
+          className="w-full py-3 rounded-xl font-semibold text-[#1a1a2e] mb-3 transition-all hover:opacity-90"
+          style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+        >
+          Create a free account
+        </button>
+        <button onClick={onClose} className="text-[13px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors">
+          Maybe later
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Challenge picker modal ────────────────────────────────────────────────────
+
+function ChallengePicker({ onClose, onPick }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(26,26,46,0.55)" }}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8">
+        <h3 className="font-serif text-xl text-[#1a1a2e] mb-1 text-center">Pick your challenge</h3>
+        <p className="text-[13px] text-[#9a8c7a] text-center mb-6">How many days can you commit to writing?</p>
+        <div className="space-y-3">
+          <button
+            onClick={() => onPick("SEVEN")}
+            className="w-full rounded-xl border-2 border-[#d4af37] p-4 text-left hover:bg-[#fdf8ec] transition-colors group"
+          >
+            <div className="font-serif text-lg text-[#1a1a2e] group-hover:text-[#b8860b]">7-Day Challenge</div>
+            <div className="text-[12px] text-[#9a8c7a] mt-0.5">A week of daily writing sessions. Perfect for building momentum.</div>
+          </button>
+          <button
+            onClick={() => onPick("FIFTEEN")}
+            className="w-full rounded-xl border-2 border-[#1a1a2e] p-4 text-left hover:bg-[#f5f3ef] transition-colors group"
+          >
+            <div className="font-serif text-lg text-[#1a1a2e]">15-Day Challenge</div>
+            <div className="text-[12px] text-[#9a8c7a] mt-0.5">Two weeks of sustained writing. For drafts that need real traction.</div>
+          </button>
+        </div>
+        <button onClick={onClose} className="w-full mt-4 text-[13px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Section label ────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }) {
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
+      <h2 className="font-serif text-lg text-[#1a1a2e] font-semibold">{children}</h2>
+    </div>
+  );
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function Skeleton({ className }) {
+  return <div className={`animate-pulse bg-[#e8e0d0] rounded-lg ${className}`} />;
+}
+
+// ─── Community update card ─────────────────────────────────────────────────────
+
+function CommunityCard({ post, onNudge }) {
+  const navigate = useNavigate();
+  const excerpt = getExcerpt(post.content, 130);
+
+  function handleClick(e) {
+    e.preventDefault();
+    onNudge(
+      "Sign up to read the full community update and stay in the loop.",
+      () => navigate("/signup"),
+      `/blog/${post.id}`
+    );
+  }
+
   return (
     <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0)" : "translateY(28px)",
-        transition: `opacity 0.75s ease ${delay}ms, transform 0.75s ease ${delay}ms`,
-      }}
+      onClick={handleClick}
+      className="group bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden cursor-pointer
+                 hover:border-[#d4af37]/60 hover:shadow-[0_4px_24px_rgba(212,175,55,0.12)] transition-all duration-300 flex flex-col"
     >
+      {post.mediaUrl && (
+        <div className="h-44 overflow-hidden flex-shrink-0">
+          <img
+            src={post.mediaUrl}
+            alt={post.title || ""}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        </div>
+      )}
+      {!post.mediaUrl && (
+        <div className="h-44 flex-shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1a1a2e,#1e2d4a)" }}>
+          <span className="font-serif text-white text-5xl opacity-10">✦</span>
+        </div>
+      )}
+
+      <div className="p-5 flex flex-col flex-1">
+        <span className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "#d4af37" }}>
+          {new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </span>
+
+        {post.title && (
+          <h3 className="font-serif text-base text-[#1a1a2e] leading-snug mb-2 line-clamp-2 group-hover:text-[#b8860b] transition-colors">
+            {post.title}
+          </h3>
+        )}
+
+        <p className="text-[13px] text-[#6b5c4a] leading-relaxed flex-1 line-clamp-3">{excerpt}</p>
+
+        <div className="flex items-center gap-3 mt-4 pt-3 border-t border-[#f0ebe3]">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div
+              className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-[#1a1a2e]"
+              style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+            >
+              A
+            </div>
+            <span className="text-[12px] text-[#6b5c4a] truncate font-medium">Inkwell Team</span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-[#9a8c7a]">
+            <span>{post._count?.likes ?? 0} ♥</span>
+            <span>{post._count?.comments ?? 0} 💬</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Thread card ──────────────────────────────────────────────────────────────
+
+function ThreadCard({ thread, onNudge }) {
+  const navigate = useNavigate();
+
+  function handleClick(e) {
+    e.preventDefault();
+    onNudge(
+      "Join the community to read and participate in discussions.",
+      () => navigate("/signup"),
+      `/threads/${thread.id}`
+    );
+  }
+
+  return (
+    <div
+      onClick={handleClick}
+      className="group flex gap-3 items-start py-3 border-b border-[#f0ebe3] last:border-b-0 cursor-pointer hover:bg-[#faf8f4] -mx-4 px-4 transition-colors"
+    >
+      <Avatar user={thread.author} size={8} onClick={(e) => { e?.stopPropagation?.(); }} />
+      <div className="flex-1 min-w-0">
+        <h4 className="text-[13px] font-semibold text-[#1a1a2e] line-clamp-2 group-hover:text-[#b8860b] transition-colors leading-snug">
+          {thread.title}
+        </h4>
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-[#9a8c7a]">
+          <span className="font-medium text-[#6b5c4a]">{thread.author?.username}</span>
+          <span>·</span>
+          <span>{thread._count?.likes ?? 0} ♥</span>
+          <span>·</span>
+          <span>{thread.totalCommentCount ?? thread._count?.comments ?? 0} 💬</span>
+          <span>·</span>
+          <span>{timeAgo(thread.createdAt)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sidebar widget shell ──────────────────────────────────────────────────────
+// Every right-column widget shares this shell so all three always render the
+// same fixed shape: title row, up to `cap` rows of content, a "See all" link
+// when there's more than `cap`, and a single friendly line when there's none
+// at all. Nothing here ever collapses the widget away — only what's inside
+// the fixed frame changes between a quiet day and a busy one.
+
+function SidebarWidget({ title, action, children }) {
+  return (
+    <div className="bg-white border border-[#e8e0d0] rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-[#9a8c7a]">{title}</p>
+        {action}
+      </div>
       {children}
     </div>
   );
 }
 
-// ── Gold divider ──────────────────────────────────────────────────────────────
-function GoldLine({ className = "" }) {
-  return <div className={`w-10 h-px bg-[#d4af37] ${className}`} />;
+function SidebarEmptyRow({ children }) {
+  return (
+    <p className="text-[12px] text-[#9a8c7a] leading-relaxed py-2">{children}</p>
+  );
 }
 
-// ── Writer avatar ─────────────────────────────────────────────────────────────
-function WriterAvatar({ writer, delay }) {
-  const [ref, inView] = useInView(0.1);
-  const initials = (writer.username || "").slice(0, 2).toUpperCase();
+function SidebarSkeletonRows({ count = 3 }) {
   return (
-    <div
-      ref={ref}
-      className="flex flex-col items-center gap-2"
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0) scale(1)" : "translateY(16px) scale(0.9)",
-        transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
-      }}
-    >
-      {writer.avatar ? (
-        <img
-          src={writer.avatar}
-          alt={writer.username}
-          className="w-12 h-12 rounded-full object-cover ring-2 ring-white shadow-soft"
-        />
-      ) : (
-        <div className="w-12 h-12 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center text-sm font-semibold ring-2 ring-white shadow-soft">
-          {initials}
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <Skeleton className="w-8 h-8 rounded-full" />
+          <div className="flex-1 space-y-1">
+            <Skeleton className="h-3 w-3/4" />
+            <Skeleton className="h-2 w-1/3" />
+          </div>
         </div>
-      )}
-      <span className="text-[11px] text-[#9a8c7a]">@{writer.username}</span>
+      ))}
     </div>
   );
 }
 
-// ── Community highlight card ──────────────────────────────────────────────────
-function HighlightCard({ label, icon, user, value, unit, delay }) {
-  const [ref, inView] = useInView(0.1);
-  if (!user) return null;
-  const initials = (user.username || "").slice(0, 2).toUpperCase();
+const SIDEBAR_ROW_CAP = 5;
 
-  return (
-    <div
-      ref={ref}
-      className="bg-white border border-[#e8e0d0] rounded-xl p-6 text-center hover:border-[#d4af37]/50 transition-colors duration-300"
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0)" : "translateY(20px)",
-        transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
-      }}
-    >
-      <div className="text-2xl mb-3">{icon}</div>
-      <p className="text-[11px] tracking-[0.25em] text-[#d4af37] uppercase mb-4">{label}</p>
+// ─── Main Homepage ────────────────────────────────────────────────────────────
 
-      {user.avatar ? (
-        <img
-          src={user.avatar}
-          alt={user.username}
-          className="w-14 h-14 rounded-full object-cover mx-auto mb-3 ring-2 ring-[#fffdf0]"
-        />
-      ) : (
-        <div className="w-14 h-14 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center text-lg font-semibold mx-auto mb-3 ring-2 ring-[#fffdf0]">
-          {initials}
-        </div>
-      )}
+export default function Homepage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-      <p className="font-serif text-[#1a1a2e] text-base mb-1">@{user.username}</p>
-      <p className="text-[#9a8c7a] text-[13px]">
-        {value} {unit}
-      </p>
-    </div>
-  );
-}
+  // ── Data state ──
+  const [communityPosts, setCommunityPosts]     = useState([]);
+  const [latestThreads, setLatestThreads]       = useState([]);
+  const [activeThreads, setActiveThreads]       = useState([]);
+  const [topCritiquers, setTopCritiquers]       = useState([]);
+  const [newcomers, setNewcomers]               = useState([]);
+  const [progressLoggers, setProgressLoggers]   = useState([]);
+  const [threadCommenters, setThreadCommenters] = useState([]);
+  const [recentSprinters, setRecentSprinters]   = useState([]);
+  const [loading, setLoading]                   = useState(true);
 
-// ── What you'll find ──────────────────────────────────────────────────────────
-const WHAT_YOU_FIND = [
-  {
-    title: "Daily Writing Challenges",
-    body: "Show up every day with a goal that's yours — words, chapters, scenes, or time. Build a streak. Miss a day and keep going anyway. The challenge is always there when you come back.",
-  },
-  {
-    title: "Critique Swaps",
-    body: "Share your work and get feedback from writers who've read enough to know what they're looking at. Not cheerleading — honest, craft-level notes that actually help your draft move forward.",
-  },
-  {
-    title: "A Community That Keeps Moving",
-    body: "Sprint alongside other writers, celebrate milestones together, and find people who understand the slow days as much as the breakthroughs. You stop feeling like you're writing into a void.",
-  },
-];
+  // ── UI state ──
+  const [nudge, setNudge]               = useState(null); // { message, onConfirm }
+  const [showChallengePicker, setShowChallengePicker] = useState(false);
 
-// ── Who it's for ─────────────────────────────────────────────────────────────
-const WHO_ITS_FOR = [
-  "have more ideas than finished drafts",
-  "keep starting things and losing momentum halfway through",
-  "want feedback that pushes their work forward, not just praise",
-  "feel isolated in their writing journey and want people who get it",
-  "are ready to write consistently — not perfectly, just regularly",
-];
-
-// ── Page ──────────────────────────────────────────────────────────────────────
-export default function About() {
-  const [writers, setWriters] = useState([]);
-  const [highlights, setHighlights] = useState({
-    streakLeader: null,
-    topCritiquer: null,
-    topSprinter: null,
-    topPracticeWriter: null,
-  });
-
+  // ── Fetch all data ──
   useEffect(() => {
-    async function loadWriters() {
+    const go = async () => {
       try {
-        const res = await fetch(`${API_URL}/users/founding-writers`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (Array.isArray(data.users)) setWriters(data.users);
-      } catch (err) {
-        console.error("Failed to load writers:", err);
-      }
-    }
-
-    async function loadHighlights() {
-      try {
-        const [leaderboardRes, challengeRes] = await Promise.all([
-          fetch(`${API_URL}/leaderboard`),
-          fetch(`${API_URL}/challenge/stats`),
+        const [
+          postsRes,
+          latestRes,
+          activeRes,
+          critiquersRes,
+          newcomersRes,
+          recentActivityRes,
+        ] = await Promise.all([
+          fetch(`${API_URL}/blog/pinned`).then(r => r.ok ? r.json() : { posts: [] }),
+          // /threads/latest returns { threads, total, page, totalPages }
+          fetch(`${API_URL}/threads/latest`).then(r => r.ok ? r.json() : { threads: [] }),
+          // /threads/active returns an array directly
+          fetch(`${API_URL}/threads/active`).then(r => r.ok ? r.json() : []),
+          // top critiquers (all-time, by feedback count) — sidebar caps display at 5
+          fetch(`${API_URL}/leaderboard/critiquers`).then(r => r.ok ? r.json() : { critiquers: [] }),
+          // newest members (last 2 days only)
+          fetch(`${API_URL}/leaderboard/members`).then(r => r.ok ? r.json() : { newest: [] }),
+          // recent activity — used here just for today's progress loggers
+          fetch(`${API_URL}/leaderboard/homepage-activity`).then(r => r.ok ? r.json() : {}),
         ]);
 
-        const leaderboard = leaderboardRes.ok ? await leaderboardRes.json() : null;
-        const challenge   = challengeRes.ok ? await challengeRes.json() : null;
+        setCommunityPosts(postsRes.posts || []);
 
-        const streakTop = challenge?.streakLeaders?.[0];
+        // latestRes is { threads: [...], total, page, totalPages }
+        const latestArr = Array.isArray(latestRes.threads) ? latestRes.threads : [];
+        setLatestThreads(latestArr.slice(0, 5));
 
-        setHighlights({
-          streakLeader: streakTop
-            ? { user: streakTop.user, value: streakTop.currentStreak }
-            : null,
-          topCritiquer: leaderboard?.critiquers?.[0]
-            ? { user: leaderboard.critiquers[0].user, value: leaderboard.critiquers[0].critiqueCount }
-            : null,
-          topSprinter: leaderboard?.sprinters?.[0]
-            ? { user: leaderboard.sprinters[0].user, value: leaderboard.sprinters[0].sprintCount }
-            : null,
-          topPracticeWriter: leaderboard?.practiceWriters?.[0]
-            ? { user: leaderboard.practiceWriters[0].user, value: leaderboard.practiceWriters[0].practiceCount }
-            : null,
-        });
-      } catch (err) {
-        console.error("Failed to load community highlights:", err);
+        // activeRes is a plain array
+        const activeArr = Array.isArray(activeRes) ? activeRes : (activeRes.threads ?? []);
+        setActiveThreads(activeArr.slice(0, 5));
+
+        // critiquers: [{ rank, critiqueCount, user: { id, username, avatar, feedbackPoints } }]
+        setTopCritiquers(Array.isArray(critiquersRes.critiquers) ? critiquersRes.critiquers : []);
+
+        // newest members from the members page data: [{ rank, user, joinedAt }]
+        setNewcomers(Array.isArray(newcomersRes.newest) ? newcomersRes.newest : []);
+
+        // today's progress loggers, pulled out of the recent-activity payload
+        const recentActivity = recentActivityRes && typeof recentActivityRes === "object" ? recentActivityRes : {};
+        setProgressLoggers(Array.isArray(recentActivity.progressLoggers) ? recentActivity.progressLoggers : []);
+        setThreadCommenters(Array.isArray(recentActivity.threadCommenters) ? recentActivity.threadCommenters : []);
+        setRecentSprinters(Array.isArray(recentActivity.sprinters) ? recentActivity.sprinters : []);
+      } catch {
+        // fail silently — sections just show their empty state
+      } finally {
+        setLoading(false);
       }
-    }
-
-    loadWriters();
-    loadHighlights();
+    };
+    go();
   }, []);
 
-  const hasHighlights = Object.values(highlights).some(Boolean);
+  // For guests, show the "sign up to continue" modal pointing at signup.
+  // For logged-in users, skip the modal entirely and go straight to where
+  // they were trying to go — they're already a member, no nudge needed.
+  function showNudge(message, onConfirm, loggedInDestination) {
+    if (user) {
+      if (loggedInDestination) navigate(loggedInDestination);
+      return;
+    }
+    setNudge({ message, onConfirm });
+  }
 
-  return (
-    <div className="min-h-screen bg-[#f5f3ef]">
-      <AppMetaTags
-        title="About Inkwell — A Home for Writers with More Ideas Than Finished Drafts"
-        description="Inkwell helps writers turn sparks into stories through daily writing challenges, collaborative critique swaps, and a community that keeps moving forward together."
-      />
-      <Header />
+  // Both guests and logged-in users go straight into the wizard now — no
+  // signup nudge here. Guests get to answer every question first; the
+  // wizard itself prompts for an account right before the final submit,
+  // then creates the challenge automatically once they're signed up.
+  function handleChallengePickerDone(duration) {
+    setShowChallengePicker(false);
+    navigate(`/days-challenge/new?duration=${duration}`);
+  }
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-[#1a1a2e] border-b border-white/10">
-        {/* ambient glow */}
-        <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full pointer-events-none"
-          style={{
-            background: "radial-gradient(ellipse, rgba(212,175,55,0.09) 0%, transparent 68%)",
-          }}
-        />
-        {/* gold hairline at bottom of hero */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/30 to-transparent" />
+  // ─── Sidebar content ────────────────────────────────────────────────────────
+  // Built once here so the same widgets can sit in the right column on
+  // desktop and re-flow into the document on mobile without duplicating markup.
 
-        <div className="relative max-w-3xl mx-auto px-6 pt-24 pb-24 sm:pt-32 sm:pb-32 text-center">
-          <p
-            className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-6"
-            style={{ animation: "inkFadeUp 0.8s ease 0.1s both" }}
-          >
-            About Inkwell
-          </p>
-
-          <h1
-            className="text-4xl sm:text-5xl md:text-[3.25rem] font-serif text-white leading-[1.25] mb-6"
-            style={{ animation: "inkFadeUp 0.9s ease 0.25s both" }}
-          >
-            A home for writers with
-            <br />
-            <em className="not-italic text-[#d4af37]">more ideas than finished drafts.</em>
-          </h1>
-
-          <GoldLine className="mx-auto mb-8" />
-
-          <div style={{ animation: "inkFadeUp 0.9s ease 0.5s both" }}>
-            <p className="text-lg sm:text-xl text-white/65 leading-[1.85] max-w-xl mx-auto">
-              Turn your sparks into stories through daily writing challenges,
-              collaborative critique swaps, and a community that keeps
-              moving forward together.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── What you'll find here ────────────────────────────────────────── */}
-      <section className="bg-[#fffdf0]">
-        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24">
-          <FadeIn>
-            <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
-              What's here
-            </p>
-            <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-12">
-              Three ways Inkwell keeps you moving.
-            </h2>
-          </FadeIn>
-
-          <div className="space-y-8">
-            {WHAT_YOU_FIND.map((item, i) => (
-              <FadeIn key={item.title} delay={i * 120}>
-                <div className="group bg-white border border-[#e8e0d0] rounded-xl p-6 sm:p-8 sm:flex sm:items-start sm:gap-6 hover:border-[#d4af37]/50 transition-colors duration-300">
-                  <div
-                    className="hidden sm:flex w-12 h-12 rounded-full items-center justify-center flex-shrink-0 font-serif text-lg"
-                    style={{ background: "#d4af371a", color: "#d4af37" }}
-                  >
-                    {String(i + 1).padStart(2, "0")}
+  const sidebar = (
+    <div className="space-y-6">
+      {/* Newest members — last 2 days */}
+      <SidebarWidget
+        title="New Writers to Welcome"
+        action={
+          newcomers.length > SIDEBAR_ROW_CAP && (
+            <button onClick={() => showNudge("Sign up to see all our newest members.", () => navigate("/signup"), "/members")} className="text-[11px] font-semibold hover:underline" style={{ color: "#d4af37" }}>
+              See all →
+            </button>
+          )
+        }
+      >
+        {loading ? (
+          <SidebarSkeletonRows count={3} />
+        ) : newcomers.length > 0 ? (
+          <div className="space-y-3">
+            {newcomers.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
+              const u = entry.user;
+              return (
+                <div key={u?.id ?? entry.rank} className="flex items-center gap-3">
+                  <Avatar user={u} size={7} />
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      to={`/profile/${u?.id}`}
+                      className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
+                    >
+                      {u?.username}
+                    </Link>
+                    <p className="text-[10px] text-[#9a8c7a]">Joined {timeAgo(entry.joinedAt)}</p>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-3 mb-3 sm:hidden">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
-                      <h3 className="text-xl font-serif text-[#1a1a2e]">{item.title}</h3>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <SidebarEmptyRow>
+            No new writers in the last couple of days —{" "}
+            <button onClick={() => navigate("/signup")} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
+              be the next one to join
+            </button>.
+          </SidebarEmptyRow>
+        )}
+      </SidebarWidget>
+
+      {/* Writers who logged progress today */}
+      <SidebarWidget title="Writers Logged Progress Today">
+        {loading ? (
+          <SidebarSkeletonRows count={3} />
+        ) : progressLoggers.length > 0 ? (
+          <div className="space-y-3">
+            {progressLoggers.slice(0, SIDEBAR_ROW_CAP).map((entry) => (
+              <div key={entry.user.id} className="flex items-center gap-3">
+                <Avatar user={entry.user} size={7} />
+                <div className="flex-1 min-w-0">
+                  <Link to={`/profile/${entry.user.id}`} className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block">
+                    {entry.user.username}
+                  </Link>
+                  <p className="text-[10px] text-[#9a8c7a]">{entry.wordsLogged.toLocaleString()} words</p>
+                </div>
+                <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#1a7a4c" }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#1a7a4c" }} />
+                  Logged Today
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <SidebarEmptyRow>
+            No one's logged their progress yet today —{" "}
+            {user ? (
+              <button onClick={() => navigate("/draftplan")} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
+                log yours
+              </button>
+            ) : (
+              <button onClick={() => showNudge("Create a free account to start logging your writing progress.", () => navigate("/signup"))} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
+                be the first
+              </button>
+            )}
+            .
+          </SidebarEmptyRow>
+        )}
+      </SidebarWidget>
+
+      {/* Members active in threads today — hidden when empty */}
+      {(loading || threadCommenters.length > 0) && (
+        <SidebarWidget title="Active in Threads Today">
+          {loading ? (
+            <SidebarSkeletonRows count={3} />
+          ) : (
+            <div className="space-y-3">
+              {threadCommenters.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
+                const tc = entry.threadCount  ?? 0;
+                const cc = entry.commentCount ?? 0;
+                // Build a label like "2 posts · 3 comments", "1 post", or "4 comments"
+                const parts = [];
+                if (tc > 0) parts.push(`${tc} post${tc !== 1 ? "s" : ""}`);
+                if (cc > 0) parts.push(`${cc} comment${cc !== 1 ? "s" : ""}`);
+                // Fallback: older entries that only carry postCount
+                const activityLabel = parts.length > 0
+                  ? parts.join(" · ")
+                  : `${entry.postCount} comment${entry.postCount !== 1 ? "s" : ""}`;
+
+                return (
+                  <div key={entry.user.id} className="flex items-center gap-3">
+                    <Avatar user={entry.user} size={7} />
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        to={`/profile/${entry.user.id}`}
+                        className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
+                      >
+                        {entry.user.username}
+                      </Link>
+                      <p className="text-[10px] text-[#9a8c7a]">{activityLabel} today</p>
                     </div>
-                    <h3 className="hidden sm:block text-xl font-serif text-[#1a1a2e] mb-2">{item.title}</h3>
-                    <p className="text-[15px] text-[#6b5c4a] leading-[1.8]">{item.body}</p>
+                    <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#2563a8" }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#2563a8" }} />
+                      In threads
+                    </span>
                   </div>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Why it exists ────────────────────────────────────────────────── */}
-      <section className="bg-[#f5f3ef]">
-        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24">
-          <FadeIn>
-            <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
-              Why it exists
-            </p>
-            <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-8">
-              The spark is never the problem.
-            </h2>
-            <p className="text-lg text-[#6b5c4a] leading-[1.85] mb-6">
-              Most writers don't run out of ideas. They run out of momentum. The draft
-              that felt so alive at 3,000 words goes quiet. The story that felt urgent
-              sits in a folder, half-done, waiting.
-            </p>
-            <p className="text-lg text-[#6b5c4a] leading-[1.85]">
-              Inkwell exists to close that gap — between the idea and the draft,
-              between the draft and the finished thing. Daily challenges keep you showing
-              up. Critique swaps keep your work honest. And the community reminds you
-              that the slow patches are part of the process, not a sign you should stop.
-            </p>
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* ── Mission banner ───────────────────────────────────────────────── */}
-      <section className="bg-[#1a1a2e]">
-        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24 text-center">
-          <FadeIn>
-            <GoldLine className="mx-auto mb-10" />
-            <p className="text-2xl sm:text-3xl md:text-4xl font-serif text-white leading-[1.6] mb-4">
-              To help writers finish what they start
-            </p>
-            <p className="text-lg text-white/55 leading-relaxed">
-              through daily challenges, honest critique, and a community
-              that keeps moving forward together.
-            </p>
-            <GoldLine className="mx-auto mt-10" />
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* ── Who it's for ─────────────────────────────────────────────────── */}
-      <section className="bg-[#fffdf0]">
-        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24">
-          <FadeIn>
-            <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
-              Who it's for
-            </p>
-            <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-12">
-              Inkwell is for writers who —
-            </h2>
-          </FadeIn>
-
-          <div className="space-y-6">
-            {WHO_ITS_FOR.map((item, i) => (
-              <FadeIn key={item} delay={i * 100}>
-                <div className="flex items-start gap-5">
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0 mt-[10px]"
-                    style={{ background: "#d4af37" }}
-                  />
-                  <p className="text-lg text-[#6b5c4a] leading-relaxed">{item}</p>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Community Highlights ─────────────────────────────────────────── */}
-      {hasHighlights && (
-        <section className="bg-[#fffdf0]">
-          <div className="max-w-4xl mx-auto px-6 py-20 sm:py-24">
-            <FadeIn>
-              <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5 text-center">
-                Community Highlights
-              </p>
-              <h2 className="text-3xl sm:text-4xl font-serif text-[#1a1a2e] leading-snug mb-12 text-center">
-                Writers leading the way.
-              </h2>
-            </FadeIn>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-              <HighlightCard
-                label="Longest Streak"
-                icon="🔥"
-                user={highlights.streakLeader?.user}
-                value={highlights.streakLeader?.value}
-                unit="day streak"
-                delay={0}
-              />
-              <HighlightCard
-                label="Top Critiquer"
-                icon="✍️"
-                user={highlights.topCritiquer?.user}
-                value={highlights.topCritiquer?.value}
-                unit={highlights.topCritiquer?.value === 1 ? "critique" : "critiques"}
-                delay={80}
-              />
-              <HighlightCard
-                label="Top Sprinter"
-                icon="⏱️"
-                user={highlights.topSprinter?.user}
-                value={highlights.topSprinter?.value}
-                unit={highlights.topSprinter?.value === 1 ? "sprint" : "sprints"}
-                delay={160}
-              />
-              <HighlightCard
-                label="Emotion Practice"
-                icon="💛"
-                user={highlights.topPracticeWriter?.user}
-                value={highlights.topPracticeWriter?.value}
-                unit={highlights.topPracticeWriter?.value === 1 ? "session" : "sessions"}
-                delay={240}
-              />
+                );
+              })}
             </div>
-          </div>
-        </section>
+          )}
+        </SidebarWidget>
       )}
 
-      {/* ── Writers already here ─────────────────────────────────────────── */}
-      {writers.length > 0 && (
-        <section className="bg-[#f5f3ef]">
-          <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24 text-center">
-            <FadeIn>
-              <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
-                The community
-              </p>
-              <h2 className="text-2xl sm:text-3xl font-serif text-[#1a1a2e] mb-3">
-                Writers are already here.
-              </h2>
-              <p className="text-[#9a8c7a] mb-12 max-w-sm mx-auto">
-                Showing up to challenges, sharing drafts, and helping each other finish.
-              </p>
-            </FadeIn>
-
-            <div className="flex flex-wrap items-start justify-center gap-6 sm:gap-8">
-              {writers.map((w, i) => (
-                <WriterAvatar key={w.id} writer={w} delay={i * 80} />
+      {/* Members who sprinted recently (today + yesterday) — hidden when empty */}
+      {(loading || recentSprinters.length > 0) && (
+        <SidebarWidget title="Sprinting Recently">
+          {loading ? (
+            <SidebarSkeletonRows count={3} />
+          ) : (
+            <div className="space-y-3">
+              {recentSprinters.slice(0, SIDEBAR_ROW_CAP).map((entry) => (
+                <div key={entry.user.id} className="flex items-center gap-3">
+                  <Avatar user={entry.user} size={7} />
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      to={`/profile/${entry.user.id}`}
+                      className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
+                    >
+                      {entry.user.username}
+                    </Link>
+                    <p className="text-[10px] text-[#9a8c7a]">
+                      {entry.sprintCount} sprint{entry.sprintCount !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#7c3aed" }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#7c3aed" }} />
+                    Sprinting
+                  </span>
+                </div>
               ))}
             </div>
-          </div>
-        </section>
+          )}
+        </SidebarWidget>
       )}
 
-      {/* ── Community Partners ───────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-[#1a1a2e]">
-        <div
-          className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/3"
-          style={{
-            background: "radial-gradient(circle, rgba(212,175,55,0.10) 0%, transparent 70%)",
-          }}
-        />
-        <div className="relative max-w-4xl mx-auto px-6 py-20 sm:py-28">
-          <FadeIn>
-            <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5 text-center">
-              With Gratitude
-            </p>
-            <h2 className="text-3xl sm:text-4xl font-serif text-white leading-snug mb-6 text-center max-w-xl mx-auto">
-              A community that helps Inkwell grow.
-            </h2>
-            <p className="text-white/60 text-lg leading-[1.8] text-center max-w-lg mx-auto mb-14">
-              We're grateful to partner with Writers' Circle — a community that
-              shares Inkwell with its members and welcomes them into our
-              challenges, critique spaces, and writing sessions.
-            </p>
-          </FadeIn>
-
-          <FadeIn delay={140}>
-            <div className="bg-[#fffdf0] rounded-2xl overflow-hidden shadow-soft sm:flex sm:items-stretch">
-              <div className="sm:w-[42%] h-56 sm:h-auto relative">
-                <img
-                  src="writersCircle.png"
-                  alt="Writers' Circle"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a2e]/30 to-transparent sm:bg-gradient-to-r" />
-              </div>
-
-              <div className="flex-1 p-8 sm:p-10 flex flex-col justify-center">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#d4af37" }} />
-                  <p className="text-[11px] tracking-[0.3em] text-[#d4af37] uppercase">Community Partner</p>
-                </div>
-                <h3 className="text-2xl font-serif text-[#1a1a2e] mb-4">Writers' Circle</h3>
-                <p className="text-[15px] text-[#6b5c4a] leading-[1.8]">
-                  Writers' Circle is a close-knit, supportive community of
-                  writers in its own right. As a partner, they generously
-                  share Inkwell's events and sessions with their members —
-                  contributing to our community and helping more writers
-                  find a space to write, get feedback, and grow. We're
-                  grateful for their support and the spirit they bring to it.
-                </p>
-              </div>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* ── Write with us ────────────────────────────────────────────────── */}
-      <section className="bg-[#f5f3ef]">
-        <div className="max-w-3xl mx-auto px-6 py-20 sm:py-24 text-center">
-          <FadeIn>
-            <p className="text-[11px] tracking-[0.35em] text-[#d4af37] uppercase mb-5">
-              Write with us
-            </p>
-            <h2 className="text-2xl sm:text-3xl font-serif text-[#1a1a2e] mb-4">
-              You don't have to write alone.
-            </h2>
-            <p className="text-[#9a8c7a] mb-10 max-w-md mx-auto leading-relaxed">
-              Join the challenge, find accountability partners, and get feedback
-              on your work in the Inkwell community.
-            </p>
-
-            <a
-              href="https://discord.gg/DYHJK6EP"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group inline-flex items-center gap-3 px-8 py-4 border border-[#1a1a2e] text-[#1a1a2e] text-sm font-medium rounded-xl hover:bg-[#1a1a2e] hover:text-white transition-all duration-300"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-              </svg>
-              Join the community
-            </a>
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* ── Closing ──────────────────────────────────────────────────────── */}
-      <section className="bg-[#1a1a2e]">
-        <div className="max-w-3xl mx-auto px-6 py-28 sm:py-36 text-center">
-          <FadeIn>
-            <GoldLine className="mx-auto mb-12" />
-            <p className="text-4xl sm:text-5xl md:text-[3.25rem] font-serif text-white leading-[1.5]">
-              Start the spark.
-              <br />
-              <em className="not-italic text-[#d4af37]">Finish the story.</em>
-            </p>
-            <GoldLine className="mx-auto mt-12 mb-14" />
-            <Link
-              to="/signup"
-              className="inline-block px-10 py-4 bg-[#d4af37] text-[#1a1a2e] text-sm font-semibold rounded-xl hover:opacity-90 transition-all duration-200 shadow-soft"
-            >
-              Start Writing Today
-            </Link>
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer className="bg-[#1a1a2e] border-t border-white/10 py-6 text-center">
-        <p className="text-sm text-white/40">
-          © {new Date().getFullYear()} Inkwell. Made with care for writers.
-        </p>
-      </footer>
-
-      <style>{`
-        @keyframes inkFadeUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to   { opacity: 1; transform: translateY(0);    }
+      {/* Top critiquers — all-time, ranked by feedback count */}
+      <SidebarWidget
+        title="Top Critiquers"
+        action={
+          topCritiquers.length > SIDEBAR_ROW_CAP && (
+            <button onClick={() => showNudge("Sign up to see the full critiquer leaderboard.", () => navigate("/signup"), "/critique")} className="text-[11px] font-semibold hover:underline" style={{ color: "#d4af37" }}>
+              See all →
+            </button>
+          )
         }
-      `}</style>
+      >
+        {loading ? (
+          <SidebarSkeletonRows count={3} />
+        ) : topCritiquers.length > 0 ? (
+          <div className="space-y-3">
+            {topCritiquers.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
+              const u = entry.user;
+              const rep = u?.feedbackPoints?.reputation ?? null;
+              return (
+                <div key={u?.id ?? entry.rank} className="flex items-center gap-3">
+                  <span className="text-[11px] font-bold text-[#9a8c7a] w-4 flex-shrink-0">#{entry.rank}</span>
+                  <Avatar user={u} size={7} />
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      to={`/profile/${u?.id}`}
+                      className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
+                    >
+                      {u?.username}
+                    </Link>
+                    <p className="text-[10px] text-[#9a8c7a]">
+                      {entry.critiqueCount} critique{entry.critiqueCount !== 1 ? "s" : ""}
+                      {rep !== null ? ` · ★ ${rep}` : ""}
+                    </p>
+                  </div>
+                  {entry.rank === 1 && (
+                    <span className="text-[10px] font-semibold flex items-center gap-0.5 flex-shrink-0" style={{ color: "#d4af37" }}>
+                      ★ Feedback Star
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <SidebarEmptyRow>
+            {user ? (
+              "No critiques yet — be the first to give feedback."
+            ) : (
+              <>
+                Join to see who's giving the best feedback.{" "}
+                <button onClick={() => navigate("/signup")} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
+                  Sign up →
+                </button>
+              </>
+            )}
+          </SidebarEmptyRow>
+        )}
+      </SidebarWidget>
+    </div>
+  );
+
+  // ─── Sections ──────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen" style={{ background: "#faf8f4" }}>
+
+      {/* ── NUDGE MODAL ─────────────────────────────────────────────────────── */}
+      {nudge && (
+        <SignupNudge
+          message={nudge.message}
+          onClose={() => setNudge(null)}
+          onSignup={() => { setNudge(null); nudge.onConfirm?.(); }}
+        />
+      )}
+
+      {/* ── CHALLENGE PICKER ─────────────────────────────────────────────── */}
+      {showChallengePicker && (
+        <ChallengePicker
+          onClose={() => setShowChallengePicker(false)}
+          onPick={handleChallengePickerDone}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          HERO — guests see the pitch; logged-in users see a personal welcome
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {user ? (
+        <header className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#1a1a2e 0%,#1e2d4a 60%,#0f1a2e 100%)" }}>
+          <div className="absolute inset-0 opacity-5 pointer-events-none"
+            style={{
+              backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(212,175,55,0.4) 40px, rgba(212,175,55,0.4) 41px)",
+            }}
+          />
+
+          <div className="relative max-w-6xl mx-auto px-5 py-16 sm:py-20 text-center">
+            <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border text-[11px] font-bold uppercase tracking-widest"
+              style={{ borderColor: "rgba(212,175,55,0.4)", color: "#d4af37", background: "rgba(212,175,55,0.08)" }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
+              Community is writing right now
+            </div>
+
+            <h1 className="font-serif text-3xl sm:text-5xl font-bold text-white leading-tight mb-4">
+              Welcome back,<br />
+              <span style={{ color: "#d4af37" }}>{user.username}.</span>
+            </h1>
+
+            <p className="text-[15px] sm:text-base text-[#c5bfb5] max-w-xl mx-auto mb-10 leading-relaxed">
+              Pick up where you left off — log today's progress, jump into a sprint, or see what the community's been writing.
+            </p>
+
+            {/* Quick actions — straight to the real page, no signup nudge */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-2">
+              <button
+                onClick={() => navigate("/draftplan")}
+                className="px-8 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
+                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+              >
+                Log my progress →
+              </button>
+
+              <button
+                onClick={() => navigate("/sprint-room")}
+                className="px-8 py-3.5 rounded-xl font-semibold text-white text-[15px] border transition-all hover:bg-white/10"
+                style={{ borderColor: "rgba(212,175,55,0.5)" }}
+              >
+                Start a sprint
+              </button>
+
+              <button
+                onClick={() => navigate("/critique")}
+                className="px-8 py-3.5 rounded-xl font-semibold text-white text-[15px] border transition-all hover:bg-white/10"
+                style={{ borderColor: "rgba(212,175,55,0.5)" }}
+              >
+                Give feedback
+              </button>
+            </div>
+          </div>
+        </header>
+      ) : (
+        <header className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#1a1a2e 0%,#1e2d4a 60%,#0f1a2e 100%)" }}>
+          {/* Subtle texture lines */}
+          <div className="absolute inset-0 opacity-5 pointer-events-none"
+            style={{
+              backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(212,175,55,0.4) 40px, rgba(212,175,55,0.4) 41px)",
+            }}
+          />
+
+          <div className="relative max-w-6xl mx-auto px-5 py-20 sm:py-28 text-center">
+            {/* Eyebrow */}
+            <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border text-[11px] font-bold uppercase tracking-widest"
+              style={{ borderColor: "rgba(212,175,55,0.4)", color: "#d4af37", background: "rgba(212,175,55,0.08)" }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
+              Community is writing right now
+            </div>
+
+            <h1 className="font-serif text-4xl sm:text-6xl font-bold text-white leading-tight mb-5">
+              A home for writers with<br />
+              <span style={{ color: "#d4af37" }}>more ideas than finished drafts.</span>
+            </h1>
+
+            <p className="text-[16px] sm:text-lg text-[#c5bfb5] max-w-2xl mx-auto mb-10 leading-relaxed">
+            Track your draft. Take a writing challenge. Get real feedback. Find resources to sharpen your craft and the community support to carry you to the finish line. Every day, writers here show up and make progress — join them.
+            </p>
+
+            {/* Primary CTAs */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+              <button
+                onClick={() => navigate("/draftplan/new")}
+                className="px-8 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
+                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+              >
+                Want to finish that draft? →
+              </button>
+
+              <button
+                onClick={() => setShowChallengePicker(true)}
+                className="px-8 py-3.5 rounded-xl font-semibold text-white text-[15px] border transition-all hover:bg-white/10"
+                style={{ borderColor: "rgba(212,175,55,0.5)" }}
+              >
+                Developing, editing or brainstorming? Take the challenge
+              </button>
+            </div>
+
+            {/* Secondary CTA */}
+            <p className="text-[13px] text-[#9a8c7a]">
+              Want feedback on your work?{" "}
+              <button
+                onClick={() => navigate("/signup?intent=critique")}
+                className="font-semibold hover:underline transition-colors"
+                style={{ color: "#d4af37" }}
+              >
+                Get started here for free →
+              </button>
+            </p>
+          </div>
+        </header>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          BODY — fixed two-column layout below ~1024px breakpoint reflows to
+          a single column with the sidebar widgets after the main feed.
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 items-start">
+
+          {/* ── MAIN COLUMN ───────────────────────────────────────────────── */}
+          <div className="space-y-12 min-w-0">
+
+            {/* Pinned community posts — grouped by category */}
+            {(loading || communityPosts.length > 0) && (() => {
+              const groups = {};
+              for (const post of communityPosts) {
+                const key = post.category?.trim() || "Community News";
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(post);
+              }
+              const groupEntries = Object.entries(groups);
+
+              return (
+                <>
+                  {loading ? (
+                    <section>
+                      <SectionLabel>From the community</SectionLabel>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {[1, 2].map(i => (
+                          <div key={i} className="bg-white border border-[#e8e0d0] rounded-2xl overflow-hidden">
+                            <Skeleton className="h-44 rounded-none" />
+                            <div className="p-5 space-y-2">
+                              <Skeleton className="h-2.5 w-16" />
+                              <Skeleton className="h-4 w-4/5" />
+                              <Skeleton className="h-3 w-full" />
+                              <Skeleton className="h-3 w-2/3" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : (
+                    groupEntries.map(([category, posts]) => (
+                      <section key={category}>
+                        <SectionLabel>{category}</SectionLabel>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {posts.map(post => (
+                            <CommunityCard key={post.id} post={post} onNudge={showNudge} />
+                          ))}
+                        </div>
+                        <div className="mt-3 text-right">
+                          <button
+                            onClick={() => showNudge("Sign up to read all community updates.", () => navigate("/signup"), "/community-update")}
+                            className="text-[12px] font-semibold hover:underline transition-colors"
+                            style={{ color: "#d4af37" }}
+                          >
+                            Read all updates →
+                          </button>
+                        </div>
+                      </section>
+                    ))
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Latest threads + Active discussions — side by side */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              <section>
+                <SectionLabel>Latest threads</SectionLabel>
+                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-4 py-2">
+                  {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="flex gap-3 items-start py-3 border-b border-[#f0ebe3] last:border-b-0">
+                        <Skeleton className="w-8 h-8 rounded-full" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3.5 w-4/5" />
+                          <Skeleton className="h-2.5 w-1/2" />
+                        </div>
+                      </div>
+                    ))
+                  ) : latestThreads.length > 0 ? (
+                    latestThreads.map(t => (
+                      <ThreadCard key={t.id} thread={t} onNudge={showNudge} />
+                    ))
+                  ) : (
+                    <p className="text-[13px] text-[#9a8c7a] py-6 text-center">No threads yet.</p>
+                  )}
+                </div>
+                <div className="mt-2 text-right">
+                  <button
+                    onClick={() => showNudge("Sign up to join the forum and start or reply to threads.", () => navigate("/signup"), "/forum")}
+                    className="text-[12px] font-semibold hover:underline"
+                    style={{ color: "#d4af37" }}
+                  >
+                    See all threads →
+                  </button>
+                </div>
+              </section>
+
+              <section>
+                <SectionLabel>Active discussions</SectionLabel>
+                <div className="bg-white border border-[#e8e0d0] rounded-2xl px-4 py-2">
+                  {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="flex gap-3 items-start py-3 border-b border-[#f0ebe3] last:border-b-0">
+                        <Skeleton className="w-8 h-8 rounded-full" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3.5 w-4/5" />
+                          <Skeleton className="h-2.5 w-1/2" />
+                        </div>
+                      </div>
+                    ))
+                  ) : activeThreads.length > 0 ? (
+                    activeThreads.map(t => (
+                      <ThreadCard key={t.id} thread={t} onNudge={showNudge} />
+                    ))
+                  ) : (
+                    <p className="text-[13px] text-[#9a8c7a] py-6 text-center">Quiet in here — be the first to post!</p>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            {/* Mid-page CTA banner */}
+            <section
+              className="rounded-2xl p-8 sm:p-10 text-center relative overflow-hidden"
+              style={{ background: "linear-gradient(135deg,#1a1a2e,#1e2d4a)" }}
+            >
+              <div className="absolute inset-0 pointer-events-none opacity-5"
+                style={{ backgroundImage: "radial-gradient(circle at 80% 20%, #d4af37 0%, transparent 60%)" }} />
+              <p className="relative text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "#d4af37" }}>
+                Ready to write?
+              </p>
+              <h2 className="relative font-serif text-2xl sm:text-3xl text-white mb-6 leading-snug">
+                Stop planning to write.<br />Start writing.
+              </h2>
+              <div className="relative flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => navigate("/draftplan/new")}
+                  className="px-7 py-3 rounded-xl font-semibold text-[#1a1a2e] text-[14px] transition-all hover:opacity-90"
+                  style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+                >
+                  Start my draft plan
+                </button>
+                <button
+                  onClick={() => setShowChallengePicker(true)}
+                  className="px-7 py-3 rounded-xl font-semibold text-white text-[14px] border border-white/20 hover:bg-white/10 transition-all"
+                >
+                  Take the writing challenge
+                </button>
+              </div>
+            </section>
+
+            {/* Bottom CTA — desktop only here; on mobile it renders after the sidebar */}
+            <section className="hidden lg:block rounded-2xl border border-[#e8e0d0] bg-white p-8 sm:p-12 text-center">
+              {user ? (
+                <>
+                  <p className="font-serif text-2xl sm:text-3xl text-[#1a1a2e] mb-3 leading-snug">
+                    Your draft isn't going to write itself.<br />
+                    <span style={{ color: "#d4af37" }}>But we can help.</span>
+                  </p>
+                  <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
+                    Track progress, take a challenge, get critique — pick up where you left off.
+                  </p>
+                  <button
+                    onClick={() => navigate("/draftplan")}
+                    className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
+                    style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+                  >
+                    Go to my draft plan →
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="font-serif text-2xl sm:text-3xl text-[#1a1a2e] mb-3 leading-snug">
+                    Your draft isn't going to write itself.<br />
+                    <span style={{ color: "#d4af37" }}>But we can help.</span>
+                  </p>
+                  <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
+                    Track progress, take challenges, get critique — everything a writing community should do.
+                  </p>
+                  <button
+                    onClick={() => navigate("/signup")}
+                    className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
+                    style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+                  >
+                    Join for free →
+                  </button>
+                  <p className="text-[12px] text-[#c5bfb5] mt-4">No credit card. No catch. Just writing.</p>
+                </>
+              )}
+            </section>
+          </div>
+
+          {/* ── SIDEBAR COLUMN ────────────────────────────────────────────── */}
+          <aside className="lg:sticky lg:top-6">
+            {sidebar}
+          </aside>
+
+        </div>
+
+        {/* Bottom CTA — mobile only, appears after the sidebar widgets */}
+        <section className="lg:hidden mt-8 rounded-2xl border border-[#e8e0d0] bg-white p-8 text-center">
+          {user ? (
+            <>
+              <p className="font-serif text-2xl text-[#1a1a2e] mb-3 leading-snug">
+                Your draft isn't going to write itself.<br />
+                <span style={{ color: "#d4af37" }}>But we can help.</span>
+              </p>
+              <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
+                Track progress, take a challenge, get critique — pick up where you left off.
+              </p>
+              <button
+                onClick={() => navigate("/draftplan")}
+                className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
+                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+              >
+                Go to my draft plan →
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="font-serif text-2xl text-[#1a1a2e] mb-3 leading-snug">
+                Your draft isn't going to write itself.<br />
+                <span style={{ color: "#d4af37" }}>But we can help.</span>
+              </p>
+              <p className="text-[14px] text-[#9a8c7a] mb-7 max-w-md mx-auto">
+                Track progress, take challenges, get critique — everything a writing community should do.
+              </p>
+              <button
+                onClick={() => navigate("/signup")}
+                className="inline-block px-10 py-3.5 rounded-xl font-semibold text-[#1a1a2e] text-[15px] transition-all hover:opacity-90 hover:shadow-lg"
+                style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)" }}
+              >
+                Join for free →
+              </button>
+              <p className="text-[12px] text-[#c5bfb5] mt-4">No credit card. No catch. Just writing.</p>
+            </>
+          )}
+        </section>
+      </main>
+
+      {/* ── FOOTER ────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-[#e8e0d0] mt-8 py-8 px-5 text-center">
+        <p className="font-serif text-[#1a1a2e] text-sm mb-1">Inkwell</p>
+        <p className="text-[12px] text-[#9a8c7a]">A home for writers with more ideas than finished drafts.</p>
+      </footer>
     </div>
   );
 }

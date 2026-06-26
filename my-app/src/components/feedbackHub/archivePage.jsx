@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -237,99 +236,89 @@ export default function ArchivePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f3ef]">
-      <Header />
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-7 sm:py-8">
 
-      {/* ── Hero ── */}
-      <div className="bg-[#1a1a2e] border-b border-white/10 relative overflow-hidden">
-        {/* Gold shimmer bar at very top */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent opacity-60" />
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
-          <Link
-            to="/critique"
-            className="inline-flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors mb-4"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Spotlight
-          </Link>
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#d4af37] mb-1.5">Critique Archive</p>
-              <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-1.5">Archive</h1>
-              <p className="text-white/50 text-sm leading-relaxed max-w-md">
-                Chapters that received 3 or more critiques. Still open for comments — half the points apply.
-              </p>
-            </div>
-            {total > 0 && (
-              <p className="text-[12px] text-white/40 flex-shrink-0">
-                {total} {total === 1 ? "chapter" : "chapters"}
-              </p>
-            )}
-          </div>
+      {/* ── Page header — fits inside the sidebar/topbar layout, no dark hero ── */}
+      <Link
+        to="/critique"
+        className="inline-flex items-center gap-1.5 text-[11px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors mb-4"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Critique Hub
+      </Link>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#b8860b] mb-1.5">Critique Archive</p>
+          <h1 className="font-serif text-[#1a1a2e] text-2xl sm:text-[28px] leading-tight mb-1.5">Archive</h1>
+          <p className="text-[#6b5c4a] text-sm leading-relaxed max-w-md">
+            Chapters that received 3 or more critiques. Still open for comments — half the points apply.
+          </p>
         </div>
-      </div>
-
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
-
-        {/* Toolbar: info + filter */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2 bg-white border border-[#e8e0d0] rounded-lg px-3.5 py-2 flex-1 max-w-sm">
-            <div className="w-px self-stretch bg-[#b8a898] flex-shrink-0" />
-            <p className="text-[11px] text-[#6b5c4a] pl-1">
-              Critiquing here earns <span className="font-semibold text-[#1a1a2e]">half the usual points</span> — good practice while the spotlight fills up.
-            </p>
-          </div>
-          <GenreDropdown genres={genres} activeGenre={activeGenre} onSelect={selectGenre} />
-        </div>
-
-        {/* List */}
-        {loading ? (
-          <div className="space-y-2.5">
-            {Array.from({ length: 8 }).map((_, i) => <RowSkeleton key={i} />)}
-          </div>
-        ) : submissions.length === 0 ? (
-          <div className="text-center py-20 bg-white border border-[#e8e0d0] rounded-xl">
-            <p className="font-serif text-[#1a1a2e] text-base mb-1">The archive is empty</p>
-            <p className="text-sm text-[#9a8c7a]">Chapters appear here once they reach 3 critiques.</p>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-2.5">
-              {submissions.map((sub) => (
-                <ArchivedRow key={sub.id} sub={sub} />
-              ))}
-            </div>
-
-            {(page > 1 || hasMore) && (
-              <div className="flex items-center justify-center gap-3 mt-10">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium border border-[#e8e0d0] bg-white text-[#6b5c4a] hover:border-[#1a1a2e] hover:text-[#1a1a2e] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Previous
-                </button>
-                <span className="text-sm text-[#9a8c7a]">Page {page}</span>
-                <button
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={!hasMore}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium border border-[#e8e0d0] bg-white text-[#6b5c4a] hover:border-[#1a1a2e] hover:text-[#1a1a2e] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  Next
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            )}
-          </>
+        {total > 0 && (
+          <p className="text-[12px] text-[#9a8c7a] flex-shrink-0">
+            {total} {total === 1 ? "chapter" : "chapters"}
+          </p>
         )}
       </div>
+
+      {/* Toolbar: info + filter */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2 bg-white border border-[#e8e0d0] rounded-lg px-3.5 py-2 flex-1 max-w-sm">
+          <div className="w-px self-stretch bg-[#b8a898] flex-shrink-0" />
+          <p className="text-[11px] text-[#6b5c4a] pl-1">
+            Critiquing here earns <span className="font-semibold text-[#1a1a2e]">half the usual points</span> — good practice while the spotlight fills up.
+          </p>
+        </div>
+        <GenreDropdown genres={genres} activeGenre={activeGenre} onSelect={selectGenre} />
+      </div>
+
+      {/* List */}
+      {loading ? (
+        <div className="space-y-2.5">
+          {Array.from({ length: 8 }).map((_, i) => <RowSkeleton key={i} />)}
+        </div>
+      ) : submissions.length === 0 ? (
+        <div className="text-center py-20 bg-white border border-[#e8e0d0] rounded-xl">
+          <p className="font-serif text-[#1a1a2e] text-base mb-1">The archive is empty</p>
+          <p className="text-sm text-[#9a8c7a]">Chapters appear here once they reach 3 critiques.</p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2.5">
+            {submissions.map((sub) => (
+              <ArchivedRow key={sub.id} sub={sub} />
+            ))}
+          </div>
+
+          {(page > 1 || hasMore) && (
+            <div className="flex items-center justify-center gap-3 mt-10">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium border border-[#e8e0d0] bg-white text-[#6b5c4a] hover:border-[#1a1a2e] hover:text-[#1a1a2e] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Previous
+              </button>
+              <span className="text-sm text-[#9a8c7a]">Page {page}</span>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasMore}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium border border-[#e8e0d0] bg-white text-[#6b5c4a] hover:border-[#1a1a2e] hover:text-[#1a1a2e] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Next
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

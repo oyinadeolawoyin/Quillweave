@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
-import Header from "../profile/header";
 import { AppMetaTags } from "../utilis/metatags";
 import API_URL from "@/config/api";
 
@@ -297,7 +296,7 @@ function ShareButton({ title }) {
 
   async function handleShare() {
     const url = window.location.href;
-    const shareData = { title: title || "Check out this post on Quillweave", text: title ? `"${title}" — Quillweave Community News` : "Read this on Quillweave", url };
+    const shareData = { title: title || "Check out this post on Quillweave", text: title ? `"${title}" — Quillweave Community` : "Read this on Quillweave", url };
     if (navigator.share) {
       try { await navigator.share(shareData); } catch {}
       return;
@@ -410,16 +409,15 @@ export default function BlogPost() {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   }) : "";
 
-  if (isLoading) return <><Header /><PostSkeleton /></>;
+  if (isLoading) return <PostSkeleton />;
 
   if (notFound) {
     return (
       <div className="min-h-screen" style={{ background: "#f5f3ef" }}>
-        <Header />
         <main className="max-w-3xl mx-auto px-4 py-28 text-center">
           <p className="font-serif text-7xl text-gray-200 mb-4">404</p>
           <h1 className="text-2xl font-serif text-[#1a1a2e] mb-3">Post not found</h1>
-          <Link to="/blog" className="text-sm hover:underline" style={{ color: "#d4af37" }}>← Back to Community News</Link>
+          <Link to="/blog" className="text-sm hover:underline" style={{ color: "#d4af37" }}>← Back to Community</Link>
         </main>
       </div>
     );
@@ -429,10 +427,9 @@ export default function BlogPost() {
 
   return (
     <div className="min-h-screen" style={{ background: "#f5f3ef" }}>
-      <Header />
       {post && (
         <AppMetaTags
-          title={post.title ? `${post.title} — Quillweave Community News` : "Quillweave Community News"}
+          title={post.title ? `${post.title} — Quillweave Community` : "Quillweave Community"}
           description={stripHtml(post.content).slice(0, 160)}
         />
       )}
@@ -446,7 +443,7 @@ export default function BlogPost() {
         <div className="h-[3px]" style={{ background: "#d4af37" }} />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <Link
-            to="/communityNews"
+            to="/community-update"
             className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest transition-colors"
             style={{ color: "rgba(255,255,255,0.5)" }}
             onMouseEnter={e => e.currentTarget.style.color = "#d4af37"}
@@ -455,7 +452,7 @@ export default function BlogPost() {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Community News
+            Community
           </Link>
           <p className="text-[10px] font-bold tracking-[0.3em] uppercase text-white/30 hidden sm:block">Inkwell</p>
           <div className="flex items-center gap-2">
@@ -477,12 +474,11 @@ export default function BlogPost() {
 
       {/* ── Hero image ──────────────────────────────────────────────────────── */}
       {post.mediaUrl && (
-        <div className="w-full overflow-hidden" style={{ maxHeight: "500px" }}>
+        <div className="w-full overflow-hidden" style={{ maxHeight: "640px", background: "#1a1a2e" }}>
           <img
             src={post.mediaUrl}
             alt={post.title || ""}
-            className="w-full h-full object-cover"
-            style={{ maxHeight: "500px" }}
+            className="w-full h-auto max-h-[640px] object-contain mx-auto"
           />
         </div>
       )}

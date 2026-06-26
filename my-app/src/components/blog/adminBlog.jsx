@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
-import Header from "../profile/header";
 import API_URL from "@/config/api";
 import { WriteEditor } from "../drafts/writeeditorshared";
 
@@ -53,20 +52,28 @@ function PostForm({ initial, seriesList, onSave, onCancel }) {
   const [seriesId, setSeriesId] = useState(initial?.seriesId ? String(initial.seriesId) : "");
   const [seriesOrder, setSeriesOrder] = useState(initial?.seriesOrder ?? "");
   const [category, setCategory] = useState(initial?.category || "");
+  const [tag, setTag] = useState(initial?.tag || "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
   const contentRef = useRef(null);
 
   const POST_CATEGORIES = [
-    "Community News",
-    "Behind the Draft",
+    "Stories from Writers",
+    "Writing Tips",
+    "Finished Drafts",
     "Opinion",
-    "Book Corner",
-    "New Faces",
-    "Weekly Roundup",
-    "Fun Fact",
-    "Preview",
+    "Community Update & News",
+  ];
+
+  const BLOG_TAGS = [
+    { value: "writing-tips",        label: "Writing Tips" },
+    { value: "drafting",            label: "Drafting" },
+    { value: "outlining",           label: "Outlining" },
+    { value: "editing",             label: "Editing" },
+    { value: "brainstorming",       label: "Brainstorming" },
+    { value: "story-development",   label: "Story Development" },
+    { value: "successful-stories",  label: "Successful Stories" },
   ];
 
   // The WriteEditor auto-saves on an interval — for blog posts there's nothing
@@ -97,6 +104,7 @@ function PostForm({ initial, seriesList, onSave, onCancel }) {
       if (link.trim()) formData.append("link", link.trim());
       if (mediaFile) formData.append("media", mediaFile);
       if (category) formData.append("category", category);
+      if (tag) formData.append("tag", tag);
 
       const isEdit = !!initial?.id;
 
@@ -164,7 +172,25 @@ function PostForm({ initial, seriesList, onSave, onCancel }) {
           ))}
         </select>
         <p className="text-xs mt-1.5" style={{ color: MUTED }}>
-          Readers can filter posts by category on the Community News page.
+          Readers can browse posts by category on the Community page.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold mb-1.5" style={{ color: NAVY }}>Craft Tag (optional)</label>
+        <select
+          value={tag}
+          onChange={e => setTag(e.target.value)}
+          className="w-full border rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all"
+          style={{ borderColor: BORDER, "--tw-ring-color": `${GOLD}40` }}
+        >
+          <option value="">No tag</option>
+          {BLOG_TAGS.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+        <p className="text-xs mt-1.5" style={{ color: MUTED }}>
+          Tagged articles surface automatically in Draft Plan and Days Challenge dashboards.
         </p>
       </div>
 
@@ -817,20 +843,17 @@ export default function AdminBlog() {
 
   return (
     <div className="min-h-screen" style={{ background: CREAM }}>
-      <Header />
 
-      {/* ── Hero banner ───────────────────────────────────────────────────── */}
-      <div className="border-b border-white/10" style={{ background: NAVY }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-2" style={{ color: GOLD }}>Admin Panel</p>
-          <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-2">Community News</h1>
-          <p className="text-white/55 text-sm leading-relaxed max-w-lg">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+
+        {/* ── Page title ───────────────────────────────────────────────────── */}
+        <div className="mb-8">
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-1" style={{ color: GOLD }}>Admin Panel</p>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold leading-tight mb-1" style={{ color: NAVY }}>Community</h1>
+          <p className="text-sm" style={{ color: MUTED }}>
             Publish posts, pin a Top Story, organize series for ongoing stories and community events.
           </p>
         </div>
-      </div>
-
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
         {/* ── Tabs ─────────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2 mb-8 bg-white rounded-xl p-1.5 border w-fit" style={{ borderColor: BORDER }}>

@@ -2,7 +2,6 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
 import { WriteEditor, ThesaurusDrawer } from "./writeeditorshared";
 import { StartGroupSprintModal } from "../sprint/groupSprintModal";
 
@@ -116,9 +115,6 @@ export default function WritePage() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#f5f0e8" }}>
-
-      {/* Global header — hidden in focus mode */}
-      {!focusMode && <Header />}
 
       {/* ── Sticky write top bar ── */}
       {!focusMode && (

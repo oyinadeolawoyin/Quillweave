@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import Header from "../profile/header";
 import { AppMetaTags } from "../utilis/metatags";
 import API_URL from "@/config/api";
 
@@ -108,16 +107,15 @@ export default function BlogSeries() {
     }
   }
 
-  if (isLoading) return <><Header /><SeriesSkeleton /></>;
+  if (isLoading) return <SeriesSkeleton />;
 
   if (notFound || !series) {
     return (
       <div className="min-h-screen bg-[#f5f3ef]">
-        <Header />
         <main className="max-w-3xl mx-auto px-4 py-28 text-center">
           <p className="text-7xl font-serif text-gray-200 mb-4">404</p>
           <h1 className="text-2xl font-serif text-ink-primary mb-3">Series not found</h1>
-          <Link to="/blog" className="text-[#d4af37] hover:underline text-sm">← Back to Blog</Link>
+          <Link to="/blog" className="text-[#d4af37] hover:underline text-sm">← Back to Community</Link>
         </main>
       </div>
     );
@@ -127,10 +125,9 @@ export default function BlogSeries() {
 
   return (
     <div className="min-h-screen bg-[#f5f3ef]">
-      <Header />
       <AppMetaTags
-        title={`${series.title} – Inkwell Blog`}
-        description={series.description || `A story series on the Inkwell blog: ${series.title}`}
+        title={`${series.title} – Inkwell Community`}
+        description={series.description || `A story series from the Inkwell community: ${series.title}`}
       />
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}

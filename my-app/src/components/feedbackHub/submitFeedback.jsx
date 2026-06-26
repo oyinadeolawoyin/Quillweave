@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
 import { WriteEditor, ThesaurusDrawer, countWords } from "../drafts/writeeditorshared";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -431,22 +430,17 @@ export default function SubmitFeedback() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#faf7f2]">
-        <Header />
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <svg className="w-8 h-8 animate-spin text-[#9a8c7a]" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-          </svg>
-        </div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <svg className="w-8 h-8 animate-spin text-[#9a8c7a]" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+        </svg>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#faf7f2]">
-      <Header />
-
+    <>
       <main className={`mx-auto px-4 sm:px-6 py-10 ${step === 2 ? "max-w-4xl" : "max-w-2xl"}`}>
 
         <Link to={isEditMode ? `/critique/${submissionId}` : "/critique"}
@@ -852,6 +846,6 @@ export default function SubmitFeedback() {
 
       {/* Thesaurus drawer — available on step 2 */}
       <ThesaurusDrawer isOpen={thesaurusOpen} onClose={() => setThesaurusOpen(false)} />
-    </div>
+    </>
   );
 }

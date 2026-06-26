@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -1064,12 +1063,15 @@ export default function FeedbackPage() {
           if (t) blocks.push({ html: false, text: t });
         } else if (node.nodeType === Node.ELEMENT_NODE) {
           if (node.tagName === "HR") { blocks.push({ divider: true, text: "" }); return; }
+          const hasImage = !!node.querySelector?.("img") || node.tagName === "IMG";
           const text = (node.innerText || node.textContent || "").trim();
-          if (!text) return;
-          blocks.push({ html: true, content: node.outerHTML, text });
+          // Image-only blocks have no visible text but should still render —
+          // only drop a block when it's truly empty (no text AND no image).
+          if (!text && !hasImage) return;
+          blocks.push({ html: true, content: node.outerHTML, text, hasImage });
         }
       });
-      return blocks.filter(b => b.divider || b.text.trim());
+      return blocks.filter(b => b.divider || b.text.trim() || b.hasImage);
     }
     return rawContent
       .replace(/\r\n/g, "\n")
@@ -1086,7 +1088,9 @@ export default function FeedbackPage() {
 
   function openSidebar(index) {
     const para = paragraphs[index];
-    const preview = (para?.text ?? "").slice(0, 80);
+    const preview = (para?.text?.trim())
+      ? para.text.slice(0, 80)
+      : para?.hasImage ? "[Image]" : "";
     setActivePara({ index, preview });
     setSidebarOpen(true);
   }
@@ -1188,13 +1192,10 @@ export default function FeedbackPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#faf7f2]">
-        <Header />
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-6 bg-[#f0ebe3] rounded-xl animate-pulse" />
-          ))}
-        </div>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-6 bg-[#f0ebe3] rounded-xl animate-pulse" />
+        ))}
       </div>
     );
   }
@@ -1202,26 +1203,23 @@ export default function FeedbackPage() {
   if (!submission) {
     if (guestBlocked) {
       return (
-        <div className="min-h-screen bg-[#faf7f2]">
-          <Header />
-          <div className="max-w-md mx-auto px-4 py-24 text-center">
-            <div className="w-12 h-12 rounded-full bg-[#f4f1ec] flex items-center justify-center mx-auto mb-5">
-              <svg className="w-6 h-6 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h2 className="font-serif text-2xl text-[#2d3748] mb-2">Sign in to read this</h2>
-            <p className="text-sm text-[#9a8c7a] mb-7 leading-relaxed">
-              Create a free account or sign in to read submissions and leave critiques.
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <Link to="/login" className="px-5 py-2.5 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all">
-                Sign in
-              </Link>
-              <Link to="/signup" className="px-5 py-2.5 border border-[#e8e0d0] text-[#2d3748] text-sm font-semibold rounded-xl hover:border-[#2d3748] transition-all">
-                Create account
-              </Link>
-            </div>
+        <div className="max-w-md mx-auto px-4 py-24 text-center">
+          <div className="w-12 h-12 rounded-full bg-[#f4f1ec] flex items-center justify-center mx-auto mb-5">
+            <svg className="w-6 h-6 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="font-serif text-2xl text-[#2d3748] mb-2">Sign in to read this</h2>
+          <p className="text-sm text-[#9a8c7a] mb-7 leading-relaxed">
+            Create a free account or sign in to read submissions and leave critiques.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <Link to="/login" className="px-5 py-2.5 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all">
+              Sign in
+            </Link>
+            <Link to="/signup" className="px-5 py-2.5 border border-[#e8e0d0] text-[#2d3748] text-sm font-semibold rounded-xl hover:border-[#2d3748] transition-all">
+              Create account
+            </Link>
           </div>
         </div>
       );
@@ -1232,17 +1230,14 @@ export default function FeedbackPage() {
   const activeComments = activePara !== null ? getParaComments(activePara.index) : [];
 
   return (
-    <div className="min-h-screen bg-[#faf7f2]">
-      <Header />
+    <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-
-        <Link to="/critique" className="inline-flex items-center gap-1.5 text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors mb-8">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to hub
-        </Link>
+      <Link to="/critique" className="inline-flex items-center gap-1.5 text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors mb-8">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to hub
+      </Link>
 
         <div className="flex gap-7 transition-all duration-300">
 
@@ -1463,7 +1458,6 @@ export default function FeedbackPage() {
           </div>
         )}
       </main>
-    </div>
   );
 }
 

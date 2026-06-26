@@ -4,8 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
-
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr) {
@@ -604,12 +602,12 @@ function ComposeModal({ placeholder, onSubmit, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl bg-white overflow-hidden"
+        className="w-full max-w-lg rounded-2xl bg-white"
         style={{ boxShadow: "0 24px 64px rgba(26,26,46,0.22)", animation: "cmSlideUp 0.18s ease" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#f4f1ec]">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#f4f1ec] rounded-t-2xl">
           <span className="text-[13px] font-bold text-[#1a1a2e]">
             {placeholder?.startsWith("Replying") ? "Write a reply" : "Leave a comment"}
           </span>
@@ -619,7 +617,7 @@ function ComposeModal({ placeholder, onSubmit, onClose }) {
             </svg>
           </button>
         </div>
-        <div className="p-5">
+        <div className="p-5 rounded-b-2xl overflow-visible">
           <ComposeBox
             placeholder={placeholder}
             onSubmit={async (content, files) => { await onSubmit(content, files); onClose(); }}
@@ -670,30 +668,32 @@ function ReplyRow({ reply, user, commentId, threadId, onLikeToggled, onReplyTo, 
   }
 
   return (
-    <div id={`reply-${reply.id}`} className="flex gap-3" style={{ scrollMarginTop: 96 }}>
-      <Avatar user={reply.author} size={28} />
-      <div className="flex-1 min-w-0">
+    <div id={`reply-${reply.id}`} className="flex gap-4" style={{ scrollMarginTop: 96 }}>
+      <Avatar user={reply.author} size={36} />
+      <div className="flex-1 min-w-0 pb-3">
         <div
-          className="rounded-xl px-4 py-3 transition-all duration-700"
+          className="bg-white rounded-2xl border px-5 py-4 transition-all duration-700"
           style={{
-            background:  highlighted ? "#fffdf0" : "#faf7f2",
-            boxShadow:   highlighted ? "0 0 0 2px #d4af37" : "none",
+            boxShadow:   highlighted ? "0 0 0 3px #d4af37, 0 4px 16px rgba(212,175,55,0.18)" : "0 1px 6px rgba(26,26,46,0.05)",
+            borderColor: highlighted ? "#d4af37" : "#e8e0d0",
           }}
-        >          <div className="flex items-center gap-2 mb-1.5">
-            {reply.author?.id ? (
-              <Link
-                to={`/profile/${reply.author.id}`}
-                className="text-[14px] font-bold text-[#1a1a2e] hover:text-[#d4af37] transition-colors"
-              >
-                {reply.author.username}
-              </Link>
-            ) : (
-              <span className="text-[14px] font-bold text-[#1a1a2e]">Deleted user</span>
-            )}
-            <span className="text-[11px] text-[#c8b89a]">{timeAgo(reply.createdAt)}</span>
+        >
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-baseline gap-2">
+              {reply.author?.id ? (
+                <Link
+                  to={`/profile/${reply.author.id}`}
+                  className="text-[14px] font-bold text-[#1a1a2e] hover:text-[#d4af37] transition-colors"
+                >
+                  {reply.author.username}
+                </Link>
+              ) : (
+                <span className="text-[14px] font-bold text-[#1a1a2e]">Deleted user</span>
+              )}
+              <span className="text-[11px] text-[#c8b89a]">{timeAgo(reply.createdAt)}</span>
+            </div>
           </div>
-          <FormattedText content={reply.content} className="text-[14px] font-medium text-[#2d2416] leading-relaxed" />
-          {/* media in reply */}
+          <FormattedText content={reply.content} className="text-[14px] text-[#2d2416] leading-relaxed" />
           {(() => {
             const urls = parseMediaUrls(reply.mediaUrls);
             return urls.length > 0
@@ -701,7 +701,7 @@ function ReplyRow({ reply, user, commentId, threadId, onLikeToggled, onReplyTo, 
               : reply.mediaUrl && <MediaBlock url={reply.mediaUrl} />;
           })()}
         </div>
-        <div className="flex items-center gap-1 mt-1.5 pl-1">
+        <div className="flex items-center gap-1 mt-2 pl-1">
           <LikeButton count={likes} liked={liked} onToggle={toggleLike} disabled={!user || toggling} size="md" />
           {user && (
             <button
@@ -929,7 +929,7 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
 
         {/* Replies list */}
         {repliesLoaded && replies.length > 0 && (
-          <div className="mt-3 ml-1 space-y-3 pl-4 border-l-2 border-[#ede8e0]">
+          <div className="mt-3 ml-5 space-y-3">
             {replies.map(reply => (
               <ReplyRow
                 key={reply.id}
@@ -1052,9 +1052,8 @@ export default function ThreadPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f3ef]">
-        <Header />
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+      <div className="bg-[#f5f3ef] min-h-screen">
+        <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8">
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
               <div key={i} className="h-28 bg-white rounded-2xl border border-[#e8e0d0] animate-pulse" />
@@ -1068,94 +1067,29 @@ export default function ThreadPage() {
   if (!thread) return null;
 
   return (
-    <div className="min-h-screen bg-[#f5f3ef]">
-      <Header />
+    <div className="bg-[#f5f3ef] min-h-screen">
+      <div className="max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
 
-      {/* ── Hero strip ── */}
-      <div style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #212140 100%)" }}>
-        <div className="max-w-4xl mx-auto px-4 sm:px-8 pt-8 pb-12">
-
-          {/* Breadcrumb */}
-          <Link
-            to="/forum"
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/40 hover:text-[#d4af37] transition-colors mb-6"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7"/>
-            </svg>
-            All threads
-          </Link>
-
-          {/* Thread label */}
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37]/70 mb-2">
-            {thread.isPinned ? "📌 Pinned thread" : "Thread"}
-          </p>
-
-          {/* Title */}
-          <h1 className="font-serif text-white text-3xl sm:text-4xl font-bold leading-tight mb-5">
-            {thread.title}
-          </h1>
-
-          {/* Author + date */}
-          <div className="flex items-center gap-3 mb-6">
-            <Avatar user={thread.author} size={32} />
-            <div>
-              {thread.author?.id ? (
-                <Link
-                  to={`/profile/${thread.author.id}`}
-                  className="text-[13px] font-semibold text-white/80 hover:text-[#d4af37] transition-colors"
-                >
-                  {thread.author.username}
-                </Link>
-              ) : (
-                <span className="text-[13px] font-semibold text-white/80">Admin</span>
-              )}
-              <span className="text-[11px] text-white/35 ml-2.5">{timeAgo(thread.createdAt)}</span>
-            </div>
-          </div>
-
-          {/* Like + comment count */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleThreadLike}
-              disabled={!user || toggling}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold transition-all border disabled:opacity-40 ${
-                threadLiked
-                  ? "bg-[#d4af37] text-[#1a1a2e] border-[#d4af37]"
-                  : "border-white/20 text-white/60 hover:border-[#d4af37] hover:text-[#d4af37]"
-              }`}
-              style={{
-                transform: threadLikePop ? "scale(1.12)" : "scale(1)",
-                transition: "transform 0.22s cubic-bezier(0.34,1.56,0.64,1), color 0.15s, background 0.15s, border-color 0.15s",
-              }}
-            >
-              <svg className="w-5 h-5" fill={threadLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={threadLiked ? 0 : 2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-              {threadLikes} {threadLikes === 1 ? "like" : "likes"}
-            </button>
-            <span className="text-[12px] text-white/35">
-              {comments.length} {comments.length === 1 ? "comment" : "comments"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Content card ── */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-8 -mt-5 mb-8">
-        <div
-          className="bg-white rounded-2xl border border-[#e8e0d0] overflow-hidden"
-          style={{ boxShadow: "0 4px 24px rgba(26,26,46,0.09)" }}
+        {/* Breadcrumb */}
+        <Link
+          to="/forum"
+          className="inline-flex items-center gap-1.5 text-[12px] text-[#9a8c7a] hover:text-[#b8860b] transition-colors mb-5"
         >
-          {/* Hero image — zoomable, full width, shown at its full natural height (no cropping) */}
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7"/>
+          </svg>
+          Forum
+        </Link>
+
+        {/* ── Thread card ── */}
+        <div className="bg-white rounded-2xl border border-[#e8e0d0] overflow-hidden mb-6"
+          style={{ boxShadow: "0 2px 16px rgba(26,26,46,0.07)" }}>
+
+          {/* Optional image */}
           {thread.mediaUrl && (() => {
             const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(thread.mediaUrl);
             return (
-              <div
-                className="relative cursor-zoom-in group"
-                onClick={() => setHeroLightbox(true)}
-              >
+              <div className="relative cursor-zoom-in group" onClick={() => setHeroLightbox(true)}>
                 {isVideo
                   ? <video src={thread.mediaUrl} className="w-full h-auto" muted />
                   : <img src={thread.mediaUrl} alt="" className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.01]" />
@@ -1170,16 +1104,52 @@ export default function ThreadPage() {
             );
           })()}
 
-          <div className="px-7 py-6">
-            <FormattedText content={thread.context} className="text-[16px] text-[#2d2416] leading-[1.75]" />
+          <div className="px-6 sm:px-8 pt-6 pb-5">
+            {/* Badges */}
+            <div className="flex items-center gap-2 mb-3">
+              {thread.isPinned && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                  style={{ color: "#b8860b", background: "#fffdf0", borderColor: "#d4af37" }}>
+                  Pinned
+                </span>
+              )}
+              {thread.category && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#f4f1ec] text-[#6b5c4a]">
+                  {thread.category.name}
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <h1 className="font-serif text-[#1a1a2e] text-2xl sm:text-3xl font-bold leading-tight mb-4">
+              {thread.title}
+            </h1>
+
+            {/* Author row */}
+            <div className="flex items-center gap-3 mb-5">
+              <Avatar user={thread.author} size={34} />
+              <div>
+                {thread.author?.id ? (
+                  <Link to={`/profile/${thread.author.id}`}
+                    className="text-[13px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors">
+                    {thread.author.username}
+                  </Link>
+                ) : (
+                  <span className="text-[13px] font-semibold text-[#1a1a2e]">Admin</span>
+                )}
+                <span className="text-[11px] text-[#c8b89a] ml-2">{timeAgo(thread.createdAt)}</span>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-[#f0ebe3] mb-5" />
+
+            {/* Body */}
+            <FormattedText content={thread.context} className="text-[15px] text-[#2d2416] leading-[1.8]" />
 
             {thread.link && (
-              <a
-                href={thread.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-5 text-[12px] font-semibold text-[#1a5fb4] hover:underline"
-              >
+              <a href={thread.link} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-5 text-[12px] font-semibold text-[#1a5fb4] hover:underline">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
@@ -1187,9 +1157,34 @@ export default function ThreadPage() {
                 {thread.link}
               </a>
             )}
+
+            {/* Like row */}
+            <div className="flex items-center gap-4 mt-6 pt-4 border-t border-[#f0ebe3]">
+              <button
+                onClick={toggleThreadLike}
+                disabled={!user || toggling}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold transition-all border disabled:opacity-40 ${
+                  threadLiked
+                    ? "bg-[#d4af37]/10 text-[#b8860b] border-[#d4af37]/40"
+                    : "border-[#e8e0d0] text-[#9a8c7a] hover:border-[#d4af37] hover:text-[#b8860b]"
+                }`}
+                style={{
+                  transform: threadLikePop ? "scale(1.1)" : "scale(1)",
+                  transition: "transform 0.22s cubic-bezier(0.34,1.56,0.64,1), color 0.15s, background 0.15s, border-color 0.15s",
+                }}
+              >
+                <svg className="w-4 h-4" fill={threadLiked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={threadLiked ? 0 : 2}
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                {threadLikes} {threadLikes === 1 ? "like" : "likes"}
+              </button>
+              <span className="text-[12px] text-[#c8b89a]">
+                {comments.length} {comments.length === 1 ? "comment" : "comments"}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* hero lightbox */}
       {heroLightbox && thread.mediaUrl && (
@@ -1197,7 +1192,7 @@ export default function ThreadPage() {
       )}
 
       {/* ── Comments section ── */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-8 pb-20">
+      <div className="pb-20">
 
         {showWelcome && <WelcomeChallengeNudge onDismiss={dismissWelcome} />}
 
@@ -1293,6 +1288,7 @@ export default function ThreadPage() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
-import Header from "../profile/header";
 import API_URL from "@/config/api";
 
 // ─── Admin Soundscapes Page ────────────────────────────────────
@@ -93,7 +92,6 @@ export default function AdminSoundscapes() {
 
   return (
     <div className="min-h-screen bg-[#faf7f2]">
-      <Header />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14 space-y-6">
 

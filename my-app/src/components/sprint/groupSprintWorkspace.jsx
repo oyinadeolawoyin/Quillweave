@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
-import Header from "../profile/header";
 import API_URL from "@/config/api";
 import { CheckoutModal, JoinGroupSprintModal } from "./groupSprintModal";
 import { Room, Track } from "livekit-client";
@@ -618,7 +617,6 @@ export default function GroupSprintWorkspace() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f5f0e8" }}>
-      {!writeMode && <Header />}
 
       {/* ── TOP BAR ──────────────────────────────────────────────────────────── */}
       <div

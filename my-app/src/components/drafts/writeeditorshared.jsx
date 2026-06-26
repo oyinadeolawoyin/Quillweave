@@ -49,41 +49,22 @@ const BG_COLORS = [
 ];
 
 // ─── Thesaurus drawer ─────────────────────────────────────────────────────────
-// Right-side sliding drawer with Thesaurus + Emotion Cues tabs.
-// Matches the richer emotion-cue UX from GroupSprintWorkspace.
+// Right-side sliding drawer with synonym/antonym/definition lookup.
 //
 // Props:
 //   isOpen   bool
 //   onClose  fn
 
 export function ThesaurusDrawer({ isOpen, onClose }) {
-  const [tab, setTab]         = useState("thesaurus"); // "thesaurus" | "emotions"
   const [query, setQuery]     = useState("");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const inputRef = useRef(null);
 
-  // Emotion cues
-  const [emotions, setEmotions]               = useState([]);
-  const [emotionsLoading, setEmotionsLoading] = useState(false);
-  const [emotionsError, setEmotionsError]     = useState(null);
-  const [expandedEmotion, setExpandedEmotion] = useState(null); // null = list view; id = detail view
-
   useEffect(() => {
-    if (isOpen && tab === "thesaurus") setTimeout(() => inputRef.current?.focus(), 100);
-  }, [isOpen, tab]);
-
-  useEffect(() => {
-    if (tab !== "emotions" || emotions.length > 0) return;
-    setEmotionsLoading(true);
-    setEmotionsError(null);
-    fetch(`${API_URL}/emotions`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setEmotions(d.emotions || []))
-      .catch(() => setEmotionsError("Couldn't load emotion cues. Try again."))
-      .finally(() => setEmotionsLoading(false));
-  }, [tab, emotions.length]);
+    if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
+  }, [isOpen]);
 
   async function search(word) {
     const w = word.trim().toLowerCase();
@@ -132,7 +113,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#e8dcc8] bg-[#faf7f2] flex-shrink-0">
           <div>
             <p className="text-xs text-[#9a8c7a] font-semibold uppercase tracking-wider">Writer's toolkit</p>
-            <p className="text-sm font-serif text-[#2d3748]">Words & emotions</p>
+            <p className="text-sm font-serif text-[#2d3748]">Thesaurus</p>
           </div>
           <button type="button"
             onClick={onClose}
@@ -143,223 +124,108 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-[#f0ebe3] flex-shrink-0">
-          <button type="button"
-            onClick={() => setTab("thesaurus")}
-            className={`flex-1 py-2.5 text-xs font-semibold transition-all ${
-              tab === "thesaurus" ? "text-[#2d3748] border-b-2 border-[#d4af37]" : "text-[#9a8c7a] hover:text-[#5a4a30]"
-            }`}>
-            📖 Thesaurus
-          </button>
-          <button type="button"
-            onClick={() => setTab("emotions")}
-            className={`flex-1 py-2.5 text-xs font-semibold transition-all ${
-              tab === "emotions" ? "text-[#2d3748] border-b-2 border-[#d4af37]" : "text-[#9a8c7a] hover:text-[#5a4a30]"
-            }`}>
-            🌿 Emotion Cues
-          </button>
+        {/* ── Thesaurus ─────────────────────────────────────────────────────── */}
+        <div className="px-4 py-3 border-b border-[#f0ebe3] flex-shrink-0">
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && search(query)}
+              placeholder="Search a word…"
+              className="flex-1 px-3 py-2 text-sm bg-[#faf7f2] border border-[#e8e0d0] rounded-lg focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 text-[#2d3748] placeholder-[#c4bdb4] transition-all"
+            />
+            <button type="button"
+              onClick={() => search(query)}
+              className="px-3 py-2 bg-[#2d3748] text-white rounded-lg text-sm font-medium hover:bg-[#3d4f64] transition-all">
+              Go
+            </button>
+          </div>
         </div>
 
-        {/* ── Thesaurus tab ─────────────────────────────────────────────────── */}
-        {tab === "thesaurus" && (
-          <>
-            <div className="px-4 py-3 border-b border-[#f0ebe3] flex-shrink-0">
-              <div className="flex gap-2">
-                <input
-                  ref={inputRef}
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && search(query)}
-                  placeholder="Search a word…"
-                  className="flex-1 px-3 py-2 text-sm bg-[#faf7f2] border border-[#e8e0d0] rounded-lg focus:outline-none focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/20 text-[#2d3748] placeholder-[#c4bdb4] transition-all"
-                />
-                <button type="button"
-                  onClick={() => search(query)}
-                  className="px-3 py-2 bg-[#2d3748] text-white rounded-lg text-sm font-medium hover:bg-[#3d4f64] transition-all">
-                  Go
-                </button>
-              </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading && (
+            <div className="flex items-center justify-center py-12 gap-2 text-sm text-[#9a8c7a]">
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Looking it up…
             </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {loading && (
-                <div className="flex items-center justify-center py-12 gap-2 text-sm text-[#9a8c7a]">
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Looking it up…
-                </div>
-              )}
-              {error && !loading && (
-                <div className="px-4 py-8 text-center">
-                  <p className="text-sm text-[#9a8c7a]">{error}</p>
-                </div>
-              )}
-              {results && !loading && (
-                <div className="p-4 space-y-5">
-                  <div>
-                    <p className="text-xl font-serif font-semibold text-[#2d3748]" style={{ fontFamily: "'Georgia', serif" }}>
-                      {results.word}
-                    </p>
-                    {results.phonetic && (
-                      <p className="text-xs text-[#9a8c7a] mt-0.5">{results.phonetic}</p>
-                    )}
-                  </div>
-                  {results.meanings.length > 0 && (
-                    <div className="space-y-3">
-                      {results.meanings.map((m, i) => (
-                        <div key={i}>
-                          <span className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wider bg-[#f4f1ec] px-2 py-0.5 rounded">
-                            {m.partOfSpeech}
-                          </span>
-                          {m.definitions?.[0]?.definition && (
-                            <p className="text-xs text-[#7a6a50] mt-1.5 leading-relaxed">
-                              {m.definitions[0].definition}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {results.synonyms.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-[#2d3748] mb-2">Synonyms</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {results.synonyms.map(s => (
-                          <button type="button"
-                            key={s}
-                            onClick={() => { setQuery(s); search(s); }}
-                            className="text-xs px-2.5 py-1 bg-[#faf7f2] border border-[#e8e0d0] text-[#5a4a30] rounded-full hover:border-[#d4af37] hover:bg-[#fffbf0] transition-all">
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {results.antonyms.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-[#2d3748] mb-2">Antonyms</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {results.antonyms.map(a => (
-                          <button type="button"
-                            key={a}
-                            onClick={() => { setQuery(a); search(a); }}
-                            className="text-xs px-2.5 py-1 bg-[#fff0f0] border border-[#f5caca] text-[#7a3a3a] rounded-full hover:border-[#e57a7a] transition-all">
-                            {a}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {!results.synonyms.length && !results.antonyms.length && (
-                    <p className="text-xs text-[#b8a898] text-center py-2">No synonyms or antonyms found.</p>
-                  )}
-                </div>
-              )}
-              {!loading && !error && !results && (
-                <div className="px-4 py-10 text-center space-y-2">
-                  <p className="text-2xl">📖</p>
-                  <p className="text-xs text-[#b8a898]">Type a word above to find synonyms, antonyms, and definitions.</p>
-                </div>
-              )}
+          )}
+          {error && !loading && (
+            <div className="px-4 py-8 text-center">
+              <p className="text-sm text-[#9a8c7a]">{error}</p>
             </div>
-          </>
-        )}
-
-        {/* ── Emotion Cues tab ─────────────────────────────────────────────── */}
-        {tab === "emotions" && (
-          <div className="flex-1 overflow-y-auto flex flex-col">
-            {emotionsLoading && (
-              <div className="flex items-center justify-center py-12 gap-2 text-sm text-[#9a8c7a]">
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Loading emotion cues…
-              </div>
-            )}
-            {emotionsError && !emotionsLoading && (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm text-[#9a8c7a]">{emotionsError}</p>
-                <button type="button"
-                  onClick={() => { setEmotions([]); setEmotionsError(null); }}
-                  className="mt-3 text-xs text-[#d4af37] hover:underline">
-                  Retry
-                </button>
-              </div>
-            )}
-            {!emotionsLoading && !emotionsError && emotions.length === 0 && (
-              <div className="px-4 py-10 text-center">
-                <p className="text-2xl mb-2">🌿</p>
-                <p className="text-xs text-[#b8a898]">No emotion cues yet.</p>
-              </div>
-            )}
-
-            {/* List view */}
-            {!emotionsLoading && emotions.length > 0 && expandedEmotion === null && (
-              <div className="p-3 space-y-1">
-                <p className="text-[10px] text-[#b8a898] px-1 pb-2">
-                  Tap an emotion to see its sensory cues — use them to write more vividly.
+          )}
+          {results && !loading && (
+            <div className="p-4 space-y-5">
+              <div>
+                <p className="text-xl font-serif font-semibold text-[#2d3748]" style={{ fontFamily: "'Georgia', serif" }}>
+                  {results.word}
                 </p>
-                {emotions.map(e => (
-                  <button type="button"
-                    key={e.id}
-                    onClick={() => setExpandedEmotion(e.id)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#faf7f2] hover:bg-[#f4f0e8] border border-[#e8dcc8] hover:border-[#d4af37] transition-all text-left group">
-                    <div className="flex items-center gap-2.5">
-                      {e.emoji && <span className="text-base">{e.emoji}</span>}
-                      <span className="text-sm font-medium text-[#2d3748]">{e.emotion || e.name}</span>
-                    </div>
-                    <svg
-                      className="w-3.5 h-3.5 text-[#c4bdb4] group-hover:text-[#d4af37] transition-colors"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ))}
+                {results.phonetic && (
+                  <p className="text-xs text-[#9a8c7a] mt-0.5">{results.phonetic}</p>
+                )}
               </div>
-            )}
-
-            {/* Detail view */}
-            {!emotionsLoading && emotions.length > 0 && expandedEmotion !== null && (() => {
-              const em = emotions.find(e => e.id === expandedEmotion);
-              if (!em) return null;
-              const rawCues = em.cues || "";
-              const cueItems = Array.isArray(rawCues)
-                ? rawCues.map(s => String(s).trim()).filter(Boolean)
-                : String(rawCues)
-                    .split(/(?<=[a-z,)])(?=[A-Z])/)
-                    .map(s => s.trim())
-                    .filter(Boolean);
-              return (
-                <div className="flex flex-col flex-1">
-                  <button type="button"
-                    onClick={() => setExpandedEmotion(null)}
-                    className="flex items-center gap-2 px-4 py-3 bg-[#faf7f2] border-b border-[#e8dcc8] hover:bg-[#f4f0e8] transition-all text-left w-full group flex-shrink-0">
-                    <svg className="w-4 h-4 text-[#9a8c7a] group-hover:text-[#2d3748] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    <span className="text-sm font-semibold text-[#2d3748]">{em.emotion || em.name}</span>
-                    <span className="text-[10px] text-[#b8a898] ml-auto">tap to go back</span>
-                  </button>
-                  <div className="flex-1 overflow-y-auto p-4">
-                    <p className="text-[10px] text-[#b8a898] mb-3 uppercase tracking-wider font-semibold">Sensory cues</p>
-                    <ul className="space-y-2">
-                      {cueItems.map((cue, i) => (
-                        <li key={i} className="flex items-start gap-2.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] flex-shrink-0 mt-1.5" />
-                          <span className="text-xs text-[#5a4a30] leading-relaxed">{cue}</span>
-                        </li>
-                      ))}
-                    </ul>
+              {results.meanings.length > 0 && (
+                <div className="space-y-3">
+                  {results.meanings.map((m, i) => (
+                    <div key={i}>
+                      <span className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wider bg-[#f4f1ec] px-2 py-0.5 rounded">
+                        {m.partOfSpeech}
+                      </span>
+                      {m.definitions?.[0]?.definition && (
+                        <p className="text-xs text-[#7a6a50] mt-1.5 leading-relaxed">
+                          {m.definitions[0].definition}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {results.synonyms.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-[#2d3748] mb-2">Synonyms</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {results.synonyms.map(s => (
+                      <button type="button"
+                        key={s}
+                        onClick={() => { setQuery(s); search(s); }}
+                        className="text-xs px-2.5 py-1 bg-[#faf7f2] border border-[#e8e0d0] text-[#5a4a30] rounded-full hover:border-[#d4af37] hover:bg-[#fffbf0] transition-all">
+                        {s}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              );
-            })()}
-          </div>
-        )}
+              )}
+              {results.antonyms.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-[#2d3748] mb-2">Antonyms</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {results.antonyms.map(a => (
+                      <button type="button"
+                        key={a}
+                        onClick={() => { setQuery(a); search(a); }}
+                        className="text-xs px-2.5 py-1 bg-[#fff0f0] border border-[#f5caca] text-[#7a3a3a] rounded-full hover:border-[#e57a7a] transition-all">
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!results.synonyms.length && !results.antonyms.length && (
+                <p className="text-xs text-[#b8a898] text-center py-2">No synonyms or antonyms found.</p>
+              )}
+            </div>
+          )}
+          {!loading && !error && !results && (
+            <div className="px-4 py-10 text-center space-y-2">
+              <p className="text-2xl">📖</p>
+              <p className="text-xs text-[#b8a898]">Type a word above to find synonyms, antonyms, and definitions.</p>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
@@ -374,7 +240,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
 //   onImagePicked fn(payload) — for inline image insert
 //   visible     bool
 
-function FloatingFormatBar({ onCommand, onImagePicked, visible }) {
+function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, visible }) {
   const [showTextColor, setShowTextColor] = useState(false);
   const [showHighlight, setShowHighlight] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
@@ -578,6 +444,13 @@ function FloatingFormatBar({ onCommand, onImagePicked, visible }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
           </svg>
         </button>
+
+        {/* Link */}
+        <button type="button" title="Insert link" onMouseDown={e => { e.preventDefault(); onLinkClick?.(); }} className={floatBtn}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -611,6 +484,7 @@ export function RichToolbar({
   currentTextColor = "#2d3748",
   currentBgColor   = "transparent",
   onImagePicked,
+  onLinkClick,
 }) {
   const [colorPicker, setColorPicker] = useState(null); // "text" | "bg" | null
   const colorPickerRef = useRef(null);
@@ -816,6 +690,17 @@ export function RichToolbar({
           }}
         />
       </label>
+
+      {/* Insert link — opens a modal for URL + display text, no upload involved */}
+      <button type="button"
+        onMouseDown={e => { e.preventDefault(); onLinkClick?.(); }}
+        className={btn}
+        title="Insert link"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
+        </svg>
+      </button>
 
       {/* ── Selection colour (applies to highlighted text) ──────────────── */}
       <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
@@ -1084,6 +969,107 @@ function ImageSizeModal({ url, savedRange, onInsert, onClose }) {
   );
 }
 
+// ─── Link insert modal ────────────────────────────────────────────────────────
+// Lets the writer insert as many in-article links as they want — no upload,
+// no external service, just an <a> tag written straight into the post HTML.
+//
+// Props:
+//   initialText  string — pre-filled from the current selection, if any
+//   savedRange   Range | null — cursor/selection position before the modal opened
+//   onInsert     fn({ url, text, savedRange })
+//   onClose      fn
+
+function LinkModal({ initialText, savedRange, onInsert, onClose }) {
+  const [url, setUrl] = useState("");
+  const [text, setText] = useState(initialText || "");
+  const [error, setError] = useState(null);
+  const urlInputRef = useRef(null);
+
+  useEffect(() => {
+    setTimeout(() => urlInputRef.current?.focus(), 50);
+  }, []);
+
+  function normalizeUrl(raw) {
+    const v = raw.trim();
+    if (!v) return "";
+    // Allow relative in-site links (e.g. /blog/123) and anchors as-is;
+    // otherwise default to https:// if no scheme was given.
+    if (/^(https?:\/\/|mailto:|\/|#)/i.test(v)) return v;
+    return `https://${v}`;
+  }
+
+  function handleInsert() {
+    const cleanUrl = normalizeUrl(url);
+    if (!cleanUrl) { setError("Enter a URL first."); return; }
+    onInsert({ url: cleanUrl, text: text.trim(), savedRange });
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl border border-[#e8e0d0] p-6 w-80 space-y-4">
+        <h3 className="font-serif text-base text-[#1a1a2e]">Insert link</h3>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a8c7a] mb-1.5">URL</p>
+          <input
+            ref={urlInputRef}
+            type="text"
+            value={url}
+            onChange={e => { setUrl(e.target.value); setError(null); }}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleInsert(); } }}
+            placeholder="https://… or /blog/post-id"
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-all"
+            style={{ borderColor: "#e8e0d0", "--tw-ring-color": "#d4af3740" }}
+          />
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a8c7a] mb-1.5">
+            Link text {initialText ? "" : "(optional)"}
+          </p>
+          <input
+            type="text"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleInsert(); } }}
+            placeholder="Words readers will see"
+            disabled={!!initialText}
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-all disabled:bg-[#f5f3ef] disabled:text-[#9a8c7a]"
+            style={{ borderColor: "#e8e0d0", "--tw-ring-color": "#d4af3740" }}
+          />
+          <p className="text-[11px] mt-1.5 text-[#9a8c7a]">
+            {initialText ? "Your highlighted text will become the link." : "Leave blank to show the URL itself."}
+          </p>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button type="button"
+            onClick={handleInsert}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+            style={{ background: "#1a1a2e" }}
+          >
+            Insert link
+          </button>
+          <button type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium border text-[#6b5c4a] hover:bg-[#f5f3ef] transition-all"
+            style={{ borderColor: "#e8e0d0" }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Write editor ──────────────────────────────────────────────────────────────
 // Rich text via contenteditable. Auto-saves every 30 s. Preserves formatting,
 // font choice, font size, text colour, and background colour in the saved HTML.
@@ -1112,6 +1098,7 @@ export function WriteEditor({
   const [wordCount, setWordCount] = useState(0);
   const [editorFocused, setEditorFocused] = useState(false);
   const [imagePick, setImagePick] = useState(null); // { url, savedRange }
+  const [linkPick, setLinkPick] = useState(null); // { initialText, savedRange }
 
   // Typography / colour state (persisted in draft HTML via wrapper div style)
   const [fontFamily,   setFontFamily]   = useState(FONT_FAMILIES[0].value);
@@ -1205,6 +1192,63 @@ export function WriteEditor({
   function handleCommand(cmd) {
     document.execCommand(cmd, false, null);
     editorRef.current?.focus();
+  }
+
+  // ── Open the link modal, remembering the current selection ──────────────
+  function openLinkModal() {
+    const sel = window.getSelection();
+    let savedRange = null;
+    let initialText = "";
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedRange = sel.getRangeAt(0).cloneRange();
+      initialText = sel.toString();
+    }
+    setLinkPick({ initialText, savedRange });
+  }
+
+  // ── Insert a link after URL/text are chosen ──────────────────────────────
+  function insertLink({ url, text, savedRange }) {
+    editorRef.current?.focus();
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+
+    const sel = window.getSelection();
+    if (savedRange) {
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      const range = sel.getRangeAt(0);
+
+      if (!range.collapsed) {
+        // Wrap the existing selection in the link, ignoring any typed
+        // replacement text — the highlighted words become the link text.
+        try {
+          range.surroundContents(a);
+        } catch {
+          // Selection spans partial elements (surroundContents can't handle
+          // that) — fall back to extracting the text and rebuilding it as
+          // a plain link, which always works.
+          const fragment = range.extractContents();
+          a.appendChild(fragment);
+          range.insertNode(a);
+        }
+        range.setStartAfter(a);
+        range.collapse(true);
+      } else {
+        a.textContent = text || url;
+        range.insertNode(a);
+        range.setStartAfter(a);
+        range.collapse(true);
+      }
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      a.textContent = text || url;
+      editorRef.current?.appendChild(a);
+    }
+    handleEditorInput();
   }
 
   // ── Insert image after size is chosen ────────────────────────────────────
@@ -1315,6 +1359,7 @@ export function WriteEditor({
         currentTextColor={textColor}
         currentBgColor={bgColor}
         onImagePicked={payload => setImagePick(payload)}
+        onLinkClick={openLinkModal}
       />
 
       {/* Title */}
@@ -1356,6 +1401,7 @@ export function WriteEditor({
       <FloatingFormatBar
         onCommand={handleCommand}
         onImagePicked={payload => setImagePick(payload)}
+        onLinkClick={openLinkModal}
         visible={editorFocused}
       />
 
@@ -1366,6 +1412,16 @@ export function WriteEditor({
           savedRange={imagePick.savedRange}
           onInsert={insertImage}
           onClose={() => setImagePick(null)}
+        />
+      )}
+
+      {/* Link insert modal */}
+      {linkPick && (
+        <LinkModal
+          initialText={linkPick.initialText}
+          savedRange={linkPick.savedRange}
+          onInsert={insertLink}
+          onClose={() => setLinkPick(null)}
         />
       )}
 
@@ -1382,6 +1438,7 @@ export function WriteEditor({
         [contenteditable] b, [contenteditable] strong { font-weight: 700; }
         [contenteditable] i, [contenteditable] em { font-style: italic; }
         [contenteditable] u { text-decoration: underline; }
+        [contenteditable] a { color: #d4af37; text-decoration: underline; cursor: text; }
       `}</style>
     </div>
   );

@@ -590,18 +590,11 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
   const [submitting, setSubmitting]     = useState(false);
   const [error, setError]               = useState("");
   const [capturedSprintId, setCapturedSprintId] = useState(null);
-  const [dailyThreadId, setDailyThreadId] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
       setCurrentWords(""); setError(""); setSubmitting(false);
       if (sprintId) setCapturedSprintId(sprintId);
-
-      // Fetch the Daily Writing Challenge thread so we can link to it
-      fetch(`${API_URL}/threads/daily`, { credentials: "include" })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => setDailyThreadId(d?.thread?.id ?? null))
-        .catch(() => setDailyThreadId(null));
     }
   }, [isOpen, sprintId]);
 
@@ -627,8 +620,27 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
       if (!res.ok) throw new Error("Checkout failed");
       onSubmit();
       if (!isEarly) {
-        navigate(`/threads/${2}` , { state: { fromSprint: true } });
+        navigate("/drafts");
       }
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleLeave() {
+    const val = parseInt(currentWords, 10);
+    if (!isReadingSprint && (isNaN(val) || val < 0)) { setError("Please enter a valid word count."); return; }
+    if (!effectiveId) { setError("Still loading your session — please wait a moment."); return; }
+    setSubmitting(true); setError("");
+    try {
+      const res = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ currentWordCount: isReadingSprint ? 0 : val }),
+      });
+      if (!res.ok) throw new Error("Checkout failed");
+      onSubmit();
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -660,32 +672,22 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
           </Field>
         )}
 
-        <div className="px-4 py-4 rounded-xl bg-[#fffbf0] border border-[#f0e0bb] space-y-2">
-          <p className="text-sm text-[#2d3748] leading-relaxed">
-            {isReadingSprint
-              ? "Tell the community what you read today — drop it in the Daily Writing Challenge thread."
-              : "Tell the community what you're writing today — drop it in the Daily Writing Challenge thread."}
-          </p>
-          {/* <a
-            href={`/threads/${2}`}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#d4af37] hover:text-[#b8932c] transition-all"
-          >
-            Go to the Daily Writing Challenge
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
-          </a> */}
-        </div>
-
         {error && <p className="text-xs text-red-500">{error}</p>}
 
-        <div className="flex gap-3 pt-1">
-          {isEarly && (
-            <button onClick={onClose} className="px-5 py-3 border border-[#e8e0d0] text-[#6b5c4a] text-sm rounded-xl hover:border-[#b8a898] transition-all bg-[#faf7f2]">Stay</button>
-          )}
+        <div className="space-y-2 pt-1">
           <button onClick={handleSubmit} disabled={submitting || (!isReadingSprint && !currentWords)}
-            className="flex-1 py-3 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:bg-[#3d4f64] transition-all disabled:opacity-40">
-            {submitting ? "Saving…" : "Check out"}
+            className="w-full py-3 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:bg-[#3d4f64] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+            {submitting ? "Saving…" : "Save & go to drafts"}
+          </button>
+          <button onClick={onClose}
+            className="w-full py-2.5 border-2 border-[#d4af37] text-[#9a6f00] bg-[#fffbf0] rounded-xl text-sm font-semibold hover:bg-[#fff8e0] transition-all flex items-center justify-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Continue sprint
+          </button>
+          <button onClick={handleLeave} disabled={submitting}
+            className="w-full py-2.5 border border-[#e8e0d0] text-[#6b5c4a] text-sm rounded-xl hover:border-[#b8a898] transition-all bg-[#faf7f2] disabled:opacity-40">
+            Leave
           </button>
         </div>
       </div>

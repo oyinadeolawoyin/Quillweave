@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import Header from "../profile/header";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -297,6 +296,9 @@ export default function FeedbackHub() {
   const [archiveGenres, setArchiveGenres] = useState([]);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
 
+  const waitingSpotlight = spotlight.filter((s) => s.isLongStay);
+  const freshSpotlight   = spotlight.filter((s) => !s.isLongStay);
+
   const canPost =
     wallet?.freePostAvailable ||
     (wallet?.postingBalance ?? 0) >=
@@ -328,7 +330,7 @@ export default function FeedbackHub() {
 
   async function fetchWallet() {
     try {
-      const res = await fetch(`${API_URL}/feedback/wallet`, { credentials: "include" });
+      const res = await fetch(`${API_URL}/feedback/points/me`, { credentials: "include" });
       if (res.ok) setWallet(await res.json());
     } catch (e) {}
   }
@@ -348,193 +350,233 @@ export default function FeedbackHub() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f3ef]">
-      <Header />
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-7 sm:py-8">
 
-      {/* ── Hero — compact, dark, accountability-style ── */}
-      <div className="bg-[#1a1a2e] border-b border-white/10 relative overflow-hidden">
-        {/* Gold shimmer bar at very top */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent opacity-60" />
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#d4af37] mb-1.5">Feedback Hub</p>
-              <h1 className="font-serif text-white text-2xl sm:text-3xl leading-tight mb-1.5">
-                Feedback Spotlight
-              </h1>
-              <p className="text-white/50 text-sm leading-relaxed max-w-md">
-                Six chapters in the spotlight at a time. Critique one to earn points — and get yours read in return.
-              </p>
-            </div>
-            {user && (
-              <button
-                onClick={() => setShowHowItWorks((v) => !v)}
-                className="text-[11px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0 underline underline-offset-2"
-              >
-                How it works
-              </button>
-            )}
-          </div>
+      {/* ── Page header — fits inside the sidebar/topbar layout, no dark hero ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#b8860b] mb-1.5">Critique Hub</p>
+          <h1 className="font-serif text-[#1a1a2e] text-2xl sm:text-[28px] leading-tight mb-2">
+            Post here, grow here
+          </h1>
+          <p className="text-[#6b5c4a] text-sm leading-relaxed max-w-lg">
+            Share a chapter to learn what's working and what needs another pass — and return the
+            favor for another writer also trying to finish their draft. Everyone here is building
+            something, one chapter at a time.
+          </p>
         </div>
+        {user && (
+          <button
+            onClick={() => setShowHowItWorks((v) => !v)}
+            className="text-[11px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors flex-shrink-0 underline underline-offset-2"
+          >
+            How it works
+          </button>
+        )}
       </div>
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
+      <div className="flex items-center justify-end mb-6">
+        <Link
+          to="/critique/submit"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold bg-[#d4af37] text-[#1a1a2e] hover:bg-[#c9a42d] transition-colors flex-shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Submit your first chapter
+        </Link>
+      </div>
 
-        {/* How it works — collapsible */}
-        {showHowItWorks && (
-          <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[
-              { n: "01", title: "Critique to earn", desc: "Every critique earns you points based on chapter length." },
-              { n: "02", title: "Spend to post", desc: "Use your points to post your chapter into the spotlight." },
-              { n: "03", title: "Receive feedback", desc: "Your chapter collects critiques until it reaches 3." },
-            ].map((s) => (
-              <div key={s.n} className="bg-white border border-[#e8e0d0] rounded-xl p-4">
-                <p className="text-[10px] font-bold text-[#d4af37] tracking-widest mb-2">{s.n}</p>
-                <p className="font-semibold text-[#1a1a2e] text-sm mb-1">{s.title}</p>
-                <p className="text-[12px] text-[#9a8c7a] leading-relaxed">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Wallet strip */}
-        {user && <WalletStrip wallet={wallet} />}
-
-        {/* Guest CTA */}
-        {!user && (
-          <div className="bg-[#1a1a2e] text-white rounded-xl px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 relative overflow-hidden">
-            <div className="absolute inset-0 pointer-events-none opacity-10"
-              style={{ backgroundImage: "radial-gradient(circle, rgba(212,175,55,0.3) 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
-            <div className="relative">
-              <p className="font-serif text-lg mb-1">Ready to get feedback on your writing?</p>
-              <p className="text-sm text-white/50">Sign in to read, critique, and post chapters.</p>
+      {/* How it works — collapsible */}
+      {showHowItWorks && (
+        <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { n: "01", title: "Critique to earn", desc: "Every critique earns you points based on chapter length." },
+            { n: "02", title: "Spend to post", desc: "Use your points to post your chapter into the spotlight." },
+            { n: "03", title: "Receive feedback", desc: "Your chapter collects critiques until it reaches 3." },
+          ].map((s) => (
+            <div key={s.n} className="bg-white border border-[#e8e0d0] rounded-xl p-4">
+              <p className="text-[10px] font-bold text-[#d4af37] tracking-widest mb-2">{s.n}</p>
+              <p className="font-semibold text-[#1a1a2e] text-sm mb-1">{s.title}</p>
+              <p className="text-[12px] text-[#9a8c7a] leading-relaxed">{s.desc}</p>
             </div>
-            <Link
-              to="/signup"
-              className="relative flex-shrink-0 bg-[#d4af37] text-[#1a1a2e] px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#c9a42d] transition-colors"
-            >
-              Get started
-            </Link>
-          </div>
-        )}
-
-        {/* Spotlight header */}
-        <div className="flex items-center justify-between gap-3 mb-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a8c7a]">
-              In the Spotlight
-            </h2>
-            <span className="text-[10px] text-[#b8a898]">{spotlight.length}/6</span>
-          </div>
-          {!loading && spotlightGenres.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {spotlightGenres.map((g) => (
-                <span key={g} className="text-[10px] font-semibold text-[#1a1a2e] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
-                  {g}
-                </span>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
-        <p className="text-[12px] text-[#9a8c7a] mb-5">
-          Chapters in spotlight over 10 days earn critics a <span className="font-semibold text-[#b8860b]">+2 bonus</span>.
-        </p>
+      )}
 
-        {/* Spotlight list */}
-        {loading ? (
-          <div className="space-y-2.5">
-            {Array.from({ length: 6 }).map((_, i) => <RowSkeleton key={i} />)}
+      {/* Wallet strip */}
+      {user && <WalletStrip wallet={wallet} />}
+
+      {/* Guest CTA */}
+      {!user && (
+        <div className="bg-[#1a1a2e] text-white rounded-xl px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 relative overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none opacity-10"
+            style={{ backgroundImage: "radial-gradient(circle, rgba(212,175,55,0.3) 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
+          <div className="relative">
+            <p className="font-serif text-lg mb-1">Ready to grow your writing with others?</p>
+            <p className="text-sm text-white/50">Sign in to read, critique, and share your own chapters.</p>
           </div>
-        ) : spotlight.length === 0 ? (
-          <div className="text-center py-20 bg-white border border-[#e8e0d0] rounded-xl">
-            <p className="font-serif text-[#1a1a2e] text-base mb-1">Nothing here yet</p>
-            <p className="text-sm text-[#9a8c7a]">Be the first to post a chapter for feedback.</p>
+          <Link
+            to="/signup"
+            className="relative flex-shrink-0 bg-[#d4af37] text-[#1a1a2e] px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-[#c9a42d] transition-colors"
+          >
+            Get started
+          </Link>
+        </div>
+      )}
+
+      {/* ── Waiting for critique — chapters in spotlight 10+ days ── */}
+      {!loading && waitingSpotlight.length > 0 && (
+        <div className="mb-10">
+          <div className="bg-[#fffdf0] border border-[#d4af37]/40 rounded-xl px-5 py-4 mb-4 flex items-start gap-3">
+            <div className="w-7 h-7 rounded-lg bg-[#d4af37] flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-3.5 h-3.5 text-[#1a1a2e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-[#1a1a2e] text-sm mb-0.5">These writers have been waiting a little longer</p>
+              <p className="text-[12px] text-[#6b5c4a] leading-relaxed">
+                A few chapters here for 10+ days, still hoping for a read. Critiquing one earns a{" "}
+                <span className="font-semibold text-[#b8860b]">+2 bonus</span> — and might be exactly
+                what someone needs to keep going.
+              </p>
+            </div>
           </div>
-        ) : (
           <div className="space-y-2.5">
-            {spotlight.map((sub) => (
+            {waitingSpotlight.map((sub) => (
               <SpotlightRow key={sub.id} sub={sub} />
             ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Open slot notice */}
-        {!loading && spotlight.length > 0 && spotlight.length < 6 && (
-          <div className="mt-4 flex items-center gap-3 bg-[#fffdf0] border border-[#d4af37]/40 rounded-xl px-4 py-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#d4af37] flex-shrink-0" />
-            <p className="text-[12px] text-[#6b5c4a]">
-              {6 - spotlight.length} spotlight {6 - spotlight.length === 1 ? "slot is" : "slots are"} open.{" "}
-              {user && canPost ? (
-                <Link to="/critique/submit" className="text-[#1a1a2e] font-semibold hover:underline">Submit your chapter</Link>
-              ) : user ? (
-                "Critique a chapter to earn posting points."
-              ) : (
-                <Link to="/signup" className="text-[#1a1a2e] font-semibold hover:underline">Sign in</Link>
-              )}{" "}
-              to fill one.
-            </p>
+      {/* Spotlight header */}
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <div className="flex items-center gap-3">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a8c7a]">
+            {waitingSpotlight.length > 0 ? "Recently Posted" : "In the Spotlight"}
+          </h2>
+          <span className="text-[10px] text-[#b8a898]">{spotlight.length}/6</span>
+        </div>
+        {!loading && spotlightGenres.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {spotlightGenres.map((g) => (
+              <span key={g} className="text-[10px] font-semibold text-[#1a1a2e] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
+                {g}
+              </span>
+            ))}
           </div>
         )}
+      </div>
+      <p className="text-[12px] text-[#9a8c7a] mb-5">
+        Read a chapter, leave honest feedback, help someone else's draft move forward.
+      </p>
 
-        {/* Queue + Archive nav */}
-        <div className="mt-12 pt-8 border-t border-[#e8e0d0] grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Spotlight list */}
+      {loading ? (
+        <div className="space-y-2.5">
+          {Array.from({ length: 6 }).map((_, i) => <RowSkeleton key={i} />)}
+        </div>
+      ) : spotlight.length === 0 ? (
+        <div className="text-center py-20 bg-white border border-[#e8e0d0] rounded-xl">
+          <p className="font-serif text-[#1a1a2e] text-base mb-1">Nothing here yet</p>
+          <p className="text-sm text-[#9a8c7a] mb-4">Be the first to post a chapter — someone will read it.</p>
           <Link
-            to="/critique/queue"
-            className="group flex items-start gap-4 bg-white border border-[#e8e0d0] rounded-xl p-5 hover:border-[#1a1a2e] hover:shadow-[0_4px_16px_rgba(26,26,46,0.07)] transition-all duration-200"
+            to="/critique/submit"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold bg-[#1a1a2e] text-white hover:bg-[#2d3748] transition-colors"
           >
-            <div className="w-8 h-8 rounded-lg bg-[#1a1a2e] flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 10h16M4 14h10" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[#1a1a2e] text-sm mb-1">Queue</p>
-              <p className="text-[12px] text-[#9a8c7a] leading-relaxed mb-2">
-                Chapters waiting for a spotlight slot. Earn base-tier points for critiquing.
-              </p>
-              {queueGenres.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {queueGenres.slice(0, 5).map((g) => (
-                    <span key={g} className="text-[10px] font-semibold text-[#1a1a2e] bg-[#f4f1ec] px-2 py-0.5 rounded-full">{g}</span>
-                  ))}
-                  {queueGenres.length > 5 && <span className="text-[10px] text-[#9a8c7a] px-1">{queueGenres.length - 5} more</span>}
-                </div>
-              )}
-            </div>
-            <svg className="w-4 h-4 text-[#b8a898] flex-shrink-0 mt-0.5 group-hover:text-[#1a1a2e] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-
-          <Link
-            to="/critique/archive"
-            className="group flex items-start gap-4 bg-white border border-[#e8e0d0] rounded-xl p-5 hover:border-[#b8a898] hover:shadow-[0_4px_16px_rgba(26,26,46,0.07)] transition-all duration-200"
-          >
-            <div className="w-8 h-8 rounded-lg bg-[#f4f1ec] flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                  d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[#1a1a2e] text-sm mb-1">Archive</p>
-              <p className="text-[12px] text-[#9a8c7a] leading-relaxed mb-2">
-                Chapters with 3+ critiques. Still open — half points apply.
-              </p>
-              {archiveGenres.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {archiveGenres.slice(0, 5).map((g) => (
-                    <span key={g} className="text-[10px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] px-2 py-0.5 rounded-full">{g}</span>
-                  ))}
-                  {archiveGenres.length > 5 && <span className="text-[10px] text-[#9a8c7a] px-1">{archiveGenres.length - 5} more</span>}
-                </div>
-              )}
-            </div>
-            <svg className="w-4 h-4 text-[#b8a898] flex-shrink-0 mt-0.5 group-hover:text-[#9a8c7a] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            Submit your first chapter
           </Link>
         </div>
+      ) : freshSpotlight.length === 0 ? (
+        <div className="text-center py-12 bg-white border border-[#e8e0d0] rounded-xl">
+          <p className="text-sm text-[#9a8c7a]">No other chapters posted recently — check back soon.</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {freshSpotlight.map((sub) => (
+            <SpotlightRow key={sub.id} sub={sub} />
+          ))}
+        </div>
+      )}
+
+      {/* Open slot notice */}
+      {!loading && spotlight.length > 0 && spotlight.length < 6 && (
+        <div className="mt-4 flex items-center gap-3 bg-[#fffdf0] border border-[#d4af37]/40 rounded-xl px-4 py-3">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#d4af37] flex-shrink-0" />
+          <p className="text-[12px] text-[#6b5c4a]">
+            {6 - spotlight.length} spotlight {6 - spotlight.length === 1 ? "slot is" : "slots are"} open.{" "}
+            {user && canPost ? (
+              <Link to="/critique/submit" className="text-[#1a1a2e] font-semibold hover:underline">Submit your chapter</Link>
+            ) : user ? (
+              "Critique a chapter to earn posting points."
+            ) : (
+              <Link to="/signup" className="text-[#1a1a2e] font-semibold hover:underline">Sign in</Link>
+            )}{" "}
+            to fill one.
+          </p>
+        </div>
+      )}
+
+      {/* Queue + Archive nav */}
+      <div className="mt-12 pt-8 border-t border-[#e8e0d0] grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Link
+          to="/critique/queue"
+          className="group flex items-start gap-4 bg-white border border-[#e8e0d0] rounded-xl p-5 hover:border-[#1a1a2e] hover:shadow-[0_4px_16px_rgba(26,26,46,0.07)] transition-all duration-200"
+        >
+          <div className="w-8 h-8 rounded-lg bg-[#1a1a2e] flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 10h16M4 14h10" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[#1a1a2e] text-sm mb-1">Queue</p>
+            <p className="text-[12px] text-[#9a8c7a] leading-relaxed mb-2">
+              Chapters waiting for a spotlight slot. Earn base-tier points for critiquing.
+            </p>
+            {queueGenres.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {queueGenres.slice(0, 5).map((g) => (
+                  <span key={g} className="text-[10px] font-semibold text-[#1a1a2e] bg-[#f4f1ec] px-2 py-0.5 rounded-full">{g}</span>
+                ))}
+                {queueGenres.length > 5 && <span className="text-[10px] text-[#9a8c7a] px-1">{queueGenres.length - 5} more</span>}
+              </div>
+            )}
+          </div>
+          <svg className="w-4 h-4 text-[#b8a898] flex-shrink-0 mt-0.5 group-hover:text-[#1a1a2e] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+
+        <Link
+          to="/critique/archive"
+          className="group flex items-start gap-4 bg-white border border-[#e8e0d0] rounded-xl p-5 hover:border-[#b8a898] hover:shadow-[0_4px_16px_rgba(26,26,46,0.07)] transition-all duration-200"
+        >
+          <div className="w-8 h-8 rounded-lg bg-[#f4f1ec] flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-[#9a8c7a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[#1a1a2e] text-sm mb-1">Archive</p>
+            <p className="text-[12px] text-[#9a8c7a] leading-relaxed mb-2">
+              Chapters with 3+ critiques. Still open — half points apply.
+            </p>
+            {archiveGenres.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {archiveGenres.slice(0, 5).map((g) => (
+                  <span key={g} className="text-[10px] font-semibold text-[#9a8c7a] bg-[#f4f1ec] px-2 py-0.5 rounded-full">{g}</span>
+                ))}
+                {archiveGenres.length > 5 && <span className="text-[10px] text-[#9a8c7a] px-1">{archiveGenres.length - 5} more</span>}
+              </div>
+            )}
+          </div>
+          <svg className="w-4 h-4 text-[#b8a898] flex-shrink-0 mt-0.5 group-hover:text-[#9a8c7a] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       </div>
     </div>
   );
