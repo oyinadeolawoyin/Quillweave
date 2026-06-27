@@ -656,7 +656,7 @@ export default function Homepage() {
             <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border text-[11px] font-bold uppercase tracking-widest"
               style={{ borderColor: "rgba(212,175,55,0.4)", color: "#d4af37", background: "rgba(212,175,55,0.08)" }}>
               <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
-              Community is writing right now
+              WRITERS HELPING WRITERS FINISH DRAFTS
             </div>
 
             <h1 className="font-serif text-3xl sm:text-5xl font-bold text-white leading-tight mb-4">
@@ -710,7 +710,7 @@ export default function Homepage() {
             <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border text-[11px] font-bold uppercase tracking-widest"
               style={{ borderColor: "rgba(212,175,55,0.4)", color: "#d4af37", background: "rgba(212,175,55,0.08)" }}>
               <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-pulse" />
-              Community is writing right now
+              WRITERS HELPING WRITERS FINISH DRAFTS
             </div>
 
             <h1 className="font-serif text-4xl sm:text-6xl font-bold text-white leading-tight mb-5">
@@ -719,7 +719,7 @@ export default function Homepage() {
             </h1>
 
             <p className="text-[16px] sm:text-lg text-[#c5bfb5] max-w-2xl mx-auto mb-10 leading-relaxed">
-            Track your draft. Take a writing challenge. Get real feedback. Find resources to sharpen your craft and the community support to carry you to the finish line. Every day, writers here show up and make progress — join them.
+            Join other writers who are working through messy middles, abandoned chapters, and unfinished stories. Share your progress, get feedback, improve your craft, and finally bring more of your ideas to the finish line.
             </p>
 
             {/* Primary CTAs */}
