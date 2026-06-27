@@ -96,6 +96,13 @@ export default function DraftPlanWizard({ onCreated, onExit }) {
       onCreated?.(plan);
       navigate("/draftplan");
     } catch (err) {
+      if (err.message?.includes("already have a draft plan")) {
+        // Race condition (double-submit, duplicate tab, retry after a slow
+        // response, etc.) — they already have a plan, so don't dead-end on
+        // an error, just take them to it.
+        navigate("/draftplan", { replace: true });
+        return;
+      }
       setSubmitError(err.message ?? "Something went wrong creating your plan.");
     } finally {
       setSubmitting(false);
