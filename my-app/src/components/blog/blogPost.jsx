@@ -9,12 +9,69 @@ function isHtmlContent(content = "") {
   return /<[a-z][\s\S]*>/i.test(content);
 }
 
+// Rich-text editors are inconsistent about what sits at the very start of
+// saved content: an empty <p><br></p>, an empty <h1><br></h1> left over from
+// a title field merged into the body, an outer wrapper div (e.g. Quill's
+// .ql-editor), an empty <p> with a nested <span>&nbsp;</span>, etc. Any of
+// these breaks `.prose-news > p:first-child::first-letter`, because the CSS
+// selector needs the real first paragraph to be a literal first DOM child —
+// it can't see "first paragraph with actual text" the way a person can; an
+// empty *non-paragraph* element sitting first (e.g. <h1><br></h1>) is just
+// as fatal to the selector as an empty paragraph, since it still becomes
+// :first-child and pushes the real paragraph down to second place.
+//
+// Rather than chase every possible editor-output shape with a regex, parse
+// the saved HTML for real and normalize it:
+//   1. If there's a single wrapping element with no siblings (e.g. an outer
+//      <div class="ql-editor">), unwrap it so its children become top-level.
+//   2. Drop any number of leading elements that are empty of real content
+//      (headings, paragraphs, divs containing only whitespace, &nbsp;, <br>,
+//      or empty inline wrappers).
+const STRIPPABLE_LEADING_TAGS = /^(p|div|h1|h2|h3|h4|h5|h6)$/i;
+
+function normalizePostHtml(html = "") {
+  if (typeof document === "undefined") return html; // SSR safety
+  const container = document.createElement("div");
+  container.innerHTML = html;
+
+  // Unwrap a single outer wrapper repeatedly (handles double-wrapped output).
+  while (
+    container.children.length === 1 &&
+    container.firstElementChild &&
+    /^(div|section|article)$/i.test(container.firstElementChild.tagName) &&
+    container.firstElementChild.children.length > 0
+  ) {
+    const wrapper = container.firstElementChild;
+    while (wrapper.firstChild) container.appendChild(wrapper.firstChild);
+    container.removeChild(wrapper);
+  }
+
+  function isEffectivelyEmpty(el) {
+    const text = (el.textContent || "").replace(/\u00a0/g, "").trim();
+    if (text.length > 0) return false;
+    // An <img>, embed, or similar counts as real content even with no text.
+    return !el.querySelector("img, video, iframe");
+  }
+
+  // Drop leading empty elements so the true first paragraph becomes the
+  // real first child the CSS selector can see.
+  while (
+    container.firstElementChild &&
+    STRIPPABLE_LEADING_TAGS.test(container.firstElementChild.tagName) &&
+    isEffectivelyEmpty(container.firstElementChild)
+  ) {
+    container.removeChild(container.firstElementChild);
+  }
+
+  return container.innerHTML;
+}
+
 function PostContent({ content }) {
   if (isHtmlContent(content)) {
     return (
       <div
         className="prose-news text-[#2d2620] leading-[1.9] text-[1.05rem] sm:text-[1.1rem]"
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: normalizePostHtml(content) }}
       />
     );
   }
@@ -733,7 +790,7 @@ export default function BlogPost() {
 
       <style>{`
         .prose-news p { margin: 0 0 1.4em; }
-        .prose-news p:first-child::first-letter {
+        .prose-news > p:first-child::first-letter {
           float: left;
           font-family: Georgia, 'Times New Roman', serif;
           font-size: 4.2em;

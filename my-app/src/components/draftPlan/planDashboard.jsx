@@ -1177,7 +1177,7 @@ function EditProjectModal({ plan, onClose, onSaved }) {
         </div>
         <div className="px-6 pb-2 overflow-y-auto space-y-3 flex-1">
           <div><FieldLabel>Story title</FieldLabel><TextInput value={form.storyTitle} onChange={(e) => update({ storyTitle: e.target.value })} /></div>
-          <div><FieldLabel>Premise</FieldLabel><TzextArea value={form.premise} onChange={(e) => update({ premise: e.target.value })} rows={3} /></div>
+          <div><FieldLabel>Premise</FieldLabel><TextArea value={form.premise} onChange={(e) => update({ premise: e.target.value })} rows={3} /></div>
           <div><FieldLabel>Daily goal ({unitLabel(plan.goalType, 2)})</FieldLabel><TextInput type="number" min="1" value={form.dailyGoal} onChange={(e) => update({ dailyGoal: e.target.value })} /></div>
           <div>
             <FieldLabel>Writing days</FieldLabel>

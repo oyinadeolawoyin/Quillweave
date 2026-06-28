@@ -93,6 +93,7 @@ function PostForm({ initial, seriesList, onSave, onCancel }) {
     const html = contentRef.current?.innerHTML?.trim() || "";
     const plainText = contentRef.current?.innerText?.trim() || "";
     if (!plainText) { setError("Content is required."); return; }
+    if (!category) { setError("Please choose a category."); return; }
 
     setError(null);
     setSubmitting(true);
@@ -103,7 +104,7 @@ function PostForm({ initial, seriesList, onSave, onCancel }) {
       formData.append("content", html);
       if (link.trim()) formData.append("link", link.trim());
       if (mediaFile) formData.append("media", mediaFile);
-      if (category) formData.append("category", category);
+      formData.append("category", category);
       if (tag) formData.append("tag", tag);
 
       const isEdit = !!initial?.id;
@@ -159,20 +160,23 @@ function PostForm({ initial, seriesList, onSave, onCancel }) {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold mb-1.5" style={{ color: NAVY }}>Section / Category (optional)</label>
+        <label className="block text-sm font-semibold mb-1.5" style={{ color: NAVY }}>
+          Section / Category <span className="text-red-500">*</span>
+        </label>
         <select
           value={category}
           onChange={e => setCategory(e.target.value)}
+          required
           className="w-full border rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all"
           style={{ borderColor: BORDER, "--tw-ring-color": `${GOLD}40` }}
         >
-          <option value="">No category — uncategorised</option>
+          <option value="" disabled>Choose a category…</option>
           {POST_CATEGORIES.map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
         <p className="text-xs mt-1.5" style={{ color: MUTED }}>
-          Readers can browse posts by category on the Community page.
+          Readers browse posts by category on the Community page — every post needs one so it isn't missed there.
         </p>
       </div>
 
