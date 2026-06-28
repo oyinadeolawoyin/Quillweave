@@ -1107,6 +1107,8 @@ function EditProjectModal({ plan, onClose, onSaved }) {
   const [form, setForm] = useState({
     storyTitle:        plan.storyTitle ?? "",
     premise:           plan.premise ?? "",
+    targetLength:      plan.targetLength ?? "",
+    wordsWrittenSoFar: plan.wordsWrittenSoFar ?? "",
     dailyGoal:         plan.dailyGoal ?? "",
     dailyTreat:        plan.dailyTreat ?? "",
     weeklyTreat:       plan.weeklyTreat ?? "",
@@ -1132,6 +1134,12 @@ function EditProjectModal({ plan, onClose, onSaved }) {
   async function save() {
     if (!form.storyTitle.trim())                       { setError("Story title is required."); return; }
     if (!form.premise.trim())                          { setError("Premise is required."); return; }
+    if (!form.targetLength || Number(form.targetLength) < 1) {
+      setError(`Total ${unitLabel(plan.goalType, 2)} goal must be at least 1.`); return;
+    }
+    if (form.wordsWrittenSoFar === "" || Number(form.wordsWrittenSoFar) < 0) {
+      setError(`${unitLabel(plan.goalType, 2)} written so far can't be negative.`); return;
+    }
     if (!form.dailyGoal || Number(form.dailyGoal) < 1) { setError("Daily goal must be at least 1."); return; }
     if (form.writingDays.length === 0)                 { setError("Pick at least one writing day."); return; }
     setSaving(true);
@@ -1140,6 +1148,8 @@ function EditProjectModal({ plan, onClose, onSaved }) {
       const updated = await updateDraftPlan({
         storyTitle:        form.storyTitle.trim(),
         premise:           form.premise.trim(),
+        targetLength:      Number(form.targetLength),
+        wordsWrittenSoFar: Number(form.wordsWrittenSoFar),
         dailyGoal:         Number(form.dailyGoal),
         dailyTreat:        form.dailyTreat.trim(),
         weeklyTreat:       form.weeklyTreat.trim(),
@@ -1178,6 +1188,18 @@ function EditProjectModal({ plan, onClose, onSaved }) {
         <div className="px-6 pb-2 overflow-y-auto space-y-3 flex-1">
           <div><FieldLabel>Story title</FieldLabel><TextInput value={form.storyTitle} onChange={(e) => update({ storyTitle: e.target.value })} /></div>
           <div><FieldLabel>Premise</FieldLabel><TextArea value={form.premise} onChange={(e) => update({ premise: e.target.value })} rows={3} /></div>
+          <div>
+            <FieldLabel>Total {unitLabel(plan.goalType, 2)} goal</FieldLabel>
+            <TextInput type="number" min="1" value={form.targetLength} onChange={(e) => update({ targetLength: e.target.value })} />
+          </div>
+          {/* <div>
+            <FieldLabel
+              hint={`This is your starting point — adjust it if you under- or over-counted. It's separate from logging today's session.`}
+            >
+              {unitLabel(plan.goalType, 2)} written so far (before today's logs)
+            </FieldLabel>
+            <TextInput type="number" min="0" value={form.wordsWrittenSoFar} onChange={(e) => update({ wordsWrittenSoFar: e.target.value })} />
+          </div> */}
           <div><FieldLabel>Daily goal ({unitLabel(plan.goalType, 2)})</FieldLabel><TextInput type="number" min="1" value={form.dailyGoal} onChange={(e) => update({ dailyGoal: e.target.value })} /></div>
           <div>
             <FieldLabel>Writing days</FieldLabel>
