@@ -457,7 +457,10 @@ export default function Homepage() {
                   <Link to={`/profile/${entry.user.id}`} className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block">
                     {entry.user.username}
                   </Link>
-                  <p className="text-[10px] text-[#9a8c7a]">{entry.wordsLogged.toLocaleString()} words</p>
+                  <p className="text-[10px] text-[#9a8c7a]">
+                    {(entry.countLogged ?? 0).toLocaleString()}{" "}
+                    {{ CHAPTERS: "chapters", SCENES: "scenes", WORDS: "words" }[entry.goalType] ?? "words"}
+                  </p>
                 </div>
                 <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#1a7a4c" }}>
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#1a7a4c" }} />
