@@ -208,6 +208,8 @@ function CommunityCard({ post, onNudge }) {
             </div>
             <span className="text-[12px] text-[#6b5c4a] truncate font-medium">Inkwell Team</span>
           </div>
+
+
           <div className="flex items-center gap-2 text-[11px] text-[#9a8c7a]">
             <span>{post._count?.likes ?? 0} ♥</span>
             <span>{post._count?.comments ?? 0} 💬</span>
@@ -798,27 +800,62 @@ export default function Homepage() {
                         ))}
                       </div>
                     </section>
-                  ) : (
-                    groupEntries.map(([category, posts]) => (
-                      <section key={category}>
-                        <SectionLabel>{category}</SectionLabel>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {posts.map(post => (
-                            <CommunityCard key={post.id} post={post} onNudge={showNudge} />
-                          ))}
-                        </div>
-                        <div className="mt-3 text-right">
-                          <button
-                            onClick={() => showNudge("Sign up to read all community updates.", () => navigate("/signup"), "/community-update")}
-                            className="text-[12px] font-semibold hover:underline transition-colors"
-                            style={{ color: "#d4af37" }}
-                          >
-                            Read all updates →
-                          </button>
-                        </div>
-                      </section>
-                    ))
-                  )}
+                  ) : (() => {
+                    // Groups with 2+ pinned posts fill their own 2-col grid
+                    // evenly and get a normal full-width section. Groups
+                    // with exactly one pinned post would otherwise sit
+                    // alone in that same grid with an empty cell beside
+                    // them — instead, pair those singleton groups up two
+                    // at a time so two different categories share a row.
+                    const fullGroups = groupEntries.filter(([, posts]) => posts.length !== 1);
+                    const singleGroups = groupEntries.filter(([, posts]) => posts.length === 1);
+                    const singlePairs = [];
+                    for (let i = 0; i < singleGroups.length; i += 2) {
+                      singlePairs.push(singleGroups.slice(i, i + 2));
+                    }
+
+                    const readAllButton = (
+                      <div className="mt-3 text-right">
+                        <button
+                          onClick={() => showNudge("Sign up to read all community updates.", () => navigate("/signup"), "/community-update")}
+                          className="text-[12px] font-semibold hover:underline transition-colors"
+                          style={{ color: "#d4af37" }}
+                        >
+                          Read all updates →
+                        </button>
+                      </div>
+                    );
+
+                    return (
+                      <>
+                        {fullGroups.map(([category, posts]) => (
+                          <section key={category}>
+                            <SectionLabel>{category}</SectionLabel>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {posts.map(post => (
+                                <CommunityCard key={post.id} post={post} onNudge={showNudge} />
+                              ))}
+                            </div>
+                            {readAllButton}
+                          </section>
+                        ))}
+
+                        {singlePairs.map((pair, i) => (
+                          <section key={`pinned-pair-${i}`}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {pair.map(([category, posts]) => (
+                                <div key={category}>
+                                  <SectionLabel>{category}</SectionLabel>
+                                  <CommunityCard post={posts[0]} onNudge={showNudge} />
+                                </div>
+                              ))}
+                            </div>
+                            {readAllButton}
+                          </section>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </>
               );
             })()}
