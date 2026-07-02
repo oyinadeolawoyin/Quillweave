@@ -1165,6 +1165,7 @@ export function WriteEditor({
           }
           const wc = data.draft.wordCount || 0;
           setWordCount(wc);
+          onWordsUpdate?.(wc);
           onDraftLoaded?.(wc);
         }
       })

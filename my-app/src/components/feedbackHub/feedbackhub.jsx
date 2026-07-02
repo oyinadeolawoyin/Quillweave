@@ -98,7 +98,7 @@ function WalletStrip({ wallet }) {
 
 // ─── CRITIQUE PROGRESS ────────────────────────────────────────────────────────
 
-function CritiqueProgress({ count, max = 3 }) {
+function CritiqueProgress({ count, max = 2 }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex gap-1 flex-1">
@@ -199,7 +199,7 @@ function SpotlightRow({ sub }) {
         {/* Progress + comments */}
         <div className="flex items-center gap-4">
           <div className="w-32">
-            <CritiqueProgress count={responses} max={3} />
+            <CritiqueProgress count={responses} max={2} />
           </div>
           <div className="flex items-center gap-1 text-[#b8a898]">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -393,7 +393,7 @@ export default function FeedbackHub() {
           {[
             { n: "01", title: "Critique to earn", desc: "Every critique earns you points based on chapter length." },
             { n: "02", title: "Spend to post", desc: "Use your points to post your chapter into the spotlight." },
-            { n: "03", title: "Receive feedback", desc: "Your chapter collects critiques until it reaches 3." },
+            { n: "03", title: "Receive feedback", desc: "Your chapter collects critiques until it reaches 2." },
           ].map((s) => (
             <div key={s.n} className="bg-white border border-[#e8e0d0] rounded-xl p-4">
               <p className="text-[10px] font-bold text-[#d4af37] tracking-widest mb-2">{s.n}</p>
@@ -562,7 +562,7 @@ export default function FeedbackHub() {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-[#1a1a2e] text-sm mb-1">Archive</p>
             <p className="text-[12px] text-[#9a8c7a] leading-relaxed mb-2">
-              Chapters with 3+ critiques. Still open — half points apply.
+              Chapters with 2+ critiques. Still open — half points apply.
             </p>
             {archiveGenres.length > 0 && (
               <div className="flex flex-wrap gap-1">

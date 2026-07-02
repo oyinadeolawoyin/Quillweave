@@ -636,13 +636,14 @@ function ComposeModal({ placeholder, onSubmit, onClose }) {
 
 // ─── Reply row ────────────────────────────────────────────────────────────────
 
-function ReplyRow({ reply, user, commentId, threadId, onLikeToggled, onReplyTo, highlightReplyId }) {
+function ReplyRow({ reply, user, commentId, threadId, isAdmin, onLikeToggled, onReplyTo, onDeleted, highlightReplyId }) {
   const [liked, setLiked]       = useState(reply.likedByMe ?? false);
   const [likes, setLikes]       = useState(reply._count?.likes ?? 0);
   const [toggling, setToggling] = useState(false);
   const [highlighted, setHighlighted] = useState(false);
 
   const isTarget = highlightReplyId === reply.id;
+  const canDelete = user && (user.id === reply.authorId || isAdmin);
 
   useEffect(() => {
     if (!isTarget) return;
@@ -665,6 +666,14 @@ function ReplyRow({ reply, user, commentId, threadId, onLikeToggled, onReplyTo, 
         onLikeToggled?.();
       }
     } finally { setToggling(false); }
+  }
+
+  async function deleteReply() {
+    if (!window.confirm("Delete this reply?")) return;
+    await fetch(`${API_URL}/threads/${threadId}/comments/${commentId}/replies/${reply.id}`, {
+      method: "DELETE", credentials: "include",
+    });
+    onDeleted?.(reply.id);
   }
 
   return (
@@ -692,6 +701,18 @@ function ReplyRow({ reply, user, commentId, threadId, onLikeToggled, onReplyTo, 
               )}
               <span className="text-[11px] text-[#c8b89a]">{timeAgo(reply.createdAt)}</span>
             </div>
+            {canDelete && (
+              <button
+                onClick={deleteReply}
+                className="text-[#c8b89a] hover:text-[#c0392b] transition-colors flex-shrink-0 p-1"
+                title="Delete reply"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
           </div>
           <FormattedText content={reply.content} className="text-[14px] text-[#2d2416] leading-relaxed" />
           {(() => {
@@ -937,7 +958,9 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
                 user={user}
                 commentId={comment.id}
                 threadId={threadId}
+                isAdmin={isAdmin}
                 onReplyTo={openReply}
+                onDeleted={(replyId) => setReplies(prev => prev.filter(r => r.id !== replyId))}
                 highlightReplyId={highlightReplyId}
               />
             ))}

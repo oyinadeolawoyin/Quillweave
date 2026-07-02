@@ -586,6 +586,11 @@ export function ReEnterShopModal({ isOpen, onClose, onEnter, groupSprint }) {
 
 export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = false, linkedProject = null, sprintType = "WRITING" }) {
   const navigate = useNavigate();
+  const isReadingSprint = sprintType === "READING";
+
+  // Two-step flow: "count" (word count entry, skipped for reading sprints)
+  // then "progress" (log how the story's coming along) before navigating on.
+  const [step, setStep]                 = useState(isReadingSprint ? "progress" : "count");
   const [currentWords, setCurrentWords] = useState("");
   const [submitting, setSubmitting]     = useState(false);
   const [error, setError]               = useState("");
@@ -593,10 +598,11 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
 
   useEffect(() => {
     if (isOpen) {
+      setStep(isReadingSprint ? "progress" : "count");
       setCurrentWords(""); setError(""); setSubmitting(false);
       if (sprintId) setCapturedSprintId(sprintId);
     }
-  }, [isOpen, sprintId]);
+  }, [isOpen, sprintId, isReadingSprint]);
 
   useEffect(() => {
     if (sprintId && !capturedSprintId) setCapturedSprintId(sprintId);
@@ -605,27 +611,55 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
   if (!isOpen) return null;
 
   const effectiveId = capturedSprintId || sprintId;
-  const isReadingSprint = sprintType === "READING";
 
-  async function handleSubmit() {
+  // Step 1: submit word count, then move to the progress step.
+  async function handleSubmitCount() {
     const val = parseInt(currentWords, 10);
-    if (!isReadingSprint && (isNaN(val) || val < 0)) { setError("Please enter a valid word count."); return; }
+    if (isNaN(val) || val < 0) { setError("Please enter a valid word count."); return; }
     if (!effectiveId) { setError("Still loading your session — please wait a moment."); return; }
     setSubmitting(true); setError("");
     try {
       const res = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ currentWordCount: isReadingSprint ? 0 : val }),
+        body: JSON.stringify({ currentWordCount: val }),
       });
       if (!res.ok) throw new Error("Checkout failed");
-      onSubmit();
-      if (!isEarly) {
-        navigate("/drafts");
-      }
+      setStep("progress");
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // Reading sprints skip word count entirely, so the "progress" step still
+  // needs to fire the checkout call itself the first time it's reached.
+  async function ensureCheckedOut() {
+    if (!effectiveId) { setError("Still loading your session — please wait a moment."); return false; }
+    try {
+      const res = await fetch(`${API_URL}/sprint/${effectiveId}/checkout`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ currentWordCount: 0 }),
+      });
+      if (!res.ok) throw new Error("Checkout failed");
+      return true;
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+      return false;
+    }
+  }
+
+  // Step 2: log progress, then hand off to the parent and navigate.
+  async function handleSubmitProgress() {
+    setSubmitting(true); setError("");
+    if (isReadingSprint) {
+      const ok = await ensureCheckedOut();
+      if (!ok) { setSubmitting(false); return; }
+    }
+    setSubmitting(false);
+    onSubmit();
+    if (!isEarly) {
+      navigate("/draftplan");
     }
   }
 
@@ -649,18 +683,16 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
   }
 
   return (
-    <ModalShell onClose={onClose}
-      title={isEarly ? "Leaving early?" : isReadingSprint ? "Reading complete" : "Sprint complete"}
-      subtitle={isEarly ? "Check out early" : "Check out"}
+    <ModalShell onClose={onClose} step={step === "count" ? 1 : 2} totalSteps={isReadingSprint ? 1 : 2}
+      title={step === "progress" ? "Log your progress" : isEarly ? "Leaving early?" : isReadingSprint ? "Reading complete" : "Sprint complete"}
+      subtitle={step === "progress" ? "How'd it go?" : isEarly ? "Check out early" : "Check out"}
     >
-      <div className="p-6 space-y-5">
-        <p className="text-sm text-[#9a8c7a] leading-relaxed">
-          {isEarly
-            ? isReadingSprint ? "No worries — hope you enjoyed your reading session." : "No worries — enter your current word count before you go."
-            : isReadingSprint ? "Hope it was a great read." : "Every word counts. Enter your final word count."}
-        </p>
+      {step === "count" ? (
+        <div className="p-6 space-y-5">
+          <p className="text-sm text-[#9a8c7a] leading-relaxed">
+            {isEarly ? "No worries — enter your current word count before you go." : "Every word counts. Enter your final word count."}
+          </p>
 
-        {!isReadingSprint && (
           <Field label="Current word count">
             <input type="number" min="0" value={currentWords} onChange={e => setCurrentWords(e.target.value)}
               placeholder="e.g. 1240"
@@ -670,27 +702,49 @@ export function CheckoutModal({ isOpen, onClose, onSubmit, sprintId, isEarly = f
               <p className="text-[11px] text-[#9a8c7a] mt-1.5">Words written will be added to <strong>{linkedProject.title}</strong>.</p>
             )}
           </Field>
-        )}
 
-        {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-red-500">{error}</p>}
 
-        <div className="space-y-2 pt-1">
-          <button onClick={handleSubmit} disabled={submitting || (!isReadingSprint && !currentWords)}
+          <div className="space-y-2 pt-1">
+            <button onClick={handleSubmitCount} disabled={submitting || !currentWords}
+              className="w-full py-3 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:bg-[#3d4f64] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+              {submitting ? "Saving…" : "Continue"}
+            </button>
+            {!isEarly && (
+              <button onClick={onClose}
+                className="w-full py-2.5 border-2 border-[#d4af37] text-[#9a6f00] bg-[#fffbf0] rounded-xl text-sm font-semibold hover:bg-[#fff8e0] transition-all flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Continue sprint
+              </button>
+            )}
+            {isEarly && (
+              <button onClick={handleLeave} disabled={submitting}
+                className="w-full py-2.5 border border-[#e8e0d0] text-[#6b5c4a] text-sm rounded-xl hover:border-[#b8a898] transition-all bg-[#faf7f2] disabled:opacity-40">
+                Leave
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="p-6 space-y-5">
+          <div className="text-center space-y-2">
+            <p className="text-3xl">✍️</p>
+            <p className="text-sm text-[#6b5c4a] leading-relaxed">
+              {isReadingSprint ? "Hope it was a great read! " : "Nice work today! "}
+              Every session moves your story forward.
+            </p>
+          </div>
+
+          {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+
+          <button onClick={handleSubmitProgress} disabled={submitting}
             className="w-full py-3 bg-[#2d3748] text-white text-sm font-semibold rounded-xl hover:bg-[#3d4f64] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-            {submitting ? "Saving…" : "Save & go to drafts"}
-          </button>
-          <button onClick={onClose}
-            className="w-full py-2.5 border-2 border-[#d4af37] text-[#9a6f00] bg-[#fffbf0] rounded-xl text-sm font-semibold hover:bg-[#fff8e0] transition-all flex items-center justify-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Continue sprint
-          </button>
-          <button onClick={handleLeave} disabled={submitting}
-            className="w-full py-2.5 border border-[#e8e0d0] text-[#6b5c4a] text-sm rounded-xl hover:border-[#b8a898] transition-all bg-[#faf7f2] disabled:opacity-40">
-            Leave
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            {submitting ? "Logging…" : "Log progress"}
           </button>
         </div>
-      </div>
+      )}
     </ModalShell>
   );
 }

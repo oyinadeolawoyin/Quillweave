@@ -246,11 +246,15 @@ function SprintSummaryModal({ isOpen, wordsWritten, draftId, onSaveDraft, onClos
           <p className="text-sm text-[#9a8c7a] mt-1">words written this sprint</p>
         </div>
 
+        <p className="text-sm text-[#9a8c7a] leading-relaxed text-center">
+          Nice work today! Every session moves your story forward.
+        </p>
+
         <div className="space-y-2">
           <button onClick={onSaveDraft}
             className="w-full py-3 bg-[#2d3748] text-white rounded-xl text-sm font-semibold hover:bg-[#3d4f64] transition-all flex items-center justify-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-            Save & go to drafts
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            Log progress
           </button>
           <button onClick={onContinueSprint}
             className="w-full py-2.5 border-2 border-[#d4af37] text-[#9a6f00] bg-[#fffbf0] rounded-xl text-sm font-semibold hover:bg-[#fff8e0] transition-all flex items-center justify-center gap-2">
@@ -316,6 +320,16 @@ export default function GroupSprintWorkspace() {
   // Word tracking — currentWordCount is updated live from the WriteEditor
   const [currentWordCount,  setCurrentWordCount]  = useState(0);
   const startWordsRef = useRef(null); // baseline word count when sprint started (set by onDraftLoaded)
+
+  // Captures mySprint.id the moment we first see it, independent of isActive.
+  // fetchLoginUserSprint filters on isActive:true, so as soon as the group
+  // sprint auto-ends (isActive flips false server-side, often before the
+  // user has checked out), mySprint goes null on the next poll — this ref
+  // keeps the id around so checkout can still be submitted.
+  const mySprintIdRef = useRef(null);
+  useEffect(() => {
+    if (mySprint?.id) mySprintIdRef.current = mySprint.id;
+  }, [mySprint]);
 
   // Draft loading — true while the editor is fetching + counting words in the draft.
   // The editor is read-only (overlaid) until this resolves so startWordsRef is set
@@ -545,11 +559,13 @@ export default function GroupSprintWorkspace() {
     setShowSummary(false);
 
     // Call checkout API so the sprint's wordsWritten is saved in the DB.
-    // Only do this if the user is actually in an active sprint and hasn't
-    // already checked out (e.g. they clicked "Save" from the summary modal).
-    if (mySprint?.id && mySprint.isActive) {
+    // Use the captured ref, not mySprint?.id — by the time the sprint
+    // auto-ends, mySprint is often already null (see mySprintIdRef above),
+    // and the old `mySprint.isActive` guard silently skipped this call.
+    const sprintIdToCheckout = mySprintIdRef.current || mySprint?.id;
+    if (sprintIdToCheckout) {
       try {
-        await fetch(`${API_URL}/sprint/${mySprint.id}/checkout`, {
+        await fetch(`${API_URL}/sprint/${sprintIdToCheckout}/checkout`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -560,7 +576,7 @@ export default function GroupSprintWorkspace() {
       }
     }
 
-    navigate(returnTo ? returnTo : "/drafts", returnTo ? { state: { returnReason } } : undefined);
+    navigate(returnTo ? returnTo : "/draftplan", returnTo ? { state: { returnReason } } : undefined);
   }
 
   function handleContinueSprint() {
@@ -746,7 +762,7 @@ export default function GroupSprintWorkspace() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
-                  <button onClick={handleSaveDraft}
+                  <button onClick={() => handleSaveDraft()}
                     className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-[#2d3748] text-white rounded-xl text-xs font-semibold hover:bg-[#3d4f64] transition-all">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                     Go to Drafts
@@ -1051,7 +1067,7 @@ export default function GroupSprintWorkspace() {
         isOpen={showCheckout && !hasCheckedOut}
         onClose={() => setShowCheckout(false)}
         onSubmit={handleCheckedOut}
-        sprintId={mySprint?.id}
+        sprintId={mySprintIdRef.current || mySprint?.id}
         isEarly={false}
         sprintType={groupSprint.sprintType}
       />
@@ -1059,7 +1075,7 @@ export default function GroupSprintWorkspace() {
         isOpen={showEarlyCheckout}
         onClose={() => setShowEarlyCheckout(false)}
         onSubmit={handleCheckedOut}
-        sprintId={mySprint?.id}
+        sprintId={mySprintIdRef.current || mySprint?.id}
         isEarly={true}
         sprintType={groupSprint.sprintType}
       />

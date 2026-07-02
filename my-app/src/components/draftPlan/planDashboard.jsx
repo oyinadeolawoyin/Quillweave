@@ -87,6 +87,25 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
   // this action), not the running total, so the writer can see "wrote 500,
   // then wrote 300 more" rather than a single "800" entry.
   const [localSessions, setLocalSessions] = useState([]);
+  // Character lists in the community "Writers & Their Characters" panel are
+  // hidden by default (blurred) and only shown per-writer once the viewer
+  // taps "Reveal" — some writers consider character names/details spoilers
+  // or just prefer not to have them visible at a glance to every visitor.
+  // Community "Writers & Their Characters" panel — each writer's extra detail
+  // (writing days, sessions, favourite characters) is collapsed by default and
+  // takes up no space until the viewer taps "Show details". Characters in
+  // particular can be story spoilers, so they're fully hidden, not just
+  // blurred, until expanded.
+  const [expandedWriters, setExpandedWriters] = useState(new Set());
+
+  function toggleWriterExpanded(planId) {
+    setExpandedWriters((prev) => {
+      const next = new Set(prev);
+      if (next.has(planId)) next.delete(planId);
+      else next.add(planId);
+      return next;
+    });
+  }
 
   useEffect(() => { setPlan(initialPlan); }, [initialPlan]);
 
@@ -520,39 +539,81 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
             {activeWriters.length > 0 && (
               <Card className="p-6">
                 <p className="font-serif text-[#1a1a2e] text-base font-bold mb-4">Writers &amp; Their Characters</p>
-                <div className="space-y-5">
-                  {activeWriters.slice(0, 8).map((w) => (
-                    <div key={w.planId} className="pb-5 border-b border-[#f0ebe3] last:border-0 last:pb-0">
-                      <div className="flex items-center gap-3 mb-3.5">
-                        <Avatar username={w.username} avatar={w.avatar} size={38} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[15px] font-semibold text-[#1a1a2e] truncate">{w.username}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <LinearProgress percent={w.percentComplete} height={5} />
-                            <span className="text-[11px] text-[#9a8c7a] flex-shrink-0">{w.percentComplete}%</span>
+                <div className="space-y-4">
+                  {activeWriters.slice(0, 8).map((w) => {
+                    const isExpanded = expandedWriters.has(w.planId);
+                    return (
+                      <div key={w.planId} className="pb-4 border-b border-[#f0ebe3] last:border-0 last:pb-0">
+                        <div className="flex items-center gap-3">
+                          <Avatar username={w.username} avatar={w.avatar} size={38} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[15px] font-semibold text-[#1a1a2e] truncate">{w.username}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <LinearProgress percent={w.percentComplete} height={5} />
+                              <span className="text-[11px] text-[#9a8c7a] flex-shrink-0">{w.percentComplete}%</span>
+                            </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleWriterExpanded(w.planId)}
+                            className="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold text-[#b8860b] hover:text-[#9a6f00] transition-colors"
+                          >
+                            {isExpanded ? "Hide" : "Details"}
+                            <svg
+                              width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                              strokeLinecap="round" strokeLinejoin="round"
+                              style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}
+                            >
+                              <path d="M6 9l6 6 6-6" />
+                            </svg>
+                          </button>
                         </div>
-                      </div>
 
-                      {w.characters?.length > 0 && (
-                        <>
-                          <p className="text-[10.5px] font-bold uppercase tracking-wide text-[#c2b8a8] mb-2.5">
-                            Favourite characters
-                          </p>
-                          <div className="space-y-2.5">
-                            {w.characters.slice(0, 3).map((c) => (
-                              <div key={c.id} className="min-w-0">
-                                <p className="text-[13.5px] font-semibold text-[#1a1a2e] leading-tight">{c.name}</p>
-                                {c.description && (
-                                  <p className="text-[12px] text-[#9a8c7a] leading-snug mt-0.5">{c.description}</p>
-                                )}
+                        {isExpanded && (
+                          <div className="mt-3.5 pl-[50px] space-y-3.5">
+                            {/* Writing days */}
+                            <div>
+                              <p className="text-[10.5px] font-bold uppercase tracking-wide text-[#c2b8a8] mb-1.5">
+                                Writing days
+                              </p>
+                              <WriterDayCircles writingDays={w.writingDays} lastLogDate={w.lastLogDate} />
+                            </div>
+
+                            {/* Sessions done / left */}
+                            <div className="flex items-center gap-4">
+                              <div>
+                                <p className="text-[10.5px] font-bold uppercase tracking-wide text-[#c2b8a8]">Sessions done</p>
+                                <p className="text-[13px] font-semibold text-[#1a1a2e]">{w.sessionsDone ?? 0}</p>
                               </div>
-                            ))}
+                              <div>
+                                <p className="text-[10.5px] font-bold uppercase tracking-wide text-[#c2b8a8]">Sessions to go</p>
+                                <p className="text-[13px] font-semibold text-[#1a1a2e]">{w.sessionsLeft ?? "—"}</p>
+                              </div>
+                            </div>
+
+                            {/* Favourite characters */}
+                            {w.characters?.length > 0 && (
+                              <div>
+                                <p className="text-[10.5px] font-bold uppercase tracking-wide text-[#c2b8a8] mb-1.5">
+                                  Favourite characters
+                                </p>
+                                <div className="space-y-2">
+                                  {w.characters.slice(0, 3).map((c) => (
+                                    <div key={c.id} className="min-w-0">
+                                      <p className="text-[13px] font-semibold text-[#1a1a2e] leading-tight">{c.name}</p>
+                                      {c.description && (
+                                        <p className="text-[12px] text-[#9a8c7a] leading-snug mt-0.5">{c.description}</p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
             )}
@@ -1331,6 +1392,56 @@ function Avatar({ username, avatar, size = 28 }) {
       style={{ width: size, height: size, background: "#fdf9ed", fontSize: size * 0.4 }}
     >
       {username?.charAt(0).toUpperCase() ?? "?"}
+    </div>
+  );
+}
+
+// Compact read-only version of the "Writing days" circles used on the
+// viewer's own plan — for another writer we only know which weekdays they
+// picked and whether their most recent log was today, not the live
+// in-progress state of today's goal, so this stays simpler (no pulse/partial
+// states, just picked vs. not, with today ringed and checked if they've
+// already logged something today).
+function WriterDayCircles({ writingDays, lastLogDate }) {
+  const pickedSet     = new Set((writingDays ?? []).map((d) => d.day));
+  const todayKey      = JS_TO_KEY[new Date().getDay()];
+  const todayDateStr  = new Date().toLocaleDateString("en-CA");
+  const loggedToday   = lastLogDate && new Date(lastLogDate).toISOString().slice(0, 10) === todayDateStr;
+
+  return (
+    <div className="flex gap-1">
+      {WEEKDAY_ORDER.map((day) => {
+        const isPicked = pickedSet.has(day);
+        const isToday  = day === todayKey;
+        const isDone   = isToday && isPicked && loggedToday;
+
+        let bg     = "#f0ebe3";
+        let border = "2px solid transparent";
+        if (isPicked && isToday) {
+          bg     = isDone ? "#d4af37" : "#fff";
+          border = "2px solid #d4af37";
+        } else if (isPicked) {
+          bg = "#d4af37";
+        }
+
+        return (
+          <div key={day} className="flex-1 flex flex-col items-center gap-0.5">
+            <span className="text-[8px] font-bold" style={{ color: isPicked ? "#b8860b" : "#c2b8a8" }}>
+              {WEEKDAY_LABEL[day]}
+            </span>
+            <div
+              className="w-full aspect-square rounded-full flex items-center justify-center"
+              style={{ background: bg, border, maxWidth: 20 }}
+            >
+              {(isPicked && (isDone || !isToday)) && (
+                <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" strokeWidth="3" strokeLinecap="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

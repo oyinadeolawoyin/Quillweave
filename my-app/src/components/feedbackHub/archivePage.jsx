@@ -141,7 +141,7 @@ function ArchivedRow({ sub }) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 w-32">
             <div className="flex gap-1 flex-1">
-              {Array.from({ length: 3 }).map((_, i) => (
+              {Array.from({ length: 2 }).map((_, i) => (
                 <div key={i} className="flex-1 h-1 rounded-full bg-[#b8a898]" />
               ))}
             </div>
@@ -253,7 +253,7 @@ export default function ArchivePage() {
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#b8860b] mb-1.5">Critique Archive</p>
           <h1 className="font-serif text-[#1a1a2e] text-2xl sm:text-[28px] leading-tight mb-1.5">Archive</h1>
           <p className="text-[#6b5c4a] text-sm leading-relaxed max-w-md">
-            Chapters that received 3 or more critiques. Still open for comments — half the points apply.
+            Chapters that received 2 or more critiques. Still open for comments — half the points apply.
           </p>
         </div>
         {total > 0 && (
@@ -282,7 +282,7 @@ export default function ArchivePage() {
       ) : submissions.length === 0 ? (
         <div className="text-center py-20 bg-white border border-[#e8e0d0] rounded-xl">
           <p className="font-serif text-[#1a1a2e] text-base mb-1">The archive is empty</p>
-          <p className="text-sm text-[#9a8c7a]">Chapters appear here once they reach 3 critiques.</p>
+          <p className="text-sm text-[#9a8c7a]">Chapters appear here once they reach 2 critiques.</p>
         </div>
       ) : (
         <>

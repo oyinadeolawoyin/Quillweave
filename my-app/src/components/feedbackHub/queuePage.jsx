@@ -45,7 +45,7 @@ function RowSkeleton() {
 
 // ─── CRITIQUE PROGRESS ────────────────────────────────────────────────────────
 
-function CritiqueProgress({ count, max = 3 }) {
+function CritiqueProgress({ count, max = 2 }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex gap-1 flex-1">
@@ -177,7 +177,7 @@ function QueueRow({ sub, position }) {
         {critiqueCount > 0 ? (
           <div className="flex items-center gap-4">
             <div className="w-32">
-              <CritiqueProgress count={critiqueCount} max={3} />
+              <CritiqueProgress count={critiqueCount} max={2} />
             </div>
             <div className="flex items-center gap-1 text-[#b8a898]">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
