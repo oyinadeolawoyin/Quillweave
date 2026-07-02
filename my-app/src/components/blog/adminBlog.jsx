@@ -62,7 +62,8 @@ function PostForm({ initial, seriesList, onSave, onCancel }) {
     "Stories from Writers",
     "Writing Tips",
     "Finished Drafts",
-    "Opinion",
+    "Behind the Drafts",
+    "Opinion Columns",
     "Community Update & News",
   ];
 

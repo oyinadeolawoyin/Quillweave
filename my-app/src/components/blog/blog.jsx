@@ -31,8 +31,13 @@ const CATEGORIES = [
     tag: "Members who crossed the finish line",
   },
   {
-    label: "Opinion",
-    name: "Opinion",
+    label: "Behind the Drafts",
+    name: "Behind the Drafts",
+    tag: "Conversations with writers about their creative process, routines, and stories.",
+  },
+  {
+    label: "Opinion Columns",
+    name: "Opinion Columns",
     tag: "Takes and perspectives from the community",
   },
   {
