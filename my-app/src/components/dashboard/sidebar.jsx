@@ -75,6 +75,23 @@ const CommunityIcon = (p) => (
   </svg>
 );
 
+const EventIcon = (p) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+
+const TrophyIcon = (p) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M8 21h8" /><path d="M12 17v4" />
+    <path d="M7 4h10v6a5 5 0 01-10 0z" />
+    <path d="M17 5h3a2 2 0 01-2 4h-1" /><path d="M7 5H4a2 2 0 002 4h1" />
+  </svg>
+);
+
 const MembersIcon = (p) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
@@ -159,8 +176,14 @@ const PRIMARY_NAV = [
 const COMMUNITY_NAV = [
   { to: "/sprint-room",  label: "Sprint Room",    Icon: SprintIcon },
   { to: "/critique",     label: "Critique Now",   Icon: CritiqueIcon },
+  { to: "/events",       label: "Events",         Icon: EventIcon },
   { to: "/forum",        label: "Forum",          Icon: CommunityIcon },
   { to: "/members",      label: "Members",        Icon: MembersIcon },
+];
+
+const EVENT_NAV = [
+  { to: "/mini-challenges", label: "Weekly Challenge", Icon: TrophyIcon },
+  { to: "/events",            label: "Events",         Icon: EventIcon },
 ];
 
 const INBOX_NAV = [
@@ -341,6 +364,7 @@ export function Sidebar({ mobileNavOpen = false, onCloseMobileNav = () => {} }) 
         <NavSection title={null}        items={dashboardNav}  isActive={isActive} counts={counts} collapsed={collapsed} />
         <NavSection title="My Writing"  items={PRIMARY_NAV}   isActive={isActive} counts={counts} collapsed={collapsed} />
         <NavSection title="Community"   items={COMMUNITY_NAV} isActive={isActive} counts={counts} collapsed={collapsed} />
+        <NavSection title="Event"       items={EVENT_NAV} isActive={isActive} counts={counts} collapsed={collapsed} />
         <NavSection title="Inbox"       items={INBOX_NAV}     isActive={isActive} counts={counts} collapsed={collapsed} />
         <NavSection title="Account"     items={accountNav}    isActive={isActive} counts={counts} collapsed={collapsed} />
       </nav>

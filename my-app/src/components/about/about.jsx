@@ -1,23 +1,9 @@
-// src/components/about/about.jsx
-//
-// Public-facing homepage — designed to attract new users and showcase community activity.
-// White & gold theme (#ffffff, #d4af37, #1a1a2e) matching the rest of the site.
-// Routes are React Router links; API calls hit the existing endpoints.
-//
-// LAYOUT NOTE: the body is a fixed two-column layout (main feed + a
-// persistent right sidebar) rather than a stack of sections that each
-// individually decide whether to exist. With a small/young community,
-// letting every section vanish when empty made the page collapse into
-// something visibly sparse. The sidebar widgets (newcomers, logged-today,
-// top critiquers) now always render in the same shape — capped at 5 rows
-// with a "See all" link when there's more, and a single friendly
-// empty-state line when there's none — so a quiet day and a busy day look
-// like the same site, just with different content inside the same frame.
-
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "@/config/api";
 import { useAuth } from "../auth/authContext";
+import { EventPromoBanner } from "../event/eventpromobanner";
+import { MiniChallengeBanner } from "../minichallenge/minichallengebanner";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -760,7 +746,8 @@ export default function Homepage() {
           </div>
         </header>
       )}
-
+       <EventPromoBanner />
+       <MiniChallengeBanner onNudge={showNudge} />
       {/* ══════════════════════════════════════════════════════════════════════
           BODY — fixed two-column layout below ~1024px breakpoint reflows to
           a single column with the sidebar widgets after the main feed.

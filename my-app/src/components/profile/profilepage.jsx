@@ -91,6 +91,14 @@ const ReplyIcon = (p) => (
   </svg>
 );
 
+const TrophyIcon = (p) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M8 21h8" /><path d="M12 17v4" />
+    <path d="M7 4h10v6a5 5 0 01-10 0z" />
+    <path d="M17 5h3a2 2 0 01-2 4h-1" /><path d="M7 5H4a2 2 0 002 4h1" />
+  </svg>
+);
+
 // ── Tier config (mirrors pointService.js) ──────────────────────────────────────
 
 const TIER_CONFIG = {
@@ -401,6 +409,146 @@ function DaysChallengeCard({ daysChallenge, isOwner }) {
           Open challenge →
         </Link>
       )}
+    </Card>
+  );
+}
+
+// ── Badges card (public — claimed badges visible to everyone; owner sees
+//    unclaimed ones too, with a "claim" button) ───────────────────────────────
+
+const SOURCE_LABEL = { EVENT: "Event", MINI_CHALLENGE: "Weekly Challenge", MILESTONE: "Milestone" };
+
+function BadgeTile({ badge, isOwner, onClaim, claiming }) {
+  const unclaimed = isOwner && !badge.claimedAt;
+  return (
+    <div
+      className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${unclaimed ? "bg-[#fdf9ed]" : "bg-[#fafaf7]"}`}
+      style={{ borderColor: unclaimed ? "#e8d988" : "#e8e0d0" }}
+    >
+      <div className="relative flex-shrink-0">
+        <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl bg-white border" style={{ borderColor: unclaimed ? "#e8d988" : "#e8e0d0" }}>
+          {badge.icon}
+        </div>
+        {unclaimed && (
+          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full animate-pulse" style={{ background: "#d4af37" }} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-semibold truncate" style={{ color: "#1a1a2e" }}>{badge.name}</p>
+        <p className="text-[11px] text-[#9a8c7a]">
+          {SOURCE_LABEL[badge.sourceType] ?? badge.sourceType}
+          {badge.claimedAt ? ` · ${formatDate(badge.earnedAt)}` : ""}
+        </p>
+      </div>
+      {unclaimed && (
+        <button
+          onClick={() => onClaim(badge.id)}
+          disabled={claiming}
+          className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white hover:opacity-90 transition-all disabled:opacity-60"
+          style={{ background: "linear-gradient(135deg,#d4af37,#f0d060)", color: "#1a1a2e" }}
+        >
+          {claiming ? "…" : "Claim"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function BadgesCard({ userId, isOwner }) {
+  const [loading, setLoading] = useState(true);
+  const [publicBadges, setPublicBadges] = useState([]); // visitor view
+  const [myBadges, setMyBadges] = useState(null);        // owner view: { unclaimed, claimed }
+  const [claimingId, setClaimingId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        if (isOwner) {
+          const res = await fetch(`${API_URL}/mini-challenges/badges/my`, { credentials: "include" });
+          if (res.ok && !cancelled) setMyBadges(await res.json());
+        } else {
+          const res = await fetch(`${API_URL}/mini-challenges/badges/user/${userId}`);
+          if (res.ok && !cancelled) setPublicBadges((await res.json()).badges || []);
+        }
+      } catch {
+        // fail quietly — badges are a nice-to-have, not critical page content
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [userId, isOwner]);
+
+  async function handleClaim(badgeId) {
+    setClaimingId(badgeId);
+    try {
+      const res = await fetch(`${API_URL}/mini-challenges/badges/${badgeId}/claim`, { method: "POST", credentials: "include" });
+      if (res.ok) {
+        setMyBadges((prev) => {
+          if (!prev) return prev;
+          const badge = prev.unclaimed.find((b) => b.id === badgeId);
+          if (!badge) return prev;
+          return {
+            unclaimed: prev.unclaimed.filter((b) => b.id !== badgeId),
+            claimed: [{ ...badge, claimedAt: new Date().toISOString() }, ...prev.claimed],
+          };
+        });
+      }
+    } catch {
+      // no-op — button just stays clickable again
+    } finally {
+      setClaimingId(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <SectionHeader icon={TrophyIcon} title="Badges" />
+        <div className="space-y-2">
+          {[1, 2].map((i) => <div key={i} className="h-14 rounded-xl bg-[#f0ebe3] animate-pulse" />)}
+        </div>
+      </Card>
+    );
+  }
+
+  const allBadges = isOwner ? [...(myBadges?.unclaimed ?? []), ...(myBadges?.claimed ?? [])] : publicBadges;
+  const unclaimedCount = isOwner ? (myBadges?.unclaimed?.length ?? 0) : 0;
+
+  if (allBadges.length === 0) {
+    if (!isOwner) return null; // don't clutter a visitor's view of an empty trophy case
+    return (
+      <Card className="text-center">
+        <TrophyIcon className="mx-auto mb-2 text-[#d4d0ca]" style={{ width: 28, height: 28 }} />
+        <p className="text-[13px] font-medium text-[#2d3748] mb-1">No badges yet</p>
+        <p className="text-[12px] text-[#9a8c7a]">
+          Finish an event or clear a weekly challenge — badges show up here automatically, no signing up required.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[#b8860b]"><TrophyIcon /></span>
+          <h2 className="font-serif text-base font-semibold text-[#1a1a2e]">Badges</h2>
+        </div>
+        {unclaimedCount > 0 && (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: "#d4af37" }}>
+            {unclaimedCount} to claim
+          </span>
+        )}
+      </div>
+      <div className="space-y-2">
+        {allBadges.map((badge) => (
+          <BadgeTile key={badge.id} badge={badge} isOwner={isOwner} onClaim={handleClaim} claiming={claimingId === badge.id} />
+        ))}
+      </div>
     </Card>
   );
 }
@@ -777,6 +925,9 @@ export default function ProfilePage() {
 
         {/* ── RIGHT column ──────────────────────────────────────────────────── */}
         <div className="space-y-5">
+
+          {/* ── Badges — trophy case, visible to everyone; claim button owner-only ── */}
+          <BadgesCard userId={userId} isOwner={isOwner} />
 
           {/* ── Draft plan — visible to everyone ──────────────────────────── */}
           <DraftPlanCard draftPlan={draftPlan} isOwner={isOwner} />

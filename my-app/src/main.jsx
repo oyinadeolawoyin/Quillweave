@@ -56,6 +56,12 @@ import AdminThreadsPage from './components/threads/adminthreadspage';
 import InboxPage from './components/message/inboxpage';
 import ConversationPage from './components/message/conversationpage';
 
+import EventsPage from './components/event/eventspage';
+import AdminEvents from './components/event/adminevents';
+
+import MiniChallengePage from './components/minichallenge/minichallengepage';
+import AdminMiniChallenges from './components/minichallenge/adminminichallenges';
+
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js");
 }
@@ -216,6 +222,22 @@ const router = createBrowserRouter([
       {
         path: "days-challenge",
         element: <DaysChallengePage />
+      },
+      {
+        path: "/admin/events",
+        element: <AdminEvents />
+      },
+      {
+        path: "/events",
+        element: <EventsPage />
+      },
+      {
+        path: "/mini-challenges",
+        element: <MiniChallengePage />
+      },
+      {
+        path: "/admin/mini-challenges",
+        element: <AdminMiniChallenges />
       },
       {
         path: "messages",

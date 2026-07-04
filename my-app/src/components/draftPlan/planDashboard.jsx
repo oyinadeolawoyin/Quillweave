@@ -14,6 +14,7 @@ import {
 } from "./draftPlanApi";
 import LogProgressModal from "./logProgressModal";
 import API_URL from "../../config/api";
+import { EventJoinBanner } from "../event/eventjoinbanner";
 
 const WEEKDAY_ORDER   = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const WEEKDAY_LABEL   = { MON: "M", TUE: "T", WED: "W", THU: "T", FRI: "F", SAT: "S", SUN: "S" };
@@ -246,6 +247,8 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
         </div>
       </div>
 
+      <EventJoinBanner />
+      
       {/* ── Tabs ───────────────────────────────────────────────────── */}
       <div className="flex gap-0 mb-6 border-b border-[#e8e0d0]">
         {[
