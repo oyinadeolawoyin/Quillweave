@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import API_URL from "@/config/api";
 import { useAuth } from "../auth/authContext";
 import { renderMarkdownLite } from "./markdownlite";
+import { AppMetaTags } from "../utilis/metatags";
 
 const NAVY = "#1a1a2e";
 const GOLD = "#d4af37";
@@ -245,6 +246,10 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: CREAM }}>
+      <AppMetaTags
+        title="Events"
+        description="Ongoing and upcoming community events on Quillweave — join in, track who's participating, and see what finishing earns you."
+      />
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
         <div className="mb-8">
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-1" style={{ color: GOLD }}>Community</p>

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { fetchConversations } from "./directmessageapi";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ── Tiny helpers ─────────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ export default function InboxPage() {
 
   return (
     <div className="max-w-[680px] mx-auto px-4 sm:px-6 pt-7 pb-16">
+      <AppMetaTags title="Inbox" description="Your private messages on Quillweave." />
       {/* Header */}
       <div className="mb-6">
         <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#b8860b] mb-1">Private messages</p>

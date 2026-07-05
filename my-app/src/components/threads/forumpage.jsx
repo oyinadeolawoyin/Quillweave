@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,10 @@ export default function ForumPage() {
 
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1200px] mx-auto">
+      <AppMetaTags
+        title="Community Forum"
+        description="Talk with other writers on Quillweave, share your work, and keep each other writing."
+      />
 
       {/* Page title */}
       <div className="flex items-center justify-between mb-6">

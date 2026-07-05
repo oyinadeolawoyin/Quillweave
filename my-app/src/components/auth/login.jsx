@@ -173,7 +173,7 @@ export default function Login() {
         {/* Signup Link */}
         <div className="mt-4 sm:mt-6 text-center">
           <p className="text-xs sm:text-sm text-ink-gray">
-            New to Inkwell?{" "}
+            New to Quillweave?{" "}
             <Link 
               to="/signup" 
               className="text-ink-primary font-medium hover:text-ink-gold transition-colors"

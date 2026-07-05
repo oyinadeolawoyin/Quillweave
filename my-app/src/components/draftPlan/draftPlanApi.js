@@ -81,6 +81,18 @@ export async function fetchWritersWhoLoggedToday() {
   return data?.writers ?? data ?? [];
 }
 
+// GET /draftplan/scheduled-today
+// Authenticated — returns [] if the current user doesn't have today as a
+// writing day themselves (enforced server-side, not just hidden here).
+// Includes peers who've already logged today (hasLoggedToday) alongside
+// those still getting ready.
+export async function fetchWritersScheduledToday() {
+  const res = await fetch(`${API_URL}/draftplan/scheduled-today`, { credentials: "include" });
+  const data = await parseJsonSafe(res);
+  if (!res.ok) throw new Error(data?.message ?? "Couldn't load today's scheduled writers.");
+  return data?.writers ?? data ?? [];
+}
+
 // POST /draftplan/upload-image
 // Uses the same multer/supabase pipeline as thread media uploads.
 // Returns the public URL string.

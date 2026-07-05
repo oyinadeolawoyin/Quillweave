@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -401,12 +402,16 @@ export default function MembersPage() {
 
   return (
     <main className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-[1400px] mx-auto">
+      <AppMetaTags
+        title="Members"
+        description="Meet the Quillweave community — critiquers, sprinters, and draft writers."
+      />
 
       {/* ── Page title + search ── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-1">
-            Inkwell Community
+            Quillweave Community
           </p>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#1a1a2e] leading-tight">
             Members

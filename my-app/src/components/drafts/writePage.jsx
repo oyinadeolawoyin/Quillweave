@@ -266,10 +266,10 @@ export default function WritePage() {
       <StartGroupSprintModal
         isOpen={sprintOpen}
         onClose={() => setSprintOpen(false)}
-        onCreated={(groupSprint, isInkwell) => {
+        onCreated={(groupSprint, isQuillweave) => {
           setSprintOpen(false);
           navigate(`/group-sprint/${groupSprint.id}`, {
-            state: { writingMode: isInkwell ? "inkwell" : "external", draftId: activeDraftId }
+            state: { writingMode: isQuillweave ? "quillweave" : "external", draftId: activeDraftId }
           });
         }}
         prefillDraftId={activeDraftId}

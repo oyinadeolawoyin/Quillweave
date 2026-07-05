@@ -306,7 +306,7 @@ export default function Community() {
   return (
     <div className="min-h-screen" style={{ background: "#f5f3ef" }}>
       <AppMetaTags
-        title="Community – Inkwell"
+        title="Community – Quillweave"
         description="Stories from writers, writing tips, finished drafts, opinion pieces, and community news from Quillweave."
       />
 

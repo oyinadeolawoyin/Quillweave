@@ -126,8 +126,8 @@ export default function BlogSeries() {
   return (
     <div className="min-h-screen bg-[#f5f3ef]">
       <AppMetaTags
-        title={`${series.title} – Inkwell Community`}
-        description={series.description || `A story series from the Inkwell community: ${series.title}`}
+        title={`${series.title} – Quillweave Community`}
+        description={series.description || `A story series from the Quillweave community: ${series.title}`}
       />
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}

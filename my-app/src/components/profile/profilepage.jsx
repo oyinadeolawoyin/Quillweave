@@ -9,6 +9,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import { openConversation } from "../message/directmessageapi";
+import { AppMetaTags } from "../utilis/metatags";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -678,6 +679,10 @@ export default function ProfilePage() {
 
   return (
     <main className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1100px] mx-auto">
+      <AppMetaTags
+        title={`${user.username}'s Profile`}
+        description={`See ${user.username}'s writing progress, critiques, and activity on Quillweave.`}
+      />
 
       {/* ── Hero / avatar card ─────────────────────────────────────────────── */}
       <Card className="mb-6">

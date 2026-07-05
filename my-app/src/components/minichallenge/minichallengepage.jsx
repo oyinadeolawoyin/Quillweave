@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API_URL from "@/config/api";
 import { useAuth } from "../auth/authContext";
+import { AppMetaTags } from "../utilis/metatags";
 
 const NAVY = "#1a1a2e";
 const GOLD = "#d4af37";
@@ -202,6 +203,10 @@ export default function MiniChallengePage() {
 
   return (
     <div className="min-h-screen" style={{ background: CREAM }}>
+      <AppMetaTags
+        title="Weekly Challenge"
+        description="Every week brings a new writing challenge on Quillweave — keep writing and we'll track your progress automatically."
+      />
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
         <div className="mb-8">
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-1" style={{ color: GOLD }}>Community</p>

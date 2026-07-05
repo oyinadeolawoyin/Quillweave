@@ -1,15 +1,55 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e2d4a"/>
+      <stop offset="55%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#0f1a2e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f0d060"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+  </defs>
+
   <!-- Background — full bleed for maskable safe zone -->
-  <rect width="512" height="512" fill="#2d3748"/>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
 
-  <!-- Pen nib: upper diamond -->
-  <polygon points="256,108 348,218 256,255 164,218" fill="#d4af37"/>
+  <!-- Woven strands beneath the quill — two ribbons crossing under/over -->
+  <g fill="none" stroke-linecap="round">
+    <!-- strand A -->
+    <path d="M 118 330 Q 200 280 256 330 Q 312 380 394 330"
+          stroke="#b8962a" stroke-width="16" opacity="0.9"/>
+    <!-- strand B, drawn on top so it "weaves" over strand A in the middle -->
+    <path d="M 118 300 Q 200 350 256 300 Q 312 250 394 300"
+          stroke="url(#gold)" stroke-width="16"/>
+    <!-- strand A resumes on top at the outer crossings -->
+    <path d="M 118 330 Q 150 315 176 306" stroke="#b8962a" stroke-width="16" opacity="0.9"/>
+    <path d="M 336 306 Q 362 315 394 330" stroke="#b8962a" stroke-width="16" opacity="0.9"/>
+  </g>
 
-  <!-- Pen nib: lower point -->
-  <polygon points="164,218 256,404 348,218" fill="#b8962a"/>
-
-  <!-- Nib center slit -->
-  <line x1="256" y1="255" x2="256" y2="404"
-        stroke="#2d3748" stroke-width="12"
-        stroke-linecap="round" opacity="0.55"/>
+  <!-- Quill feather, angled, rising from the weave -->
+  <g transform="rotate(-28 256 246)">
+    <!-- feather body -->
+    <path d="M 256 96
+             C 300 130 316 190 300 250
+             C 292 282 272 306 256 322
+             C 240 306 220 282 212 250
+             C 196 190 212 130 256 96 Z"
+          fill="url(#gold)"/>
+    <!-- shaft / spine -->
+    <line x1="256" y1="112" x2="256" y2="316" stroke="#8a6f1e" stroke-width="5" opacity="0.6"/>
+    <!-- barb lines, alternating sides -->
+    <g stroke="#8a6f1e" stroke-width="4" stroke-linecap="round" opacity="0.55">
+      <line x1="256" y1="148" x2="224" y2="168"/>
+      <line x1="256" y1="148" x2="288" y2="168"/>
+      <line x1="256" y1="182" x2="218" y2="204"/>
+      <line x1="256" y1="182" x2="294" y2="204"/>
+      <line x1="256" y1="216" x2="222" y2="238"/>
+      <line x1="256" y1="216" x2="290" y2="238"/>
+      <line x1="256" y1="250" x2="230" y2="270"/>
+      <line x1="256" y1="250" x2="282" y2="270"/>
+    </g>
+    <!-- nib point -->
+    <path d="M 244 316 L 256 360 L 268 316 Z" fill="#b8962a"/>
+  </g>
 </svg>

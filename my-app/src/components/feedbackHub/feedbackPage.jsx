@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -1231,6 +1232,10 @@ export default function FeedbackPage() {
 
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+      <AppMetaTags
+        title={submission?.title || "Critique"}
+        description="Give and receive feedback on Quillweave."
+      />
 
       <Link to="/critique" className="inline-flex items-center gap-1.5 text-sm text-[#9a8c7a] hover:text-[#2d3748] transition-colors mb-8">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

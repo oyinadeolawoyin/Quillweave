@@ -4,6 +4,7 @@ import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import { CheckoutModal, JoinGroupSprintModal } from "./groupSprintModal";
 import { Room, Track } from "livekit-client";
+import { AppMetaTags } from "../utilis/metatags";
 import {
   ThesaurusDrawer,
   WriteEditor,
@@ -303,7 +304,7 @@ export default function GroupSprintWorkspace() {
   const hasCheckedOut = mySprint && !mySprint.isActive;
 
   // UI mode
-  const [writeMode,       setWriteMode]       = useState(routeWritingMode === "inkwell");
+  const [writeMode,       setWriteMode]       = useState(routeWritingMode === "quillweave");
   const [activeDraftId,   setActiveDraftId]   = useState(routeDraftId);
   const [focusMode,       setFocusMode]       = useState(false);
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
@@ -505,7 +506,7 @@ export default function GroupSprintWorkspace() {
 
           const wordsNow = currentWordCount;
           // Use the baseline from the loaded draft (startWordsRef) when in
-          // Inkwell mode. Fall back to the startWords stored on mySprint (set
+          // Quillweave mode. Fall back to the startWords stored on mySprint (set
           // at join time) if the editor hasn't loaded a draft yet, and
           // finally fall back to 0 so we never go negative.
           const startWords = startWordsRef.current ?? mySprint?.startWords ?? 0;
@@ -633,6 +634,10 @@ export default function GroupSprintWorkspace() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#f5f0e8" }}>
+      <AppMetaTags
+        title="Group Sprint"
+        description="Write together in a live group sprint on Quillweave."
+      />
 
       {/* ── TOP BAR ──────────────────────────────────────────────────────────── */}
       <div
@@ -842,19 +847,19 @@ export default function GroupSprintWorkspace() {
                   <p className="text-sm text-[#9a8a70]">
                     {routeWritingMode === "external"
                       ? "Writing in your own doc? Use the thesaurus if you need it."
-                      : "Ready to write? Jump into the Inkwell editor."}
+                      : "Ready to write? Jump into the Quillweave editor."}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Inkwell — always available to joined members */}
+                  {/* Quillweave — always available to joined members */}
                   <button onClick={() => setWriteMode(true)}
                     className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#d4af37] bg-[#fffbf0] hover:bg-[#fff8e0] hover:shadow-md transition-all text-left group">
                     <div className="w-10 h-10 rounded-xl bg-[#2d3748] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                       <svg className="w-5 h-5 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[#2d3748]">Write with Inkwell</p>
+                      <p className="text-sm font-semibold text-[#2d3748]">Write with Quillweave</p>
                       <p className="text-xs text-[#9a8a70] mt-0.5">Editor here — auto-saves to drafts</p>
                     </div>
                   </button>
@@ -898,7 +903,7 @@ export default function GroupSprintWorkspace() {
                   </h2>
                   <p className="text-sm text-[#9a8a70]">
                     Jump in and write alongside {activeWriters} writer{activeWriters !== 1 ? "s" : ""},
-                    or browse — the thesaurus and Inkwell are always open.
+                    or browse — the thesaurus and Quillweave are always open.
                   </p>
                 </div>
 
@@ -921,14 +926,14 @@ export default function GroupSprintWorkspace() {
                     </svg>
                   </button>
 
-                  {/* Inkwell — available without joining */}
+                  {/* Quillweave — available without joining */}
                   <button onClick={() => setWriteMode(true)}
                     className="flex items-center gap-3 p-4 rounded-2xl border-2 border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] hover:shadow-md transition-all text-left group">
                     <div className="w-8 h-8 rounded-xl bg-[#2d3748] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                       <svg className="w-4 h-4 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-[#2d3748]">Inkwell</p>
+                      <p className="text-xs font-semibold text-[#2d3748]">Quillweave</p>
                       <p className="text-[11px] text-[#9a8a70] mt-0.5">Write freely</p>
                     </div>
                   </button>
@@ -958,12 +963,12 @@ export default function GroupSprintWorkspace() {
                 {groupSprint.totalWordsWritten > 0 && <p className="text-sm text-[#7a6a50]">words written together</p>}
                 {hasCheckedOut && <p className="text-sm text-emerald-600 font-medium mt-2">✓ You checked out — great session!</p>}
 
-                {/* Thesaurus & Inkwell still available after sprint ends */}
+                {/* Thesaurus & Quillweave still available after sprint ends */}
                 <div className="mt-6 grid grid-cols-2 gap-3 max-w-xs mx-auto">
                   <button onClick={() => setWriteMode(true)}
                     className="flex items-center justify-center gap-2 p-3 rounded-xl border border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] transition-all text-xs font-medium text-[#5a4a30] group">
                     <svg className="w-3.5 h-3.5 text-[#9a8a70] group-hover:text-[#d4af37] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    Inkwell
+                    Quillweave
                   </button>
                   <button onClick={() => setThesaurusOpen(true)}
                     className="flex items-center justify-center gap-2 p-3 rounded-xl border border-[#e8dcc8] bg-[#faf7f2] hover:border-[#c9b090] transition-all text-xs font-medium text-[#5a4a30] group">

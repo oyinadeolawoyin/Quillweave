@@ -1,6 +1,6 @@
 // src/components/sprint/GroupSprintModal.jsx
 // Simplified sprint modal — personal form first, group form second.
-// Writing mode (Inkwell editor) vs external doc is chosen via two clear buttons.
+// Writing mode (Quillweave editor) vs external doc is chosen via two clear buttons.
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -160,7 +160,7 @@ function SoundscapePicker({ soundscapeId, onChange, soundscapes, loading }) {
 export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   const [step, setStep]                     = useState(1);
   // Personal fields (step 1)
-  const [writingMode, setWritingMode]       = useState("inkwell"); // "inkwell" | "external"
+  const [writingMode, setWritingMode]       = useState("quillweave"); // "quillweave" | "external"
   const [sprintType, setSprintType]         = useState("WRITING");
   const [checkin, setCheckin]               = useState("");
   const [startWordCount, setStartWordCount] = useState("");
@@ -188,7 +188,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
   function handleClose() {
     setStep(1); setDuration(25); setSoundscapeId(null); setSprintType("WRITING");
     setCheckin(""); setStartWordCount(""); setError(null); setGroupSprint(null);
-    setVisibility("PUBLIC"); setWritingMode("inkwell");
+    setVisibility("PUBLIC"); setWritingMode("quillweave");
     onClose();
   }
 
@@ -242,7 +242,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
         setError(body.message || "Couldn't start the sprint. Please try again.");
         setIsLoading(false); return;
       }
-      onCreated(gs, writingMode === "inkwell" && sprintType === "WRITING");
+      onCreated(gs, writingMode === "quillweave" && sprintType === "WRITING");
       handleClose();
     } catch {
       setError("Couldn't reach the server. Please check your connection.");
@@ -287,7 +287,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
             <Field label="Where are you writing?">
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { value: "inkwell", label: "Inkwell editor", desc: "Write here, auto-saves to drafts" },
+                  { value: "quillweave", label: "Quillweave editor", desc: "Write here, auto-saves to drafts" },
                   { value: "external", label: "My own doc", desc: "Google Docs, Scrivener, etc." },
                 ].map(m => (
                   <button key={m.value} type="button" onClick={() => setWritingMode(m.value)}
@@ -351,7 +351,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
               <p className="text-xs text-[#9a8c7a] uppercase tracking-wider font-semibold">Your setup</p>
               <p className="text-sm font-semibold text-[#2d3748]">
                 {sprintType === "WRITING"
-                  ? `Writing · ${writingMode === "inkwell" ? "Inkwell editor" : "External doc"}`
+                  ? `Writing · ${writingMode === "quillweave" ? "Quillweave editor" : "External doc"}`
                   : "Reading sprint"}
               </p>
             </div>
@@ -415,7 +415,7 @@ export function StartGroupSprintModal({ isOpen, onClose, onCreated }) {
 
 export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
   const navigate = useNavigate();
-  const [writingMode, setWritingMode]               = useState("inkwell");
+  const [writingMode, setWritingMode]               = useState("quillweave");
   const [checkin, setCheckin]                       = useState("");
   const [startWordCount, setStartWordCount]         = useState("");
   const [soundscapeId, setSoundscapeId]             = useState(null);
@@ -440,7 +440,7 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
 
   function handleClose() {
     setCheckin(""); setStartWordCount(""); setSoundscapeId(null);
-    setError(null); setWritingMode("inkwell");
+    setError(null); setWritingMode("quillweave");
     onClose();
   }
 
@@ -506,7 +506,7 @@ export function JoinGroupSprintModal({ onClose, preselectedSprint }) {
           <Field label="Where are you writing?">
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: "inkwell", label: "Inkwell editor", desc: "Write here, auto-saves" },
+                { value: "quillweave", label: "Quillweave editor", desc: "Write here, auto-saves" },
                 { value: "external", label: "My own doc", desc: "Google Docs, Scrivener…" },
               ].map(m => (
                 <button key={m.value} type="button" onClick={() => setWritingMode(m.value)}

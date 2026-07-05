@@ -235,7 +235,7 @@ export default function SignupGateModal({
           {referralOption === "other" && (
             <div>
               <label htmlFor="gate-referralSource-other" className="block text-xs sm:text-sm font-medium text-ink-primary mb-1">
-                Please tell us where you heard about Inkwell
+                Please tell us where you heard about Quillweave
               </label>
               <input
                 type="text"

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(dateStr) {
@@ -1091,6 +1092,10 @@ export default function ThreadPage() {
 
   return (
     <div className="bg-[#f5f3ef] min-h-screen">
+      <AppMetaTags
+        title={thread.title || "Thread"}
+        description="Join the discussion on Quillweave's community forum."
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
 
         {/* Breadcrumb */}

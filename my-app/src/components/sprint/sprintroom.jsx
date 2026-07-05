@@ -16,6 +16,7 @@ import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import { StartGroupSprintModal, JoinGroupSprintModal } from "./groupSprintModal";
 import ContributeSoundscape from "./Contributesoundscape";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── Small helpers ──────────────────────────────────────────────────────────
 
@@ -374,7 +375,7 @@ function FridayReminderCard({ user }) {
       <div className="flex-1 min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#b8932c] mb-1.5">Standing sprint</p>
         <p className="font-serif text-lg text-[#1a1a2e] leading-snug mb-1">
-          Inkwell sprints every Friday, 4pm UTC
+          Quillweave sprints every Friday, 4pm UTC
         </p>
         <p className="text-sm text-[#6b5c4a]">
           That's <span className="font-semibold text-[#2d3748]">{localDayLabel(target)} at {localTimeLabel(target)}</span> your time —
@@ -440,7 +441,7 @@ export default function SprintRoom() {
   }
 
   function handleCreated(groupSprint, openEditor) {
-    navigate(`/group-sprint/${groupSprint.id}`, { state: { writingMode: openEditor ? "inkwell" : null } });
+    navigate(`/group-sprint/${groupSprint.id}`, { state: { writingMode: openEditor ? "quillweave" : null } });
   }
 
   const nextSprint = nextFridayFourPM();
@@ -448,6 +449,10 @@ export default function SprintRoom() {
 
   return (
     <main className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
+      <AppMetaTags
+        title="The Sprint Room"
+        description="Sprint solo or with friends — set the clock, show up, write."
+      />
 
       {/* ── Hero: the clock ── */}
       <section className="rounded-3xl bg-[#1a1a2e] px-6 sm:px-10 py-10 sm:py-14 mb-6 relative overflow-hidden">

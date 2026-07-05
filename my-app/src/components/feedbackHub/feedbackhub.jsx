@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -351,6 +352,10 @@ export default function FeedbackHub() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-7 sm:py-8">
+      <AppMetaTags
+        title="Critique Hub"
+        description="Share a chapter for feedback and critique others' work on Quillweave — everyone here is building something, one chapter at a time."
+      />
 
       {/* ── Page header — fits inside the sidebar/topbar layout, no dark hero ── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-2">

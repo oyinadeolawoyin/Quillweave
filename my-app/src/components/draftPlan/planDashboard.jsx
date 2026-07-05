@@ -9,12 +9,13 @@ import {
 } from "./draftPlanUI";
 import { unitLabel } from "./draftPlanConstants";
 import {
-  fetchActiveDraftWriters, fetchWritersWhoLoggedToday,
+  fetchActiveDraftWriters, fetchWritersWhoLoggedToday, fetchWritersScheduledToday,
   updateDraftPlan, deleteDraftPlan, uploadMoodboardImage,
 } from "./draftPlanApi";
 import LogProgressModal from "./logProgressModal";
 import API_URL from "../../config/api";
 import { EventJoinBanner } from "../event/eventjoinbanner";
+import { AppMetaTags } from "../utilis/metatags";
 
 const WEEKDAY_ORDER   = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const WEEKDAY_LABEL   = { MON: "M", TUE: "T", WED: "W", THU: "T", FRI: "F", SAT: "S", SUN: "S" };
@@ -77,6 +78,12 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [tadaResult, setTadaResult]       = useState(null);
   const [loggedToday, setLoggedToday]     = useState([]);
+  // Writers who share today as a writing day but haven't necessarily logged
+  // yet — only ever populated when the current user's own plan also has
+  // today picked, so this stays a same-day-peers view. Each entry carries
+  // hasLoggedToday so the peer still shows up (marked done) after logging,
+  // instead of disappearing from the list.
+  const [scheduledToday, setScheduledToday] = useState([]);
   const [activeWriters, setActiveWriters] = useState([]);
   const [communityError, setCommunityError] = useState(false);
   // localSessions holds every individual add/remove action the writer does
@@ -98,6 +105,12 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
   // particular can be story spoilers, so they're fully hidden, not just
   // blurred, until expanded.
   const [expandedWriters, setExpandedWriters] = useState(new Set());
+  // Pagination for the "Writers & Their Characters" panel — the community
+  // list can be longer than one screenful, so we page through it
+  // WRITERS_PER_PAGE at a time instead of hard-cutting at 8 with no way to
+  // see the rest.
+  const [writersPage, setWritersPage] = useState(0);
+  const WRITERS_PER_PAGE = 8;
 
   function toggleWriterExpanded(planId) {
     setExpandedWriters((prev) => {
@@ -112,11 +125,16 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
 
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([fetchWritersWhoLoggedToday(), fetchActiveDraftWriters()])
-      .then(([loggedRes, activeRes]) => {
+    Promise.allSettled([
+      fetchWritersWhoLoggedToday(),
+      fetchActiveDraftWriters(),
+      fetchWritersScheduledToday(),
+    ])
+      .then(([loggedRes, activeRes, scheduledRes]) => {
         if (cancelled) return;
         if (loggedRes.status === "fulfilled") setLoggedToday(loggedRes.value);
-        if (activeRes.status === "fulfilled") setActiveWriters(activeRes.value);
+        if (activeRes.status === "fulfilled") { setActiveWriters(activeRes.value); setWritersPage(0); }
+        if (scheduledRes.status === "fulfilled") setScheduledToday(scheduledRes.value);
         if (loggedRes.status === "rejected" && activeRes.status === "rejected") setCommunityError(true);
       });
     return () => { cancelled = true; };
@@ -221,6 +239,10 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-16">
+      <AppMetaTags
+        title={plan.storyTitle ? `Draft Plan · ${plan.storyTitle}` : "My Draft Plan"}
+        description="Track your progress toward finishing your draft."
+      />
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
@@ -273,6 +295,7 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
 
       {/* ── Plan Tab ───────────────────────────────────────────────── */}
       {activeTab === "plan" && (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
 
           {/* LEFT COLUMN */}
@@ -512,9 +535,9 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
           {/* RIGHT COLUMN — Writer's Room */}
           <div className="space-y-5">
             <Card className="p-6">
-              <p className="font-serif text-[#1a1a2e] text-lg font-bold mb-4">Writer's Room</p>
+              <p className="font-serif text-[#1a1a2e] text-lg font-bold mb-4">In the Zone Today</p>
 
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#9a8c7a] mb-3">Logged progress today</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#9a8c7a] mb-3">Writers who logged today's progress</p>
               <div className="space-y-3 mb-6">
                 {loggedToday.length === 0 && !communityError && (
                   <p className="text-[12px] text-[#c2b8a8] italic">No one has logged yet today — be the first.</p>
@@ -534,6 +557,45 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
                 ))}
               </div>
 
+              {/* Same-day writing peers — only ever populated when the viewer's
+                  own plan has today picked too, so this section only appears
+                  for people it's actually relevant to. Each peer is marked
+                  logged (green check) or still getting ready (grey check),
+                  rather than dropping off the list once they've logged. */}
+              {scheduledToday.length > 0 && (
+                <>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#9a8c7a] mb-3">Writing with you today</p>
+                  <div className="space-y-3">
+                    {scheduledToday.map((w) => (
+                      <div key={w.userId} className="flex items-center gap-3">
+                        <Avatar username={w.username} avatar={w.avatar} size={34} />
+                        <span className="text-[13px] font-semibold text-[#1a1a2e] flex-1 truncate">{w.username}</span>
+                        <span
+                          className="flex items-center gap-1.5 text-[11px] font-semibold flex-shrink-0"
+                          style={{ color: w.hasLoggedToday ? "#2f9e44" : "#9a8c7a" }}
+                        >
+                          <span
+                            className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ background: w.hasLoggedToday ? "#2f9e44" : "#e8e0d0" }}
+                          >
+                            {w.hasLoggedToday ? (
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round">
+                                <path d="M20 6L9 17l-5-5" />
+                              </svg>
+                            ) : (
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#9a8c7a" strokeWidth="4" strokeLinecap="round">
+                                <path d="M20 6L9 17l-5-5" />
+                              </svg>
+                            )}
+                          </span>
+                          {w.hasLoggedToday ? "Logged progress today" : "Getting ready"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {communityError && loggedToday.length === 0 && activeWriters.length === 0 && (
                 <p className="text-[12px] text-[#c2b8a8] italic">Couldn't load community activity right now.</p>
               )}
@@ -543,7 +605,7 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
               <Card className="p-6">
                 <p className="font-serif text-[#1a1a2e] text-base font-bold mb-4">Writers &amp; Their Characters</p>
                 <div className="space-y-4">
-                  {activeWriters.slice(0, 8).map((w) => {
+                  {activeWriters.slice(writersPage * WRITERS_PER_PAGE, writersPage * WRITERS_PER_PAGE + WRITERS_PER_PAGE).map((w) => {
                     const isExpanded = expandedWriters.has(w.planId);
                     return (
                       <div key={w.planId} className="pb-4 border-b border-[#f0ebe3] last:border-0 last:pb-0">
@@ -618,11 +680,43 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
                     );
                   })}
                 </div>
+
+                {activeWriters.length > WRITERS_PER_PAGE && (
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-[#f0ebe3]">
+                    <button
+                      type="button"
+                      onClick={() => setWritersPage((p) => Math.max(p - 1, 0))}
+                      disabled={writersPage === 0}
+                      className="text-[11px] font-semibold text-[#b8860b] hover:text-[#9a6f00] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="text-[11px] text-[#9a8c7a]">
+                      Page {writersPage + 1} of {Math.ceil(activeWriters.length / WRITERS_PER_PAGE)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setWritersPage((p) =>
+                          Math.min(p + 1, Math.ceil(activeWriters.length / WRITERS_PER_PAGE) - 1)
+                        )
+                      }
+                      disabled={writersPage >= Math.ceil(activeWriters.length / WRITERS_PER_PAGE) - 1}
+                      className="text-[11px] font-semibold text-[#b8860b] hover:text-[#9a6f00] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
               </Card>
             )}
-            <RelatedArticles tags={["drafting", "successful-stories"]} />
           </div>
         </div>
+
+        <div className="mt-8">
+          <RelatedArticles tags={["drafting", "successful-stories"]} />
+        </div>
+        </>
       )}
 
       {/* ── Draft Journey Tab ──────────────────────────────────────── */}
@@ -1330,6 +1424,14 @@ function DeleteConfirmModal({ storyTitle, onClose, onConfirm }) {
 
 // ── Related Articles ────────────────────────────────────────────────────────
 
+// Post content is stored as rich-text HTML with no separate excerpt field,
+// so we strip tags and trim it down to a short plain-text teaser.
+function excerptFromContent(html, maxLen = 90) {
+  if (!html) return "";
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text.length > maxLen ? `${text.slice(0, maxLen).trimEnd()}…` : text;
+}
+
 function RelatedArticles({ tags }) {
   const [articles, setArticles] = useState([]);
 
@@ -1356,21 +1458,48 @@ function RelatedArticles({ tags }) {
   if (articles.length === 0) return null;
 
   return (
-    <Card>
-      <p className="font-serif text-[#1a1a2e] text-base font-bold mb-3">Read While You Draft</p>
-      <div className="space-y-3">
-        {articles.map((a) => (
-          <a key={a.id} href={`/blog/${a.id}`} className="block group">
-            <p className="text-[13px] font-semibold text-[#1a1a2e] group-hover:text-[#b8860b] transition-colors leading-snug line-clamp-2">
-              {a.title || "Untitled"}
-            </p>
-            <p className="text-[11px] text-[#9a8c7a] mt-0.5 capitalize">
-              {a.tag?.replace(/-/g, " ")}
-            </p>
-          </a>
-        ))}
+    <div>
+      <p className="font-serif text-[#1a1a2e] text-lg font-bold mb-4">Read While You Draft</p>
+      <div className="flex flex-wrap gap-4">
+        {articles.map((a) => {
+          const description = excerptFromContent(a.content);
+          return (
+            <a
+              key={a.id}
+              href={`/blog/${a.id}`}
+              className="group block w-full sm:w-[240px] bg-white border border-[#e8e0d0] rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+            >
+              <div className="aspect-[16/10] w-full bg-[#f0ebe3] overflow-hidden">
+                {a.mediaUrl ? (
+                  <img
+                    src={a.mediaUrl}
+                    alt={a.title || "Untitled"}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="font-serif text-[#c2b8a8] text-2xl">Aa</span>
+                  </div>
+                )}
+              </div>
+              <div className="p-3.5">
+                {a.tag && (
+                  <p className="text-[10px] font-semibold text-[#b8860b] uppercase tracking-wide mb-1">
+                    {a.tag.replace(/-/g, " ")}
+                  </p>
+                )}
+                <p className="text-[13px] font-semibold text-[#1a1a2e] group-hover:text-[#b8860b] transition-colors leading-snug line-clamp-2 mb-1">
+                  {a.title || "Untitled"}
+                </p>
+                {description && (
+                  <p className="text-[12px] text-[#9a8c7a] leading-snug line-clamp-2">{description}</p>
+                )}
+              </div>
+            </a>
+          );
+        })}
       </div>
-    </Card>
+    </div>
   );
 }
 

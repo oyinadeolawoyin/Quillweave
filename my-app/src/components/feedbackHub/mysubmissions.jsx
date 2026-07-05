@@ -9,6 +9,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -595,6 +596,7 @@ export default function MySubmissions() {
 
   return (
     <main className="px-4 sm:px-8 py-6 sm:py-8 max-w-[860px] mx-auto">
+      <AppMetaTags title="My Submissions" description="Your critique submissions on Quillweave." />
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 mb-1">

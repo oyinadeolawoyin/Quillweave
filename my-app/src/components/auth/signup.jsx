@@ -101,7 +101,7 @@ export default function Signup() {
           {/* Header */}
           <div className="text-center mb-6 sm:mb-8">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif mb-2 sm:mb-3">
-              Welcome to Inkwell
+              Welcome to Quillweave
             </h1>
             <p className="text-ink-gray text-base sm:text-lg">
               A home for writers with more ideas than finished drafts.
@@ -254,7 +254,7 @@ export default function Signup() {
                 htmlFor="referralSource"
                 className="block text-xs sm:text-sm font-medium text-ink-primary mb-1 sm:mb-2"
               >
-                Please tell us where you heard about Inkwell
+                Please tell us where you heard about Quillweave
               </label>
               <input
                 type="text"

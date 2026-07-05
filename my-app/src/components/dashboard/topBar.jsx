@@ -35,10 +35,15 @@ export function TopBar({ mobileNavOpen, onToggleMobileNav }) {
           {mobileNavOpen ? <CloseIcon /> : <HamburgerIcon />}
         </button>
 
-        <Link to="/" className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37]" aria-hidden="true" />
+        <Link to="/" className="flex items-center gap-2">
+          <svg width="26" height="26" viewBox="0 0 512 512" aria-hidden="true" className="flex-shrink-0">
+            <g transform="rotate(-28 256 246)">
+              <path d="M 256 96 C 300 130 316 190 300 250 C 292 282 272 306 256 322 C 240 306 220 282 212 250 C 196 190 212 130 256 96 Z" fill="#d4af37" />
+              <path d="M 244 316 L 256 360 L 268 316 Z" fill="#b8860b" />
+            </g>
+          </svg>
           <span className="text-[22px] font-serif font-semibold tracking-wide text-[#2d3748]">
-            Ink<span className="text-[#b8860b]">well</span>
+            Quill<span className="text-[#b8860b]">weave</span>
           </span>
         </Link>
       </div>

@@ -15,6 +15,7 @@ import {
 import LogChallengeProgressModal from "./logchallengeprogressmodal.jsx";
 import EditChallengeModal from "./editchallengemodal";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // Orange ring — this feature's accent color, distinct from the gold used
 // by the Draft Plan, so the two trackers stay visually distinguishable.
@@ -166,6 +167,10 @@ export default function DaysChallengeDashboard({ initialChallenge, initialStats,
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-16">
+      <AppMetaTags
+        title={challenge.storyTitle ? `${totalDays}-Day Challenge · ${challenge.storyTitle}` : `${totalDays}-Day Challenge`}
+        description="Track your daily progress on your writing challenge."
+      />
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="mb-5">
@@ -424,8 +429,11 @@ export default function DaysChallengeDashboard({ initialChallenge, initialStats,
               )}
             </div>
           </Card>
-          <RelatedArticles tags={["editing", "outlining", "brainstorming", "story-development"]} />
         </div>
+      </div>
+
+      <div className="mt-6">
+        <RelatedArticles tags={["editing", "outlining", "brainstorming", "story-development"]} />
       </div>
 
       {showLogModal && (
@@ -461,6 +469,14 @@ export default function DaysChallengeDashboard({ initialChallenge, initialStats,
 
 // ── Related Articles ────────────────────────────────────────────────────────
 
+// Post content is stored as rich-text HTML with no separate excerpt field,
+// so we strip tags and trim it down to a short plain-text teaser.
+function excerptFromContent(html, maxLen = 90) {
+  if (!html) return "";
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text.length > maxLen ? `${text.slice(0, maxLen).trimEnd()}…` : text;
+}
+
 function RelatedArticles({ tags }) {
   const [articles, setArticles] = useState([]);
 
@@ -487,21 +503,48 @@ function RelatedArticles({ tags }) {
   if (articles.length === 0) return null;
 
   return (
-    <Card>
-      <p className="font-serif text-[#1a1a2e] text-base font-bold mb-3">Read While You Work</p>
-      <div className="space-y-3">
-        {articles.map((a) => (
-          <a key={a.id} href={`/blog/${a.id}`} className="block group">
-            <p className="text-[13px] font-semibold text-[#1a1a2e] group-hover:text-[#b8860b] transition-colors leading-snug line-clamp-2">
-              {a.title || "Untitled"}
-            </p>
-            <p className="text-[11px] text-[#9a8c7a] mt-0.5 capitalize">
-              {a.tag?.replace(/-/g, " ")}
-            </p>
-          </a>
-        ))}
+    <div>
+      <p className="font-serif text-[#1a1a2e] text-lg font-bold mb-4">Read While You Work</p>
+      <div className="flex flex-wrap gap-4">
+        {articles.map((a) => {
+          const description = excerptFromContent(a.content);
+          return (
+            <a
+              key={a.id}
+              href={`/blog/${a.id}`}
+              className="group block w-full sm:w-[240px] bg-white border border-[#e8e0d0] rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+            >
+              <div className="aspect-[16/10] w-full bg-[#f0ebe3] overflow-hidden">
+                {a.mediaUrl ? (
+                  <img
+                    src={a.mediaUrl}
+                    alt={a.title || "Untitled"}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="font-serif text-[#c2b8a8] text-2xl">Aa</span>
+                  </div>
+                )}
+              </div>
+              <div className="p-3.5">
+                {a.tag && (
+                  <p className="text-[10px] font-semibold text-[#b8860b] uppercase tracking-wide mb-1">
+                    {a.tag.replace(/-/g, " ")}
+                  </p>
+                )}
+                <p className="text-[13px] font-semibold text-[#1a1a2e] group-hover:text-[#b8860b] transition-colors leading-snug line-clamp-2 mb-1">
+                  {a.title || "Untitled"}
+                </p>
+                {description && (
+                  <p className="text-[12px] text-[#9a8c7a] leading-snug line-clamp-2">{description}</p>
+                )}
+              </div>
+            </a>
+          );
+        })}
       </div>
-    </Card>
+    </div>
   );
 }
 

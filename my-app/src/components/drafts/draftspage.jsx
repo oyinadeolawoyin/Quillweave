@@ -9,6 +9,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import { StartGroupSprintModal } from "../sprint/groupSprintModal";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -810,17 +811,18 @@ export default function DraftsPage() {
     }
   }
 
-  function handleSprintCreated(groupSprint, isInkwell) {
+  function handleSprintCreated(groupSprint, isQuillweave) {
     const draftId = sprintDraft?.id || null;
     setSprintDraft(null);
     navigate(`/group-sprint/${groupSprint.id}`, {
-      state: { writingMode: isInkwell ? "inkwell" : "external", draftId }
+      state: { writingMode: isQuillweave ? "quillweave" : "external", draftId }
     });
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen" style={{ background: "#f5f0e8" }}>
+      <AppMetaTags title="My Drafts" description="Your drafts on Quillweave — pick up where you left off." />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
 
         {/* Page header */}
@@ -940,7 +942,7 @@ export default function DraftsPage() {
       )}
 
       {/* Continue in sprint → opens the full StartGroupSprintModal
-          The modal passes writingMode="inkwell" and the draftId to the workspace via route state */}
+          The modal passes writingMode="quillweave" and the draftId to the workspace via route state */}
       <StartGroupSprintModal
         isOpen={!!sprintDraft}
         onClose={() => setSprintDraft(null)}

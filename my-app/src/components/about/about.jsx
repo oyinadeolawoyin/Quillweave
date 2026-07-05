@@ -4,6 +4,7 @@ import API_URL from "@/config/api";
 import { useAuth } from "../auth/authContext";
 import { EventPromoBanner } from "../event/eventpromobanner";
 import { MiniChallengeBanner } from "../minichallenge/minichallengebanner";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -192,7 +193,7 @@ function CommunityCard({ post, onNudge }) {
             >
               A
             </div>
-            <span className="text-[12px] text-[#6b5c4a] truncate font-medium">Inkwell Team</span>
+            <span className="text-[12px] text-[#6b5c4a] truncate font-medium">Quillweave Team</span>
           </div>
 
 
@@ -614,6 +615,7 @@ export default function Homepage() {
 
   return (
     <div className="min-h-screen" style={{ background: "#faf8f4" }}>
+      <AppMetaTags />
 
       {/* ── NUDGE MODAL ─────────────────────────────────────────────────────── */}
       {nudge && (
@@ -1026,7 +1028,7 @@ export default function Homepage() {
 
       {/* ── FOOTER ────────────────────────────────────────────────────────── */}
       <footer className="border-t border-[#e8e0d0] mt-8 py-8 px-5 text-center">
-        <p className="font-serif text-[#1a1a2e] text-sm mb-1">Inkwell</p>
+        <p className="font-serif text-[#1a1a2e] text-sm mb-1">Quillweave</p>
         <p className="text-[12px] text-[#9a8c7a]">A home for writers with more ideas than finished drafts.</p>
       </footer>
     </div>

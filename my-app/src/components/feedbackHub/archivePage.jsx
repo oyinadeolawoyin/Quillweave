@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -237,6 +238,10 @@ export default function ArchivePage() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-7 sm:py-8">
+      <AppMetaTags
+        title="Critique Archive"
+        description="Chapters that received two or more critiques on Quillweave — still open for comments."
+      />
 
       {/* ── Page header — fits inside the sidebar/topbar layout, no dark hero ── */}
       <Link
