@@ -16,6 +16,7 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
   const [context,    setContext]    = useState(initial?.context    ?? "");
   const [link,       setLink]       = useState(initial?.link       ?? "");
   const [isPinned,   setIsPinned]   = useState(initial?.isPinned   ?? false);
+  const [isDeprioritized, setIsDeprioritized] = useState(initial?.isDeprioritized ?? false);
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? initial?.category?.id ?? "");
   const [mediaFile,  setMediaFile]  = useState(null);
   const [preview,    setPreview]    = useState(initial?.mediaUrl ?? null);
@@ -45,7 +46,10 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
       const body = new FormData();
       body.append("title",    title.trim());
       body.append("context",  context.trim());
-      if (isAdmin) body.append("isPinned", String(isPinned));
+      if (isAdmin) {
+        body.append("isPinned", String(isPinned));
+        body.append("isDeprioritized", String(isDeprioritized));
+      }
       body.append("categoryId", categoryId === "" ? "" : String(categoryId));
       if (link.trim())  body.append("link", link.trim());
       if (mediaFile)    body.append("media", mediaFile);
@@ -237,6 +241,41 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
               <div
                 className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
                 style={{ transform: isPinned ? "translateX(20px)" : "translateX(2px)", margin: "1px 0" }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Deprioritize toggle — admin only */}
+        {isAdmin && (
+          <div
+            className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all cursor-pointer ${
+              isDeprioritized
+                ? "bg-[#faf7f2] border-[#9a8c7a]"
+                : "bg-[#faf7f2] border-[#e8e0d0] hover:border-[#9a8c7a]/50"
+            }`}
+            onClick={() => setIsDeprioritized(p => !p)}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isDeprioritized ? "bg-[#9a8c7a]" : "bg-[#e8e0d0]"}`}>
+                <svg className={`w-4 h-4 ${isDeprioritized ? "text-white" : "text-[#9a8c7a]"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold text-[#1a1a2e]">Deprioritize this thread</p>
+                <p className="text-[11px] text-[#9a8c7a]">Hidden from Active, Latest, and Pinned &amp; Today — still shows at the bottom of the full thread list</p>
+              </div>
+            </div>
+
+            <div
+              className="rounded-full transition-colors flex-shrink-0 relative"
+              style={{ width: 40, height: 22, background: isDeprioritized ? "#9a8c7a" : "#e8e0d0" }}
+            >
+              <div
+                className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                style={{ transform: isDeprioritized ? "translateX(20px)" : "translateX(2px)", margin: "1px 0" }}
               />
             </div>
           </div>

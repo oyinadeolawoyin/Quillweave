@@ -324,6 +324,7 @@ function CategoryRow({ category, onEdit, onDelete }) {
 function ThreadRow({ thread, onDelete, onTogglePin }) {
   const [deleting,  setDeleting]  = useState(false);
   const [pinning,   setPinning]   = useState(false);
+  const [deprioritizing, setDeprioritizing] = useState(false);
 
   async function handleDelete() {
     if (!window.confirm(`Delete "${thread.title}"? This cannot be undone.`)) return;
@@ -351,6 +352,23 @@ function ThreadRow({ thread, onDelete, onTogglePin }) {
         onTogglePin(d.thread);
       }
     } finally { setPinning(false); }
+  }
+
+  async function handleToggleDeprioritized() {
+    setDeprioritizing(true);
+    try {
+      const body = new FormData();
+      body.append("title",    thread.title);
+      body.append("context",  thread.context);
+      body.append("isDeprioritized", String(!thread.isDeprioritized));
+      const r = await fetch(`${API_URL}/threads/${thread.id}`, {
+        method: "PUT", credentials: "include", body,
+      });
+      if (r.ok) {
+        const d = await r.json();
+        onTogglePin(d.thread, "deprioritize");
+      }
+    } finally { setDeprioritizing(false); }
   }
 
   const commentCount = thread._count?.comments ?? 0;
@@ -396,6 +414,12 @@ function ThreadRow({ thread, onDelete, onTogglePin }) {
               Pinned
             </span>
           )}
+          {thread.isDeprioritized && (
+            <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
+              style={{ color: "#6b5c4a", background: "#f4f1ec", borderColor: "#c8b89a" }}>
+              Deprioritized
+            </span>
+          )}
           {thread.category && (
             <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#f4f1ec] text-[#6b5c4a]">
               {thread.category.name}
@@ -436,6 +460,19 @@ function ThreadRow({ thread, onDelete, onTogglePin }) {
           <svg className="w-4 h-4" fill={thread.isPinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+          </svg>
+        </button>
+
+        {/* Deprioritize/restore */}
+        <button
+          onClick={handleToggleDeprioritized}
+          disabled={deprioritizing}
+          title={thread.isDeprioritized ? "Restore thread to normal ranking" : "Deprioritize thread"}
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9a8c7a] hover:bg-[#faf7f2] hover:text-[#6b5c4a] transition-all disabled:opacity-40"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d={thread.isDeprioritized ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"}/>
           </svg>
         </button>
 
@@ -530,9 +567,10 @@ export default function AdminThreadsPage() {
       const r = await fetch(`${API_URL}/threads?limit=100`, { credentials: "include" });
       if (r.ok) {
         const d = await r.json();
-        // Sort pinned first, then newest
+        // Sort pinned first, deprioritized last, then newest within each group
         const sorted = (d.threads ?? []).sort((a, b) => {
           if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+          if (a.isDeprioritized !== b.isDeprioritized) return a.isDeprioritized ? 1 : -1;
           return new Date(b.createdAt) - new Date(a.createdAt);
         });
         setThreads(sorted);
@@ -550,6 +588,7 @@ export default function AdminThreadsPage() {
     setThreads(prev =>
       prev.map(t => t.id === thread.id ? thread : t).sort((a, b) => {
         if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        if (a.isDeprioritized !== b.isDeprioritized) return a.isDeprioritized ? 1 : -1;
         return new Date(b.createdAt) - new Date(a.createdAt);
       })
     );
@@ -561,9 +600,13 @@ export default function AdminThreadsPage() {
     showToast("Thread deleted.");
   }
 
-  function handlePinToggled(thread) {
+  function handlePinToggled(thread, action = "pin") {
     handleUpdated(thread);
-    showToast(thread.isPinned ? "Thread pinned." : "Thread unpinned.");
+    if (action === "deprioritize") {
+      showToast(thread.isDeprioritized ? "Thread deprioritized." : "Thread restored to normal ranking.");
+    } else {
+      showToast(thread.isPinned ? "Thread pinned." : "Thread unpinned.");
+    }
   }
 
   function handleCategoryCreated(category) {
