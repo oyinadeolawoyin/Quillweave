@@ -63,6 +63,24 @@ function normalizePostHtml(html = "") {
     container.removeChild(container.firstElementChild);
   }
 
+  // A non-empty <h1> as the very first element is never an intentional
+  // in-body heading here — this site's own body subheadings are always
+  // <h2> (see the Step 1/2/3 headings elsewhere in a post). A leading <h1>
+  // with real sentence-length text is a copy-paste artifact (pasting from
+  // Word/Google Docs carries the source document's heading tags and
+  // font-family spans straight into the editor, since there's no paste
+  // sanitization). Tailwind's base styles reset h1's font-size/weight to
+  // "inherit", so it visually looks like a normal paragraph — but the tag
+  // is still <h1>, which `.prose-news > p:first-child` can never match.
+  // Demote it to a real <p> so it flows like the rest of the body and the
+  // drop-cap selector can see it.
+  if (container.firstElementChild?.tagName === "H1" && !isEffectivelyEmpty(container.firstElementChild)) {
+    const h1 = container.firstElementChild;
+    const p = document.createElement("p");
+    while (h1.firstChild) p.appendChild(h1.firstChild);
+    container.replaceChild(p, h1);
+  }
+
   return container.innerHTML;
 }
 
@@ -78,6 +96,15 @@ function PostContent({ content }) {
   return <FormattedContent text={content} />;
 }
 
+// Plain-text posts (older posts, or anything saved via a path that never
+// touched the rich-text editor) use **bold**/*italic* markdown-style syntax
+// instead of real tags. This used to render as a single div of line breaks
+// with no "prose-news" class and no real <p> elements — meaning the
+// drop-cap rule (`.prose-news > p:first-child::first-letter`) had nothing
+// to match: no prose-news ancestor, no <p> child. Splitting on blank lines
+// into real <p> elements inside a prose-news wrapper gives plain-text posts
+// the same first-letter treatment as HTML posts, rather than requiring
+// every post to go through the rich editor just to get a drop cap.
 function FormattedContent({ text }) {
   function parseLine(line, lineKey) {
     const parts = [];
@@ -103,15 +130,28 @@ function FormattedContent({ text }) {
     }
     return parts;
   }
-  const lines = text.split("\n");
+
+  // Paragraphs are blank-line-separated; single newlines within a paragraph
+  // become <br/> rather than starting a new <p> — matches how the text
+  // visually reads, and keeps the *first* real paragraph as the true
+  // first-child <p> the drop-cap selector needs.
+  const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+
   return (
-    <div className="text-[#2d2620] leading-[1.9] text-[1.05rem] whitespace-pre-wrap">
-      {lines.map((line, idx) => (
-        <Fragment key={idx}>
-          {parseLine(line, idx)}
-          {idx < lines.length - 1 && "\n"}
-        </Fragment>
-      ))}
+    <div className="prose-news text-[#2d2620] leading-[1.9] text-[1.05rem] sm:text-[1.1rem]">
+      {paragraphs.map((para, pIdx) => {
+        const lines = para.split("\n");
+        return (
+          <p key={pIdx}>
+            {lines.map((line, lIdx) => (
+              <Fragment key={lIdx}>
+                {parseLine(line, `${pIdx}-${lIdx}`)}
+                {lIdx < lines.length - 1 && <br />}
+              </Fragment>
+            ))}
+          </p>
+        );
+      })}
     </div>
   );
 }

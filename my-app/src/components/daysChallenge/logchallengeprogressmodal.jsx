@@ -1,8 +1,9 @@
 // src/components/daysChallenge/logChallengeProgressModal.jsx
 //
-// POST /days-challenge/progress — adds (or removes) an amount on top of
-// whatever's already logged for today, same add/remove pattern as draft
-// plan's logProgressModal.jsx.
+// POST /days-challenge/progress — by default, replaces whatever's logged
+// for today with the new number. "Add more" / "Take off" are opt-in for
+// writers who'd rather build on today's existing count instead of
+// resetting it. Same pattern as draft plan's logProgressModal.jsx.
 //
 // Stays a single-screen modal (unlike draft plan's two-stage version) so it
 // keeps the original contract with dayschallengedashboard.jsx: onLogged
@@ -21,20 +22,25 @@ import { logProgress } from "./dayschallengeapi";
 
 export default function LogChallengeProgressModal({ challenge, onClose, onLogged }) {
   const [count, setCount] = useState("");
-  const [direction, setDirection] = useState("add"); // "add" | "remove"
+  const [direction, setDirection] = useState("replace"); // "replace" | "add" | "remove"
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // What's already logged today, so the writer can see the number they
-  // type gets added on top of this — never replaces it.
+  // What's already logged today — shown for reference. By default a new
+  // entry replaces this number outright; "Add more"/"Take off" build on it
+  // instead.
   const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
   const todayCheckIn = (challenge?.checkIns ?? []).find((c) => new Date(c.checkInDate) >= todayMidnight);
   const alreadyToday = Math.max(todayCheckIn?.countLogged ?? 0, 0);
 
   async function handleSubmit() {
     if (!count || Number(count) < 1) {
-      setError(direction === "add" ? "Enter how much to add." : "Enter how much to remove.");
+      setError(
+        direction === "add" ? "Enter how much to add."
+        : direction === "remove" ? "Enter how much to remove."
+        : "Enter today's total."
+      );
       return;
     }
     setSaving(true);
@@ -52,9 +58,10 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
     }
   }
 
-  const previewAfter = direction === "add"
-    ? alreadyToday + (Number(count) || 0)
-    : Math.max(alreadyToday - (Number(count) || 0), 0);
+  const previewAfter =
+    direction === "add" ? alreadyToday + (Number(count) || 0)
+    : direction === "remove" ? Math.max(alreadyToday - (Number(count) || 0), 0)
+    : (Number(count) || 0); // replace
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -63,7 +70,9 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] mb-1" style={{ color: "#e07b39" }}>Log today's progress</p>
             <h3 className="font-serif text-[#1a1a2e] text-lg font-bold leading-tight">
-              {direction === "add" ? "How much more did you do today?" : "How much should we take off?"}
+              {direction === "add" ? "How much more did you do today?"
+                : direction === "remove" ? "How much should we take off?"
+                : "What's today's total?"}
             </h3>
           </div>
           <button onClick={onClose} className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors ml-3 flex-shrink-0 mt-1" aria-label="Close">
@@ -74,8 +83,9 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
         </div>
 
         <div className="px-6 pb-2">
-          {/* Already logged today, front and center, so it's clear new
-              entries stack on top instead of replacing it */}
+          {/* Already logged today, front and center — with "Set total"
+              selected (the default) a new entry overwrites this number;
+              switch to "Add more"/"Take off" to build on it instead */}
           {alreadyToday > 0 && (
             <div className="bg-[#fff3e0] border border-[#f5ddb8] rounded-lg px-3.5 py-2.5 mb-3 flex items-center justify-between">
               <span className="text-[11px] text-[#9a8c7a]">Already logged today</span>
@@ -85,8 +95,20 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
             </div>
           )}
 
-          {/* Add vs remove toggle */}
+          {/* Replace (default) vs add vs remove toggle */}
           <div className="flex gap-1.5 mb-3 p-1 rounded-lg" style={{ background: "#f5f3ef" }}>
+            <button
+              type="button"
+              onClick={() => setDirection("replace")}
+              className="flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
+              style={
+                direction === "replace"
+                  ? { background: "#fff", color: "#1a1a2e", boxShadow: "0 1px 2px rgba(0,0,0,0.08)" }
+                  : { color: "#9a8c7a" }
+              }
+            >
+              Set total
+            </button>
             <button
               type="button"
               onClick={() => setDirection("add")}
@@ -114,13 +136,19 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
           </div>
 
           <FieldLabel hint={`Daily goal: ${challenge.dailyGoal} ${unitLabel(challenge.goalType, challenge.dailyGoal)}`}>
-            {unitLabel(challenge.goalType, 2)} {direction === "add" ? "to add" : "to remove"}
+            {direction === "replace"
+              ? `Today's total ${unitLabel(challenge.goalType, 2)}`
+              : `${unitLabel(challenge.goalType, 2)} to ${direction === "add" ? "add" : "remove"}`}
           </FieldLabel>
           <TextInput
             type="number" min="1"
             value={count}
             onChange={(e) => setCount(e.target.value)}
-            placeholder={challenge.goalType === "WORDS" ? "e.g. 500" : "e.g. 20"}
+            placeholder={
+              direction === "replace" && alreadyToday > 0
+                ? String(alreadyToday)
+                : challenge.goalType === "WORDS" ? "e.g. 500" : "e.g. 20"
+            }
             className="mb-1"
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           />
@@ -128,7 +156,9 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
           {/* Live preview of today's running total after this entry */}
           {count && Number(count) > 0 && (
             <p className="text-[11px] text-[#9a8c7a] mb-3">
-              {direction === "add" ? "That'll bring today to" : "That'll bring today down to"}{" "}
+              {direction === "add" ? "That'll bring today to"
+                : direction === "remove" ? "That'll bring today down to"
+                : "Today will be set to"}{" "}
               <span className="font-semibold text-[#1a1a2e]">
                 {previewAfter.toLocaleString()} {unitLabel(challenge.goalType, previewAfter)}
               </span>
@@ -147,7 +177,7 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
           <TextArea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={direction === "add" ? "Anything you want to remember about today's session" : "Optional note about this correction…"}
+            placeholder={direction === "remove" ? "Optional note about this correction…" : "Anything you want to remember about today's session"}
             rows={2}
           />
           <ErrorText>{error}</ErrorText>
@@ -156,7 +186,10 @@ export default function LogChallengeProgressModal({ challenge, onClose, onLogged
         <div className="px-6 pb-6 pt-3 flex gap-2 border-t border-[#f0ebe3] mt-2">
           <SecondaryButton onClick={onClose} disabled={saving} className="flex-1">Cancel</SecondaryButton>
           <PrimaryButton onClick={handleSubmit} disabled={saving} className="flex-1">
-            {saving ? "Saving…" : direction === "add" ? "Add it" : "Remove it"}
+            {saving ? "Saving…"
+              : direction === "add" ? "Add it"
+              : direction === "remove" ? "Remove it"
+              : "Save"}
           </PrimaryButton>
         </div>
       </div>

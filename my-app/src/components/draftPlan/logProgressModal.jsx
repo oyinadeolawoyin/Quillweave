@@ -1,7 +1,9 @@
 // src/components/draftplan/logProgressModal.jsx
-// POST /draftplan/progress — adds (or removes) an amount on top of whatever
-// is already logged for today, and shows the matching treat prompts when
-// metDailyGoal / metWeeklyGoal come back true.
+// POST /draftplan/progress — by default, replaces whatever's logged for
+// today with the new number. "Add more" / "Take off" are opt-in for writers
+// who'd rather build on today's existing count instead of resetting it.
+// Shows the matching treat prompts when metDailyGoal / metWeeklyGoal come
+// back true.
 
 import { useState } from "react";
 import { PrimaryButton, SecondaryButton, TextInput, TextArea, ErrorText } from "./draftPlanUI";
@@ -10,21 +12,26 @@ import { unitLabel } from "./draftPlanConstants";
 
 export default function LogProgressModal({ plan, onClose, onLogged }) {
   const [count, setCount] = useState("");
-  const [direction, setDirection] = useState("add"); // "add" | "remove"
+  const [direction, setDirection] = useState("replace"); // "replace" | "add" | "remove"
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null); // response from the API once logged
 
-  // What's already logged today, so the writer can see the number they
-  // type gets added on top of this — never replaces it.
+  // What's already logged today — shown for reference. By default a new
+  // entry replaces this number outright; "Add more"/"Take off" build on it
+  // instead.
   const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
   const todayLog = (plan?.progressLogs ?? []).find((l) => new Date(l.logDate) >= todayMidnight);
   const alreadyToday = Math.max(todayLog?.countLogged ?? 0, 0);
 
   async function submit() {
     if (!count || Number(count) < 1) {
-      setError(direction === "add" ? "Enter how much to add." : "Enter how much to remove.");
+      setError(
+        direction === "add" ? "Enter how much to add."
+        : direction === "remove" ? "Enter how much to remove."
+        : "Enter today's total."
+      );
       return;
     }
     setSaving(true);
@@ -40,9 +47,10 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
     }
   }
 
-  const previewAfter = direction === "add"
-    ? alreadyToday + (Number(count) || 0)
-    : Math.max(alreadyToday - (Number(count) || 0), 0);
+  const previewAfter =
+    direction === "add" ? alreadyToday + (Number(count) || 0)
+    : direction === "remove" ? Math.max(alreadyToday - (Number(count) || 0), 0)
+    : (Number(count) || 0); // replace
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -56,7 +64,9 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-1">Log progress</p>
                 <h3 className="font-serif text-[#1a1a2e] text-lg font-bold leading-tight">
-                  {direction === "add" ? "How much more did you write?" : "How much should we take off?"}
+                  {direction === "add" ? "How much more did you write?"
+                    : direction === "remove" ? "How much should we take off?"
+                    : "What's today's total?"}
                 </h3>
               </div>
               <button onClick={onClose} className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors ml-3 flex-shrink-0 mt-1" aria-label="Close">
@@ -67,8 +77,9 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
             </div>
 
             <div className="px-6 pb-6">
-              {/* Already logged today, front and center, so it's clear new
-                  entries stack on top instead of replacing it */}
+              {/* Already logged today, front and center — with "Set total"
+                  selected (the default) a new entry overwrites this number;
+                  switch to "Add more"/"Take off" to build on it instead */}
               {alreadyToday > 0 && (
                 <div className="bg-[#faf7f2] border border-[#e8e0d0] rounded-lg px-3.5 py-2.5 mb-4 flex items-center justify-between">
                   <span className="text-[11px] text-[#9a8c7a]">Already logged today</span>
@@ -78,8 +89,20 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
                 </div>
               )}
 
-              {/* Add vs remove toggle */}
+              {/* Replace (default) vs add vs remove toggle */}
               <div className="flex gap-1.5 mb-4 p-1 rounded-lg" style={{ background: "#f5f3ef" }}>
+                <button
+                  type="button"
+                  onClick={() => setDirection("replace")}
+                  className="flex-1 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
+                  style={
+                    direction === "replace"
+                      ? { background: "#fff", color: "#1a1a2e", boxShadow: "0 1px 2px rgba(0,0,0,0.08)" }
+                      : { color: "#9a8c7a" }
+                  }
+                >
+                  Set total
+                </button>
                 <button
                   type="button"
                   onClick={() => setDirection("add")}
@@ -113,7 +136,11 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
                     value={count}
                     onChange={(e) => setCount(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && submit()}
-                    placeholder={plan?.dailyGoal ? String(plan.dailyGoal) : "0"}
+                    placeholder={
+                      direction === "replace" && alreadyToday > 0
+                        ? String(alreadyToday)
+                        : plan?.dailyGoal ? String(plan.dailyGoal) : "0"
+                    }
                   />
                   <span className="text-[12px] text-[#9a8c7a] flex-shrink-0 whitespace-nowrap">
                     {unitLabel(plan?.goalType, Number(count) || 0)}
@@ -123,7 +150,9 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
                 {/* Live preview of today's running total after this entry */}
                 {count && Number(count) > 0 && (
                   <p className="text-[11px] text-[#9a8c7a] mt-1.5">
-                    {direction === "add" ? "That'll bring today to" : "That'll bring today down to"}{" "}
+                    {direction === "add" ? "That'll bring today to"
+                      : direction === "remove" ? "That'll bring today down to"
+                      : "Today will be set to"}{" "}
                     <span className="font-semibold text-[#1a1a2e]">
                       {previewAfter.toLocaleString()} {unitLabel(plan?.goalType, previewAfter)}
                     </span>
@@ -131,7 +160,7 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
                   </p>
                 )}
 
-                {direction === "add" && plan?.dailyGoal && (
+                {direction !== "remove" && plan?.dailyGoal && (
                   <p className="text-[11px] text-[#9a8c7a] mt-1.5">
                     Today's goal: {plan.dailyGoal} {unitLabel(plan.goalType, plan.dailyGoal)}
                   </p>
@@ -147,7 +176,7 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
                 <TextArea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder={direction === "add" ? "Optional note about this session…" : "Optional note about this correction…"}
+                  placeholder={direction === "remove" ? "Optional note about this correction…" : "Optional note about this session…"}
                   rows={2}
                 />
               </div>
@@ -157,7 +186,10 @@ export default function LogProgressModal({ plan, onClose, onLogged }) {
               <div className="flex items-center gap-2 mt-4">
                 <SecondaryButton onClick={onClose} className="flex-1">Cancel</SecondaryButton>
                 <PrimaryButton onClick={submit} disabled={saving} className="flex-1">
-                  {saving ? "Saving…" : direction === "add" ? "Add it" : "Remove it"}
+                  {saving ? "Saving…"
+                    : direction === "add" ? "Add it"
+                    : direction === "remove" ? "Remove it"
+                    : "Save"}
                 </PrimaryButton>
               </div>
             </div>
