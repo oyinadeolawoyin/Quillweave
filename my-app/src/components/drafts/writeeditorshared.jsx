@@ -7,6 +7,15 @@ export function countWords(text = "") {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+// Allow relative in-site links (e.g. /blog/123) and anchors as-is;
+// otherwise default to https:// if no scheme was given.
+export function normalizeLinkUrl(raw) {
+  const v = (raw || "").trim();
+  if (!v) return "";
+  if (/^(https?:\/\/|mailto:|\/|#)/i.test(v)) return v;
+  return `https://${v}`;
+}
+
 // ─── Font options ─────────────────────────────────────────────────────────────
 
 export const FONT_FAMILIES = [
@@ -240,7 +249,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
 //   onImagePicked fn(payload) — for inline image insert
 //   visible     bool
 
-function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, visible }) {
+function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, onBlockClick, visible }) {
   const [showTextColor, setShowTextColor] = useState(false);
   const [showHighlight, setShowHighlight] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
@@ -451,6 +460,13 @@ function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, visible }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
           </svg>
         </button>
+
+        {/* Exercise block */}
+        <button type="button" title="Insert exercise block" onMouseDown={e => { e.preventDefault(); onBlockClick?.(); }} className={floatBtn}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -485,6 +501,7 @@ export function RichToolbar({
   currentBgColor   = "transparent",
   onImagePicked,
   onLinkClick,
+  onBlockClick,
 }) {
   const [colorPicker, setColorPicker] = useState(null); // "text" | "bg" | null
   const colorPickerRef = useRef(null);
@@ -699,6 +716,17 @@ export function RichToolbar({
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
+        </svg>
+      </button>
+
+      {/* Insert exercise/assignment block — opens a modal for heading + steps */}
+      <button type="button"
+        onMouseDown={e => { e.preventDefault(); onBlockClick?.(); }}
+        className={btn}
+        title="Insert exercise block"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
         </svg>
       </button>
 
@@ -989,17 +1017,8 @@ function LinkModal({ initialText, savedRange, onInsert, onClose }) {
     setTimeout(() => urlInputRef.current?.focus(), 50);
   }, []);
 
-  function normalizeUrl(raw) {
-    const v = raw.trim();
-    if (!v) return "";
-    // Allow relative in-site links (e.g. /blog/123) and anchors as-is;
-    // otherwise default to https:// if no scheme was given.
-    if (/^(https?:\/\/|mailto:|\/|#)/i.test(v)) return v;
-    return `https://${v}`;
-  }
-
   function handleInsert() {
-    const cleanUrl = normalizeUrl(url);
+    const cleanUrl = normalizeLinkUrl(url);
     if (!cleanUrl) { setError("Enter a URL first."); return; }
     onInsert({ url: cleanUrl, text: text.trim(), savedRange });
     onClose();
@@ -1070,6 +1089,186 @@ function LinkModal({ initialText, savedRange, onInsert, onClose }) {
   );
 }
 
+// ─── Exercise / callout block modal ───────────────────────────────────────────
+// Inserts a styled box (dark header + numbered list) — used for "Assignment",
+// "Exercise", or any other step-by-step callout in a tutorial-style post.
+//
+// Props:
+//   savedRange   Range | null — cursor position before the modal opened
+//   onInsert     fn({ heading, items, savedRange })
+//   onClose      fn
+
+function blankStep() {
+  return { text: "", linkName: "", linkUrl: "", showLink: false };
+}
+
+function BlockModal({ savedRange, onInsert, onClose }) {
+  const [heading, setHeading] = useState("Assignment");
+  const [items, setItems] = useState([blankStep(), blankStep()]);
+  const [error, setError] = useState(null);
+  const headingRef = useRef(null);
+
+  useEffect(() => {
+    setTimeout(() => headingRef.current?.focus(), 50);
+  }, []);
+
+  function updateItem(i, field, value) {
+    setItems(prev => prev.map((it, idx) => (idx === i ? { ...it, [field]: value } : it)));
+  }
+
+  function toggleLink(i) {
+    setItems(prev => prev.map((it, idx) => (idx === i ? { ...it, showLink: !it.showLink } : it)));
+  }
+
+  function addItem() {
+    setItems(prev => [...prev, blankStep()]);
+  }
+
+  function removeItem(i) {
+    setItems(prev => prev.filter((_, idx) => idx !== i));
+  }
+
+  function handleInsert() {
+    const cleanItems = items
+      .map(it => ({ text: it.text.trim(), linkName: it.linkName.trim(), linkUrl: it.linkUrl.trim() }))
+      .filter(it => it.text || it.linkUrl);
+    if (!heading.trim() && cleanItems.length === 0) {
+      setError("Add a heading or at least one item.");
+      return;
+    }
+    onInsert({ heading: heading.trim(), items: cleanItems, savedRange });
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-[#e8e0d0] p-8 w-full max-w-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+        <h3 className="font-serif text-xl text-[#1a1a2e]">Insert exercise block</h3>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#9a8c7a] mb-2">Heading</p>
+          <input
+            ref={headingRef}
+            type="text"
+            value={heading}
+            onChange={e => { setHeading(e.target.value); setError(null); }}
+            placeholder="Assignment"
+            className="w-full border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 transition-all"
+            style={{ borderColor: "#e8e0d0", "--tw-ring-color": "#d4af3740" }}
+          />
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#9a8c7a] mb-2">Steps</p>
+          <div className="space-y-4">
+            {items.map((it, i) => (
+              <div key={i} className="border rounded-xl p-4" style={{ borderColor: "#f0e8d8", background: "#fdfcfa" }}>
+                <div className="flex items-start gap-3">
+                  <span className="text-sm text-[#9a8c7a] w-5 flex-shrink-0 pt-3 font-medium">{i + 1}.</span>
+                  <div className="flex-1 space-y-2">
+                    <textarea
+                      value={it.text}
+                      onChange={e => updateItem(i, "text", e.target.value)}
+                      placeholder={`Step ${i + 1} — write as much as you need…`}
+                      rows={2}
+                      className="w-full border rounded-lg px-3 py-2.5 text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 transition-all"
+                      style={{ borderColor: "#e8e0d0", "--tw-ring-color": "#d4af3740", minHeight: "3.2rem" }}
+                    />
+
+                    {it.showLink ? (
+                      <div className="grid sm:grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a8c7a] mb-1">
+                            Link name
+                          </p>
+                          <input
+                            type="text"
+                            value={it.linkName}
+                            onChange={e => updateItem(i, "linkName", e.target.value)}
+                            placeholder="e.g. Character worksheet"
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-all"
+                            style={{ borderColor: "#e8e0d0", "--tw-ring-color": "#d4af3740" }}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9a8c7a] mb-1">
+                            Link URL
+                          </p>
+                          <input
+                            type="text"
+                            value={it.linkUrl}
+                            onChange={e => updateItem(i, "linkUrl", e.target.value)}
+                            placeholder="https://…"
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-all"
+                            style={{ borderColor: "#e8e0d0", "--tw-ring-color": "#d4af3740" }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <button type="button"
+                        onClick={() => toggleLink(i)}
+                        className="text-xs font-medium text-[#7a6a50] hover:text-[#d4af37] flex items-center gap-1 transition-all"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
+                        </svg>
+                        Add link to this step
+                      </button>
+                    )}
+                  </div>
+                  {items.length > 1 && (
+                    <button type="button"
+                      onClick={() => removeItem(i)}
+                      className="w-6 h-6 flex-shrink-0 rounded-full flex items-center justify-center text-[#b8a898] hover:bg-[#f5f3ef] hover:text-red-500 transition-all"
+                      title="Remove step"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button type="button"
+            onClick={addItem}
+            className="mt-3 text-sm font-medium text-[#7a6a50] hover:text-[#2d3748] flex items-center gap-1.5"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add step
+          </button>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button type="button"
+            onClick={handleInsert}
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+            style={{ background: "#1a1a2e" }}
+          >
+            Insert block
+          </button>
+          <button type="button"
+            onClick={onClose}
+            className="px-5 py-3 rounded-xl text-sm font-medium border text-[#6b5c4a] hover:bg-[#f5f3ef] transition-all"
+            style={{ borderColor: "#e8e0d0" }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Write editor ──────────────────────────────────────────────────────────────
 // Rich text via contenteditable. Auto-saves every 30 s. Preserves formatting,
 // font choice, font size, text colour, and background colour in the saved HTML.
@@ -1099,6 +1298,7 @@ export function WriteEditor({
   const [editorFocused, setEditorFocused] = useState(false);
   const [imagePick, setImagePick] = useState(null); // { url, savedRange }
   const [linkPick, setLinkPick] = useState(null); // { initialText, savedRange }
+  const [blockPick, setBlockPick] = useState(null); // { savedRange }
 
   // Typography / colour state (persisted in draft HTML via wrapper div style)
   const [fontFamily,   setFontFamily]   = useState(FONT_FAMILIES[0].value);
@@ -1252,6 +1452,75 @@ export function WriteEditor({
     handleEditorInput();
   }
 
+  // ── Open the exercise-block modal, remembering the current cursor pos ───
+  function openBlockModal() {
+    const sel = window.getSelection();
+    let savedRange = null;
+    if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+      savedRange = sel.getRangeAt(0).cloneRange();
+    }
+    setBlockPick({ savedRange });
+  }
+
+  // ── Insert a styled exercise/assignment block ────────────────────────────
+  function insertBlock({ heading, items, savedRange }) {
+    editorRef.current?.focus();
+
+    const box = document.createElement("div");
+    box.setAttribute("data-exercise-block", "1");
+    box.style.cssText =
+      "background:#1c2333;color:#f5f5f7;border-radius:14px;padding:20px 24px;margin:1.5em 0;";
+
+    if (heading) {
+      const h = document.createElement("p");
+      h.textContent = heading;
+      h.style.cssText = "font-weight:700;font-size:1.05em;margin:0 0 12px 0;color:#ffffff;";
+      box.appendChild(h);
+    }
+
+    if (items.length > 0) {
+      const ol = document.createElement("ol");
+      ol.style.cssText = "list-style:decimal;padding-left:1.25em;margin:0;";
+      items.forEach(({ text, linkName, linkUrl }) => {
+        const li = document.createElement("li");
+        li.style.cssText = "margin:0.4em 0;line-height:1.6;";
+        if (text) li.appendChild(document.createTextNode(text));
+        if (linkUrl) {
+          if (text) li.appendChild(document.createTextNode(" "));
+          const a = document.createElement("a");
+          a.href = normalizeLinkUrl(linkUrl);
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = linkName || linkUrl;
+          a.style.cssText = "color:#d4af37;font-weight:600;text-decoration:underline;";
+          li.appendChild(a);
+        }
+        ol.appendChild(li);
+      });
+      box.appendChild(ol);
+    }
+
+    editorRef.current?.focus();
+    if (savedRange) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      const range = sel.getRangeAt(0);
+      range.insertNode(box);
+      const after = document.createElement("div");
+      after.innerHTML = "<br>";
+      box.parentNode.insertBefore(after, box.nextSibling);
+      const nr = document.createRange();
+      nr.setStart(after, 0);
+      nr.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(nr);
+    } else {
+      editorRef.current?.appendChild(box);
+    }
+    handleEditorInput();
+  }
+
   // ── Insert image after size is chosen ────────────────────────────────────
   function insertImage({ url, size, align, savedRange }) {
     const img = document.createElement("img");
@@ -1361,6 +1630,7 @@ export function WriteEditor({
         currentBgColor={bgColor}
         onImagePicked={payload => setImagePick(payload)}
         onLinkClick={openLinkModal}
+        onBlockClick={openBlockModal}
       />
 
       {/* Title */}
@@ -1403,6 +1673,7 @@ export function WriteEditor({
         onCommand={handleCommand}
         onImagePicked={payload => setImagePick(payload)}
         onLinkClick={openLinkModal}
+        onBlockClick={openBlockModal}
         visible={editorFocused}
       />
 
@@ -1423,6 +1694,15 @@ export function WriteEditor({
           savedRange={linkPick.savedRange}
           onInsert={insertLink}
           onClose={() => setLinkPick(null)}
+        />
+      )}
+
+      {/* Exercise/assignment block modal */}
+      {blockPick && (
+        <BlockModal
+          savedRange={blockPick.savedRange}
+          onInsert={insertBlock}
+          onClose={() => setBlockPick(null)}
         />
       )}
 
