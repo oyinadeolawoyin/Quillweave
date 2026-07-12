@@ -50,6 +50,7 @@ function Avatar({ user, size = 30 }) {
 // We use thread.createdAt as the "last post" time — good enough for preview rows.
 
 function ThreadRow({ thread }) {
+  const totalCount = thread.totalCommentCount ?? thread._count?.comments ?? 0;
   return (
     <Link
       to={`/threads/${thread.id}`}
@@ -65,6 +66,8 @@ function ThreadRow({ thread }) {
           by{" "}
           <span className="font-semibold text-[#b8860b]">{thread.author?.username ?? "someone"}</span>{" "}
           {timeAgo(thread.createdAt)}
+          {" · "}
+          {totalCount} {totalCount === 1 ? "comment" : "comments"}
         </p>
       </div>
     </Link>

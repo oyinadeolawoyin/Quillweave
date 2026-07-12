@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation, useOutletContext } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import { CheckoutModal, JoinGroupSprintModal } from "./groupSprintModal";
+import { CheckoutModal, JoinGroupSprintModal, StartGroupSprintModal } from "./groupSprintModal";
 import { Room, Track } from "livekit-client";
 import { AppMetaTags } from "../utilis/metatags";
 import {
@@ -10,6 +10,13 @@ import {
   WriteEditor,
   countWords,
 } from "../drafts/writeeditorshared"; // ← shared components
+import {
+  useStickyNotes,
+  useHandwrittenFont,
+  StickyNotesPanel,
+  ParagraphStickyOverlay,
+  DraftStickyNotesButton,
+} from "../drafts/stickynotes";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LIVEKIT_URL    = import.meta.env.VITE_LIVEKIT_URL;
@@ -170,7 +177,7 @@ function WritersSidebar({ sprints, groupSprint, user }) {
 
 // ─── Drafts picker modal ──────────────────────────────────────────────────────
 
-function DraftsPickerModal({ isOpen, currentDraftId, onSelect, onClose }) {
+function DraftsPickerModal({ isOpen, currentDraftId, onSelect, onNewDraft, onClose }) {
   const [drafts,  setDrafts]  = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -198,6 +205,19 @@ function DraftsPickerModal({ isOpen, currentDraftId, onSelect, onClose }) {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
+
+        {/* New draft — start a fresh, blank draft without leaving the sprint */}
+        <div className="px-3 pt-3 flex-shrink-0">
+          <button
+            onClick={() => onNewDraft?.()}
+            className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 border-dashed border-[#d4af37]/60 text-[#9a6f00] bg-[#fffbf0] hover:bg-[#fff6dd] hover:border-[#d4af37] transition-all">
+            <span className="w-6 h-6 rounded-full bg-[#d4af37]/15 flex items-center justify-center flex-shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            </span>
+            <span className="text-sm font-semibold">Start a new draft</span>
+          </button>
+        </div>
+
         <div className="overflow-y-auto flex-1 p-3 space-y-2">
           {loading ? (
             <div className="flex items-center justify-center py-8 gap-2 text-sm text-[#9a8c7a]">
@@ -275,10 +295,11 @@ function SprintSummaryModal({ isOpen, wordsWritten, draftId, onSaveDraft, onClos
 // ─── Main workspace component ─────────────────────────────────────────────────
 
 export default function GroupSprintWorkspace() {
-  const { groupSprintId } = useParams();
-  const { user }          = useAuth();
-  const navigate          = useNavigate();
-  const location          = useLocation();
+  const { groupSprintId }     = useParams();
+  const { user }              = useAuth();
+  const navigate               = useNavigate();
+  const location               = useLocation();
+  const { setLayoutFocusMode } = useOutletContext();
 
   const routeWritingMode  = location.state?.writingMode  || null;
   const routeDraftId      = location.state?.draftId      || null;
@@ -306,13 +327,53 @@ export default function GroupSprintWorkspace() {
   // UI mode
   const [writeMode,       setWriteMode]       = useState(routeWritingMode === "quillweave");
   const [activeDraftId,   setActiveDraftId]   = useState(routeDraftId);
+  // Bumped whenever we want to force a clean remount of the WriteEditor —
+  // e.g. starting a brand new draft mid-sprint, so no stale title/content lingers.
+  const [editorInstanceKey, setEditorInstanceKey] = useState(0);
+  // Set true right when the writer explicitly asks for a blank new draft, so the
+  // auto-restore-most-recent-draft effect below doesn't immediately reload the
+  // old one just because activeDraftId briefly became null.
+  const suppressAutoRestoreRef = useRef(false);
   const [focusMode,       setFocusMode]       = useState(false);
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [thesaurusOpen,   setThesaurusOpen]   = useState(false);
+
+  // Report focus mode up to Layout so the dashboard sidebar hides too, not
+  // just whatever the sprint workspace hides on its own. Layout resets this
+  // on every route change by itself, so no cleanup is needed here beyond
+  // keeping it in sync while mounted.
+  useEffect(() => {
+    setLayoutFocusMode?.(focusMode);
+  }, [focusMode, setLayoutFocusMode]);
+
+  // ── Sticky notes (optional — off by default so sprints stay distraction-free) ──
+  useHandwrittenFont();
+  const [stickyNotesOn, setStickyNotesOn]   = useState(false);
+  const [stickyPanel,   setStickyPanel]     = useState(null); // null | { paragraphIndex: number|null }
+  const editorContentRef = useRef(null);
+  const sheetRef          = useRef(null);
+  const {
+    draftNotes,
+    notesByParagraph,
+    createNote: createStickyNote,
+    updateNote: updateStickyNote,
+    deleteNote: deleteStickyNote,
+  } = useStickyNotes(activeDraftId);
+  const stickyScopeNotes = stickyPanel
+    ? (stickyPanel.paragraphIndex === null ? draftNotes : (notesByParagraph.get(stickyPanel.paragraphIndex) || []))
+    : [];
+  const stickyScopeLabel = stickyPanel
+    ? (stickyPanel.paragraphIndex === null ? "Whole draft" : `Paragraph ${stickyPanel.paragraphIndex + 1}`)
+    : "";
   const [draftsModalOpen, setDraftsModalOpen] = useState(false);
 
   // Join modal — triggered by "Join sprint" button on the workspace
   const [showJoinModal, setShowJoinModal] = useState(false);
+
+  // Start-sprint modal — triggered by "Start another sprint" on the sprint
+  // summary screen, so the writer can set up a fresh sprint without leaving
+  // for the homepage first.
+  const [showStartModal, setShowStartModal] = useState(false);
 
   // Invite link toast
   const [showInviteToast, setShowInviteToast] = useState(false);
@@ -424,6 +485,12 @@ export default function GroupSprintWorkspace() {
   // Auto-restore most recent draft when entering write mode with no draft selected
   useEffect(() => {
     if (!writeMode || activeDraftId) return;
+    // Writer explicitly chose "start a new draft" — don't clobber that with
+    // the last-used draft. Consume the flag and skip this pass.
+    if (suppressAutoRestoreRef.current) {
+      suppressAutoRestoreRef.current = false;
+      return;
+    }
     fetch(`${API_URL}/drafts/sprint-picker`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -555,6 +622,19 @@ export default function GroupSprintWorkspace() {
     return data.draft;
   }, [activeDraftId]);
 
+  // ── Start a brand new draft without leaving the sprint ─────────────────────
+  // Clears the active draft and forces the editor to remount blank, so the
+  // writer can keep sprinting into a fresh piece whenever inspiration strikes.
+  // The existing activeDraftId-change effect re-arms draftLoading and resets
+  // startWordsRef, and the fresh WriteEditor instance reports back 0 words
+  // almost immediately since there's no content to fetch.
+  function handleNewDraft() {
+    suppressAutoRestoreRef.current = true;
+    setActiveDraftId(null);
+    setEditorInstanceKey(k => k + 1);
+    setDraftsModalOpen(false);
+  }
+
   // ── Save & go to drafts ────────────────────────────────────────────────────
   async function handleSaveDraft() {
     setShowSummary(false);
@@ -582,10 +662,18 @@ export default function GroupSprintWorkspace() {
 
   function handleContinueSprint() {
     setShowSummary(false);
+    setShowStartModal(true);
+  }
+
+  // Fired once the new group sprint is created + joined from the modal.
+  function handleNewSprintCreated(gs, isQuillweave) {
+    setShowStartModal(false);
     setSprintEnded(false);
     ringFired.current = false;
     startWordsRef.current = null;
-    navigate(returnTo ? returnTo : "/", returnTo ? { state: { returnReason } } : undefined);
+    navigate(`/group-sprint/${gs.id}`, {
+      state: { writingMode: isQuillweave ? "quillweave" : "external", draftId: activeDraftId },
+    });
   }
 
   function handleCheckedOut() {
@@ -695,6 +783,32 @@ export default function GroupSprintWorkspace() {
               <span className="hidden sm:inline">Thesaurus</span>
             </button>
 
+            {/* Sticky notes — optional, off by default during a sprint */}
+            {writeMode && (
+              <button
+                data-tour="tour-sticky"
+                onClick={() => { setStickyNotesOn(o => !o); setStickyPanel(null); }}
+                title={stickyNotesOn ? "Turn off sticky notes" : "Turn on sticky notes"}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
+                  stickyNotesOn ? "border-[#2d3748] bg-[#2d3748] text-white" : "border-[#ddd0bb] text-[#7a6a50] hover:border-[#c9b090] bg-[#faf5ed]"
+                }`}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3h10a2 2 0 012 2v13l-4 3-4-3-4 3-2-1.5V5a2 2 0 012-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 8h6M9 12h6" />
+                </svg>
+                <span className="hidden sm:inline">Sticky notes</span>
+              </button>
+            )}
+            {writeMode && stickyNotesOn && (
+              <DraftStickyNotesButton
+                count={draftNotes.length}
+                isOpen={!!stickyPanel && stickyPanel.paragraphIndex === null}
+                onClick={() => setStickyPanel(p =>
+                  p && p.paragraphIndex === null ? null : { paragraphIndex: null }
+                )}
+              />
+            )}
+
             {groupSprint.isActive && (
               <TimerPill secondsLeft={secondsLeft} ended={sprintEnded} />
             )}
@@ -756,7 +870,18 @@ export default function GroupSprintWorkspace() {
           )}
 
           {/* Editor */}
-          <div className="flex-1 overflow-y-auto bg-[#f5f0e8] px-4 sm:px-6 py-5 sm:py-7">
+          <div
+            className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 sm:py-10"
+            style={{
+              backgroundColor: "#c4915c",
+              backgroundImage: `
+                repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 96px),
+                repeating-linear-gradient(90deg, rgba(0,0,0,0.07) 0px, rgba(0,0,0,0.07) 2px, transparent 2px, transparent 96px),
+                radial-gradient(ellipse at top, rgba(255,255,255,0.10), transparent 60%),
+                linear-gradient(180deg, #d3a06a 0%, #bd875099 40%, #ab763f 100%)
+              `,
+            }}
+          >
             {sprintEnded && !showSummary && !bannerDismissed && (
               <div className="w-full mb-3 rounded-2xl border border-[#d4af37] bg-[#fffbf0] px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-3 shadow-sm">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -785,11 +910,15 @@ export default function GroupSprintWorkspace() {
               </div>
             )}
 
-            <div className="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-md border border-[#e8e0d0] relative">
+            {/* "Sheet of paper" — sharp corners, white, lifted off the wood with a deep shadow */}
+            <div
+              ref={sheetRef}
+              className="w-full max-w-6xl mx-auto bg-white border border-[#e2d3b5] relative"
+              style={{ boxShadow: "0 30px 60px -15px rgba(35,22,8,0.45), 0 10px 24px rgba(35,22,8,0.22)" }}>
               {/* Loading overlay — shown while we calculate the draft's starting word count.
                   Writers cannot type until startWordsRef is set, preventing a 0-baseline bug. */}
               {draftLoading && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/90 backdrop-blur-sm">
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/90 backdrop-blur-sm">
                   <svg className="animate-spin h-6 w-6 text-[#d4af37]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -799,7 +928,9 @@ export default function GroupSprintWorkspace() {
                 </div>
               )}
               <WriteEditor
+                key={`${activeDraftId ?? "new"}-${editorInstanceKey}`}
                 draftId={activeDraftId}
+                contentRef={editorContentRef}
                 onWordsUpdate={setCurrentWordCount}
                 onAutoSave={handleAutoSave}
                 onDraftLoaded={(savedWC) => {
@@ -807,12 +938,39 @@ export default function GroupSprintWorkspace() {
                   setDraftLoading(false);
                 }}
                 showColorTools={true}
+                showBlockTool={false}
+                placeholder="Just start writing — don't stop to fix. This is your free writing space."
               />
+
+              {/* Hidden-until-clicked paragraph note badges, in the left margin */}
+              {stickyNotesOn && (
+                <ParagraphStickyOverlay
+                  editorRef={editorContentRef}
+                  wrapperRef={sheetRef}
+                  notesByParagraph={notesByParagraph}
+                  onSelectParagraph={(index) => setStickyPanel(p =>
+                    p && p.paragraphIndex === index ? null : { paragraphIndex: index }
+                  )}
+                />
+              )}
             </div>
           </div>
 
           {/* Thesaurus drawer */}
           <ThesaurusDrawer isOpen={thesaurusOpen} onClose={() => setThesaurusOpen(false)} />
+
+          {/* Sticky notes panel */}
+          {stickyNotesOn && (
+            <StickyNotesPanel
+              isOpen={!!stickyPanel}
+              onClose={() => setStickyPanel(null)}
+              scopeLabel={stickyScopeLabel}
+              scopeNotes={stickyScopeNotes}
+              onCreate={(payload) => createStickyNote({ ...payload, paragraphIndex: stickyPanel?.paragraphIndex ?? null })}
+              onUpdate={updateStickyNote}
+              onDelete={deleteStickyNote}
+            />
+          )}
         </div>
 
       ) : (
@@ -1045,7 +1203,12 @@ export default function GroupSprintWorkspace() {
       <DraftsPickerModal
         isOpen={draftsModalOpen}
         currentDraftId={activeDraftId}
-        onSelect={d => { setActiveDraftId(d.id); setDraftsModalOpen(false); }}
+        onSelect={d => {
+          setActiveDraftId(d.id);
+          setEditorInstanceKey(k => k + 1);
+          setDraftsModalOpen(false);
+        }}
+        onNewDraft={handleNewDraft}
         onClose={() => setDraftsModalOpen(false)}
       />
 
@@ -1066,6 +1229,15 @@ export default function GroupSprintWorkspace() {
           onClose={() => setShowJoinModal(false)}
         />
       )}
+
+      {/* Start-sprint modal — triggered from "Start another sprint" on the
+          sprint summary screen, so it pops up right here instead of bouncing
+          the writer back to the homepage. */}
+      <StartGroupSprintModal
+        isOpen={showStartModal}
+        onClose={() => setShowStartModal(false)}
+        onCreated={handleNewSprintCreated}
+      />
 
       {/* Checkout modals */}
       <CheckoutModal

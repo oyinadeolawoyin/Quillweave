@@ -46,7 +46,7 @@ function ThreadRow({ thread }) {
   const lastPost = thread.lastComment ?? thread.comments?.[0];
   const lastAuthor = lastPost?.author ?? thread.author;
   const lastAt = lastPost?.createdAt ?? thread.updatedAt ?? thread.createdAt;
-  const replyCount = thread._count?.comments ?? 0;
+  const totalCount = thread.totalCommentCount ?? thread._count?.comments ?? 0;
 
   return (
     <Link
@@ -81,7 +81,7 @@ function ThreadRow({ thread }) {
         </p>
       </div>
       <span className="flex-shrink-0 text-[12px] text-[#9a8c7a] tabular-nums mt-0.5 whitespace-nowrap">
-        {replyCount} {replyCount === 1 ? "reply" : "replies"}
+        {totalCount} {totalCount === 1 ? "comment" : "comments"}
       </span>
     </Link>
   );

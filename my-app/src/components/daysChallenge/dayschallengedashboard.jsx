@@ -16,6 +16,7 @@ import LogChallengeProgressModal from "./logchallengeprogressmodal.jsx";
 import EditChallengeModal from "./editchallengemodal";
 import API_URL from "@/config/api";
 import { AppMetaTags } from "../utilis/metatags";
+import { StartGroupSprintModal } from "../sprint/groupSprintModal";
 
 // Orange ring — this feature's accent color, distinct from the gold used
 // by the Draft Plan, so the two trackers stay visually distinguishable.
@@ -60,6 +61,7 @@ export default function DaysChallengeDashboard({ initialChallenge, initialStats,
   const [showLogModal, setShowLogModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showSprintModal, setShowSprintModal] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [uncompleting, setUncompleting] = useState(false);
   const [actionError, setActionError] = useState("");
@@ -161,6 +163,10 @@ export default function DaysChallengeDashboard({ initialChallenge, initialStats,
     navigate("/days-challenge");
   }
 
+  function handleSprintCreated(groupSprint, openEditor) {
+    navigate(`/group-sprint/${groupSprint.id}`, { state: { writingMode: openEditor ? "quillweave" : null } });
+  }
+
   const totalDays = DURATION_DAYS[challenge.duration] ?? stats.totalDays;
   const dayCircles = Array.from({ length: totalDays }, (_, i) => i);
   const sortedCheckIns = [...(challenge.checkIns ?? [])].sort((a, b) => new Date(a.checkInDate) - new Date(b.checkInDate));
@@ -211,6 +217,11 @@ export default function DaysChallengeDashboard({ initialChallenge, initialStats,
             {canUndo && (
               <SecondaryButton onClick={handleUncomplete} disabled={uncompleting} className="px-4 py-2.5 text-[13px]">
                 {uncompleting ? "Resuming…" : "Undo — continue challenge"}
+              </SecondaryButton>
+            )}
+            {isActive && (
+              <SecondaryButton onClick={() => setShowSprintModal(true)} className="px-4 py-2.5 text-[13px]">
+                Start a sprint
               </SecondaryButton>
             )}
             {isActive && (
@@ -463,6 +474,12 @@ export default function DaysChallengeDashboard({ initialChallenge, initialStats,
       {tadaResult && (
         <TadaModal result={tadaResult} onClose={() => setTadaResult(null)} />
       )}
+
+      <StartGroupSprintModal
+        isOpen={showSprintModal}
+        onClose={() => setShowSprintModal(false)}
+        onCreated={handleSprintCreated}
+      />
     </div>
   );
 }

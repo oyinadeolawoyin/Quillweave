@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 const NAVY = "#1a1a2e";
 const GOLD = "#d4af37";
@@ -357,6 +358,7 @@ export default function AdminMiniChallenges() {
 
   return (
     <div className="min-h-screen" style={{ background: CREAM }}>
+      <AppMetaTags title="Admin · Weekly Challenges" description="Manage the rotating weekly mini-challenge templates on Quillweave." />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
 
         <div className="mb-8">

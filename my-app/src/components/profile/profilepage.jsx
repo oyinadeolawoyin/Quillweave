@@ -197,6 +197,7 @@ const CHECKLIST_ITEMS = [
   { key: "intro",      label: "Introduce yourself — post a thread in New to Inkwell" },
   { key: "comment",    label: "Leave your first comment on a thread in the forum" },
   { key: "critique",   label: "Give your first critique to another writer" },
+  { key: "draft",      label: "Create your first draft" },
   { key: "chapter",    label: "Post your first chapter for feedback" },
   { key: "sprint",     label: "Start your first sprint in the Sprint Room" },
   { key: "draftplan",  label: "Create your Draft Plan for your current project" },
@@ -211,6 +212,7 @@ function GettingStartedChecklist({ profileData, userId }) {
       case "intro":     return (p.threads ?? []).length > 0;
       case "comment":   return (p.threadCommentCount ?? 0) > 0;
       case "critique":  return (p.critiquesGiven ?? 0) > 0;
+      case "draft":     return (p.draftCount ?? 0) > 0;
       case "chapter":   return (p.submissions ?? []).length > 0;
       case "sprint":    return (p.sprintCount ?? 0) > 0;
       case "draftplan": return !!p.draftPlan;

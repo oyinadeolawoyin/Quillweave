@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import API_URL from "@/config/api";
+import { STICKY_COLORS } from "./stickynotes";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,9 +26,91 @@ export const FONT_FAMILIES = [
   { label: "Times New Roman",value: "'Times New Roman', Times, serif" },
   { label: "Lora",           value: "'Lora', Georgia, serif" },
   { label: "Merriweather",   value: "'Merriweather', Georgia, serif" },
-  { label: "Courier",        value: "'Courier New', Courier, monospace" },
+  { label: "Playfair Display", value: "'Playfair Display', Georgia, serif" },
+  { label: "Courier",        value: "'Courier Prime', 'Courier New', Courier, monospace" },
   { label: "Arial",          value: "Arial, Helvetica, sans-serif" },
+  { label: "Poppins",        value: "'Poppins', Arial, Helvetica, sans-serif" },
+  { label: "Handwritten",    value: "'Kalam', 'Comic Sans MS', cursive" },
   { label: "System",         value: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+];
+
+// Most fonts above (Palatino, Garamond, Lora, Merriweather, Playfair Display,
+// Courier Prime, Poppins, Kalam) aren't installed on most computers, so without
+// actually loading them the browser silently falls back to the same system
+// serif/sans/mono for all of them — which is why they all looked the same.
+// This pulls the missing ones in from Google Fonts once per page load, the
+// same way the sticky notes panel loads Kalam for itself.
+let editorFontsInjected = false;
+export function useEditorWebFonts() {
+  useEffect(() => {
+    if (editorFontsInjected) return;
+    editorFontsInjected = true;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href =
+      "https://fonts.googleapis.com/css2?" +
+      "family=EB+Garamond:wght@400;700&" +
+      "family=Lora:wght@400;700&" +
+      "family=Merriweather:wght@400;700&" +
+      "family=Playfair+Display:wght@400;700&" +
+      "family=Courier+Prime:wght@400;700&" +
+      "family=Poppins:wght@400;700&" +
+      "family=Kalam:wght@400;700&" +
+      "display=swap";
+    document.head.appendChild(link);
+  }, []);
+}
+
+// ─── Paper styles ─────────────────────────────────────────────────────────────
+// Cosmetic "skins" for the whole writing sheet — an optional alternative to
+// plain white paper, for writers who want the editor itself to feel like a
+// sticky note or a journal page rather than a blank document.
+//
+// "sticky" intentionally mirrors the sticky-note card's own colours (see
+// STICKY_COLORS.YELLOW in stickynotes.jsx) so the two actually match, plus
+// the same tape-strip + folded-corner treatment, rendered further down.
+//
+// "lined" and "legal" only carry their base/rule colours here — the actual
+// line spacing is computed per-render from the writer's chosen font size,
+// so the ruled lines always land under the text instead of drifting through
+// it as the font size changes.
+
+export const PAPER_STYLES = [
+  {
+    key: "plain", label: "Plain paper",
+    swatch: "#ffffff",
+    background: "#ffffff",
+    placeholderColor: "#d4cdc4",
+  },
+  {
+    key: "sticky", label: "Sticky note",
+    swatch: "#fff59d",
+    background: "linear-gradient(160deg, #fff59d 0%, #fff59d 80%, #e8dd6a 100%)",
+    placeholderColor: "rgba(58,47,20,0.45)",
+    ink: "#3a2f14",
+    tape: "rgba(255,255,255,0.55)",
+    font: "'Kalam', 'Comic Sans MS', cursive",
+  },
+  {
+    key: "kraft", label: "Kraft paper",
+    swatch: "#e3c99a",
+    background: "linear-gradient(160deg, #ecd8ae 0%, #dcbd85 100%)",
+    placeholderColor: "#7a6142",
+  },
+  {
+    key: "lined", label: "Lined journal",
+    swatch: "#fdfcf8",
+    base: "#fdfcf8",
+    ruleColor: "#d7e6f2",
+    placeholderColor: "#c4bdb4",
+  },
+  {
+    key: "legal", label: "Legal pad",
+    swatch: "#fdf6d8",
+    base: "#fdf6d8",
+    ruleColor: "#e9cf94",
+    placeholderColor: "#a68a4a",
+  },
 ];
 
 export const FONT_SIZES = [
@@ -51,10 +134,14 @@ const TEXT_COLORS = [
   "#1a365d", "#553c9a", "#702459", "#c05621", "#c53030",
 ];
 
-// Preset background colours
+// Preset background colours — reuses the sticky note palette (see
+// STICKY_COLORS in stickynotes.jsx) so a chosen background actually reads
+// as a warm, saturated paper tone instead of the barely-there off-whites
+// this used to offer.
 const BG_COLORS = [
-  "transparent", "#ffffff", "#faf7f2", "#fffbf0", "#f0fff4",
-  "#ebf8ff", "#faf5ff", "#fff5f5", "#f7fafc", "#1a202c",
+  "transparent",
+  "#ffffff",
+  ...Object.values(STICKY_COLORS).map(c => c.bg),
 ];
 
 // ─── Thesaurus drawer ─────────────────────────────────────────────────────────
@@ -249,7 +336,7 @@ export function ThesaurusDrawer({ isOpen, onClose }) {
 //   onImagePicked fn(payload) — for inline image insert
 //   visible     bool
 
-function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, onBlockClick, visible }) {
+function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, onBlockClick, showBlockTool = true, visible }) {
   const [showTextColor, setShowTextColor] = useState(false);
   const [showHighlight, setShowHighlight] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
@@ -405,6 +492,7 @@ function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, onBlockClick
                       const range = sel.getRangeAt(0);
                       const span = document.createElement("span");
                       span.style.fontSize = s.value;
+                      span.setAttribute("data-local-size", "1");
                       try { range.surroundContents(span); } catch {}
                     }
                     setShowFontSize(false);
@@ -462,11 +550,13 @@ function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, onBlockClick
         </button>
 
         {/* Exercise block */}
-        <button type="button" title="Insert exercise block" onMouseDown={e => { e.preventDefault(); onBlockClick?.(); }} className={floatBtn}>
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-        </button>
+        {showBlockTool && (
+          <button type="button" title="Insert exercise block" onMouseDown={e => { e.preventDefault(); onBlockClick?.(); }} className={floatBtn}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -487,6 +577,8 @@ function FloatingFormatBar({ onCommand, onImagePicked, onLinkClick, onBlockClick
 //   onBgColor        fn(color)
 //   currentTextColor string
 //   currentBgColor   string
+//   indentParagraphs bool            — whether the first-line-indent toggle is on
+//   onToggleIndent   fn()            — toggles indentParagraphs
 
 export function RichToolbar({
   onCommand,
@@ -502,6 +594,11 @@ export function RichToolbar({
   onImagePicked,
   onLinkClick,
   onBlockClick,
+  showBlockTool = true,
+  onPaperStyle,
+  currentPaperStyle = "plain",
+  indentParagraphs = false,
+  onToggleIndent,
 }) {
   const [colorPicker, setColorPicker] = useState(null); // "text" | "bg" | null
   const colorPickerRef = useRef(null);
@@ -524,6 +621,7 @@ export function RichToolbar({
     <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-[#f0e8d8] flex-shrink-0 flex-wrap bg-[#faf7f2]">
       {/* Font family */}
       <select
+        data-tour="tour-font"
         value={currentFont}
         onChange={e => onFontFamily?.(e.target.value)}
         className="h-7 text-xs text-[#5a4a30] bg-white border border-[#e8e0d0] rounded px-1.5 hover:border-[#c9b090] focus:outline-none focus:border-[#d4af37] transition-all cursor-pointer max-w-[110px]"
@@ -549,7 +647,7 @@ export function RichToolbar({
       <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
 
       {/* Bold */}
-      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("bold"); }} className={btn} title="Bold (Ctrl+B)">
+      <button type="button" data-tour="tour-format" onMouseDown={e => { e.preventDefault(); onCommand("bold"); }} className={btn} title="Bold (Ctrl+B)">
         <strong>B</strong>
       </button>
       {/* Italic */}
@@ -564,7 +662,7 @@ export function RichToolbar({
       <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
 
       {/* Align left */}
-      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("justifyLeft"); }} className={btn} title="Align left">
+      <button type="button" data-tour="tour-align" onMouseDown={e => { e.preventDefault(); onCommand("justifyLeft"); }} className={btn} title="Align left">
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 10h12M3 14h18M3 18h12" />
         </svg>
@@ -585,7 +683,7 @@ export function RichToolbar({
       <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
 
       {/* Bullet list */}
-      <button type="button" onMouseDown={e => { e.preventDefault(); onCommand("insertUnorderedList"); }} className={btn} title="Bullet list">
+      <button type="button" data-tour="tour-lists" onMouseDown={e => { e.preventDefault(); onCommand("insertUnorderedList"); }} className={btn} title="Bullet list">
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
         </svg>
@@ -597,8 +695,26 @@ export function RichToolbar({
         </svg>
       </button>
 
+      <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
+
+      {/* Indent all paragraphs — toggles a first-line indent across the whole
+          draft, the way a manuscript or novel page is usually formatted.
+          Distinct from Tab, which only indents the current line. */}
+      <button type="button"
+        data-tour="tour-indent"
+        onMouseDown={e => { e.preventDefault(); onToggleIndent?.(); }}
+        className={`${btn} ${indentParagraphs ? "bg-[#f0e8d8] text-[#2d3748]" : ""}`}
+        title={indentParagraphs ? "Turn off paragraph indents" : "Indent every paragraph"}
+        aria-pressed={indentParagraphs}
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 6h9M11 12h9M11 18h9M4 6l3 3-3 3" />
+        </svg>
+      </button>
+
       {/* Em dash */}
       <button type="button"
+        data-tour="tour-emdash"
         onMouseDown={e => {
           e.preventDefault();
           const sel = window.getSelection();
@@ -647,6 +763,7 @@ export function RichToolbar({
 
       {/* Insert image — uploads to server first, then inserts URL */}
       <label
+        data-tour="tour-image"
         className={`${btn} cursor-pointer`}
         title="Insert image"
         onMouseDown={e => e.preventDefault()}
@@ -710,6 +827,7 @@ export function RichToolbar({
 
       {/* Insert link — opens a modal for URL + display text, no upload involved */}
       <button type="button"
+        data-tour="tour-link"
         onMouseDown={e => { e.preventDefault(); onLinkClick?.(); }}
         className={btn}
         title="Insert link"
@@ -720,15 +838,18 @@ export function RichToolbar({
       </button>
 
       {/* Insert exercise/assignment block — opens a modal for heading + steps */}
-      <button type="button"
-        onMouseDown={e => { e.preventDefault(); onBlockClick?.(); }}
-        className={btn}
-        title="Insert exercise block"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        </svg>
-      </button>
+      {showBlockTool && (
+        <button type="button"
+          data-tour="tour-block"
+          onMouseDown={e => { e.preventDefault(); onBlockClick?.(); }}
+          className={btn}
+          title="Insert exercise block"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        </button>
+      )}
 
       {/* ── Selection colour (applies to highlighted text) ──────────────── */}
       <div className="w-px h-4 bg-[#e8e0d0] mx-1" />
@@ -736,6 +857,7 @@ export function RichToolbar({
       {/* Selection text colour */}
       <div className="relative" ref={colorPicker === "sel-text" ? colorPickerRef : null}>
         <button type="button"
+          data-tour="tour-color"
           onMouseDown={e => { e.preventDefault(); setColorPicker(p => p === "sel-text" ? null : "sel-text"); }}
           className={`${btn} flex-col gap-0.5`}
           title="Colour selected text">
@@ -798,6 +920,7 @@ export function RichToolbar({
           const range = sel.getRangeAt(0);
           const span = document.createElement("span");
           span.style.fontSize = px;
+          span.setAttribute("data-local-size", "1");
           range.surroundContents(span);
           e.target.value = "";
         }}
@@ -834,6 +957,7 @@ export function RichToolbar({
           {/* Background colour */}
           <div className="relative" ref={colorPicker === "bg" ? colorPickerRef : null}>
             <button type="button"
+              data-tour="tour-bg"
               onMouseDown={e => { e.preventDefault(); setColorPicker(p => p === "bg" ? null : "bg"); }}
               className={`${btn} flex-col gap-0.5`}
               title="Highlight / background colour">
@@ -855,6 +979,42 @@ export function RichToolbar({
               />
             )}
           </div>
+
+          {/* Paper style — optional sticky-note / journal look for the whole sheet */}
+          {onPaperStyle && (
+            <div className="relative" ref={colorPicker === "paper" ? colorPickerRef : null}>
+              <button type="button"
+                data-tour="tour-paper"
+                onMouseDown={e => { e.preventDefault(); setColorPicker(p => p === "paper" ? null : "paper"); }}
+                className={`${btn} flex-col gap-0.5`}
+                title="Paper style">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3h10a2 2 0 012 2v13l-4 3-4-3-4 3-2-1.5V5a2 2 0 012-2z" />
+                </svg>
+                <span
+                  className="w-4 h-0.5 rounded-full border border-[#e8e0d0]"
+                  style={{ background: PAPER_STYLES.find(p => p.key === currentPaperStyle)?.swatch || "#ffffff" }}
+                />
+              </button>
+              {colorPicker === "paper" && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-[#e8e0d0] rounded-xl shadow-xl p-3 w-48">
+                  <p className="text-[10px] font-semibold text-[#9a8c7a] uppercase tracking-wider mb-2">Paper style</p>
+                  <div className="flex flex-col gap-1">
+                    {PAPER_STYLES.map(p => (
+                      <button type="button" key={p.key}
+                        onMouseDown={e => { e.preventDefault(); onPaperStyle(p.key); setColorPicker(null); }}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all ${
+                          currentPaperStyle === p.key ? "bg-[#f0e8d8] text-[#2d3748] font-semibold" : "text-[#5a4a30] hover:bg-[#f7f2e8]"
+                        }`}>
+                        <span className="w-4 h-4 rounded-full border border-[#e8e0d0] flex-shrink-0" style={{ background: p.swatch }} />
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -1269,7 +1429,199 @@ function BlockModal({ savedRange, onInsert, onClose }) {
   );
 }
 
-// ─── Write editor ──────────────────────────────────────────────────────────────
+// ─── Toolbar walkthrough — points a small card at each tool in turn ───────────
+// Shown automatically the first time a writer lands in the editor (any page
+// that renders WriteEditor — Write page, Group Sprint workspace, etc.), and
+// re-launchable any time via the "?" button next to the save status.
+//
+// Each step's `selector` matches a `data-tour="..."` attribute placed on the
+// real toolbar control, so the card always points at the actual button —
+// no separately-maintained copy of the toolbar layout to keep in sync.
+//
+// The last step isn't a toolbar tool at all — it points at the sticky-notes
+// button (rendered by the page, not by RichToolbar) to make sure writers know
+// that button works even before they've written a single word: a sticky note
+// isn't tied to a paragraph unless you attach it to one, so it's just as
+// useful for parking an idea before the writing catches up.
+const TOOLBAR_TOUR_STEPS = [
+  {
+    selector: '[data-tour="tour-font"]',
+    title: "Font & size",
+    body: "Pick the typeface and size for your whole draft — switch it any time, it won't touch what you've already written.",
+  },
+  {
+    selector: '[data-tour="tour-format"]',
+    title: "Bold, italic, underline",
+    body: "Select some text first, then click one of these three to style it.",
+  },
+  {
+    selector: '[data-tour="tour-align"]',
+    title: "Alignment",
+    body: "Line the current paragraph up left, centre, or right.",
+  },
+  {
+    selector: '[data-tour="tour-lists"]',
+    title: "Lists",
+    body: "Turn a line into a bulleted or numbered list — handy for outlines or beat sheets inside a draft.",
+  },
+  {
+    selector: '[data-tour="tour-indent"]',
+    title: "Indent every paragraph",
+    body: "Toggle this on to give every paragraph a first-line indent, like a printed manuscript page — no need to indent each one by hand.",
+  },
+  {
+    selector: '[data-tour="tour-emdash"]',
+    title: "Em dash & divider",
+    body: "Drop in a proper em dash — or a horizontal divider to mark a scene or section break.",
+  },
+  {
+    selector: '[data-tour="tour-image"]',
+    title: "Insert image",
+    body: "Upload a reference photo, map, or moodboard image straight into the draft.",
+  },
+  {
+    selector: '[data-tour="tour-link"]',
+    title: "Insert link",
+    body: "Add a hyperlink — useful for citing a source or pointing to a companion piece.",
+  },
+  {
+    selector: '[data-tour="tour-block"]',
+    title: "Exercise block",
+    body: "Insert a boxed writing prompt or exercise, complete with its own heading and steps.",
+  },
+  {
+    selector: '[data-tour="tour-color"]',
+    title: "Colour & highlight",
+    body: "Colour or highlight selected text — great for flagging a note-to-self as you go.",
+  },
+  {
+    selector: '[data-tour="tour-bg"]',
+    title: "Background colour",
+    body: "Change the colour of the whole page — not just the text. A quiet way to mark a draft as a special one.",
+  },
+  {
+    selector: '[data-tour="tour-paper"]',
+    title: "Paper style",
+    body: "Swap the plain page for a different look — like ruled paper or a sticky-note sheet — to match the mood of what you're writing.",
+  },
+  {
+    selector: '[data-tour="tour-sticky"]',
+    title: "Sticky notes",
+    body: "You don't need to have written anything yet — this button drops a sticky note that isn't tied to any paragraph, so it's perfect for jotting an idea, a reminder, or an outline beat before the words show up.",
+  },
+];
+
+function ToolbarTourCard({ steps, stepIndex, onNext, onBack, onSkip, onFinish }) {
+  const step = steps[stepIndex] || null;
+  const [rect, setRect] = useState(null);
+
+  // Track the target element's position so the card and spotlight follow it
+  // through layout shifts, scrolling, and window resizes.
+  useEffect(() => {
+    if (!step) { setRect(null); return; }
+    function measure() {
+      const el = document.querySelector(step.selector);
+      setRect(el ? el.getBoundingClientRect() : null);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    const id = setInterval(measure, 300);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+      clearInterval(id);
+    };
+  }, [step]);
+
+  // If this step's target isn't rendered at all in this context (e.g. the
+  // exercise block tool is hidden in the feedback hub), skip past it rather
+  // than showing a card pointing at nothing.
+  useEffect(() => {
+    if (!step) return;
+    if (!document.querySelector(step.selector)) {
+      const t = setTimeout(() => onNext(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [step, onNext]);
+
+  if (!step || !rect) return null;
+
+  const isLast = stepIndex === steps.length - 1;
+  const cardWidth = 280;
+  const spacing = 12;
+  const viewportW = typeof window !== "undefined" ? window.innerWidth : 1024;
+  const viewportH = typeof window !== "undefined" ? window.innerHeight : 768;
+
+  const placeAbove = rect.bottom + 160 > viewportH && rect.top > 160;
+  let left = rect.left + rect.width / 2 - cardWidth / 2;
+  left = Math.max(12, Math.min(left, viewportW - cardWidth - 12));
+  const arrowLeft = rect.left + rect.width / 2 - left;
+
+  return (
+    <>
+      {/* Spotlight ring around the target tool */}
+      <div
+        className="fixed z-[70] rounded-lg pointer-events-none"
+        style={{
+          top: rect.top - 4,
+          left: rect.left - 4,
+          width: rect.width + 8,
+          height: rect.height + 8,
+          boxShadow: "0 0 0 4px #d4af37, 0 0 0 9999px rgba(26,26,46,0.55)",
+          transition: "top 0.15s ease, left 0.15s ease",
+        }}
+      />
+
+      {/* Card */}
+      <div
+        className="fixed z-[71] bg-[#1a1a2e] text-white rounded-xl shadow-2xl p-4"
+        style={{
+          width: cardWidth,
+          left,
+          ...(placeAbove
+            ? { bottom: viewportH - rect.top + spacing }
+            : { top: rect.bottom + spacing }),
+        }}
+      >
+        <div
+          className="absolute w-3 h-3 bg-[#1a1a2e]"
+          style={{
+            left: arrowLeft - 6,
+            transform: "rotate(45deg)",
+            ...(placeAbove ? { bottom: -6 } : { top: -6 }),
+          }}
+        />
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[#d4af37] mb-1.5">
+          {stepIndex + 1} of {steps.length}
+        </p>
+        <p className="text-sm font-semibold mb-1.5">{step.title}</p>
+        <p className="text-[13px] text-white/75 leading-relaxed mb-4">{step.body}</p>
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" onClick={onSkip} className="text-[12px] text-white/50 hover:text-white/80 transition-colors">
+            Skip tour
+          </button>
+          <div className="flex items-center gap-2">
+            {stepIndex > 0 && (
+              <button type="button" onClick={onBack} className="text-[12px] px-3 py-1.5 rounded-lg text-white/80 hover:bg-white/10 transition-colors">
+                Back
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={isLast ? onFinish : onNext}
+              className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-[#d4af37] text-[#1a1a2e] hover:bg-[#e0bf4f] transition-colors"
+            >
+              {isLast ? "Got it" : "Next"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
 // Rich text via contenteditable. Auto-saves every 30 s. Preserves formatting,
 // font choice, font size, text colour, and background colour in the saved HTML.
 //
@@ -1277,9 +1629,10 @@ function BlockModal({ savedRange, onInsert, onClose }) {
 //   draftId          string | null
 //   onWordsUpdate    fn(wc)
 //   onAutoSave       async fn({ draftId, title, content, wordCount, isManual? }) → { id }
-//   onDraftLoaded    fn(wordCount)
+//   onDraftLoaded    fn(wordCount, createdAt)
 //   saveRef          React ref — parent can call saveRef.current() to force-save
 //   showColorTools   bool (default true) — pass false in the feedback hub
+//   placeholder      string — empty-editor placeholder text (default "Begin writing…")
 
 export function WriteEditor({
   draftId,
@@ -1290,7 +1643,10 @@ export function WriteEditor({
   saveRef,
   contentRef,
   showColorTools = true,
+  showBlockTool = true,
+  placeholder = "Just start writing — don't stop to fix. This is your free writing space.",
 }) {
+  useEditorWebFonts();
   const [title, setTitle]         = useState("");
   const [saving, setSaving]       = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
@@ -1300,16 +1656,54 @@ export function WriteEditor({
   const [linkPick, setLinkPick] = useState(null); // { initialText, savedRange }
   const [blockPick, setBlockPick] = useState(null); // { savedRange }
 
+  // ── Toolbar walkthrough ───────────────────────────────────────────────────
+  const [tourActive, setTourActive] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+
+  // Auto-show once per browser, the very first time a writer lands in the
+  // editor. After that it's opt-in via the "?" button next to save status.
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("inkwell-editor-tour-seen")) setTourActive(true);
+    } catch {}
+  }, []);
+
+  function dismissTour() {
+    setTourActive(false);
+    setTourStep(0);
+    try { localStorage.setItem("inkwell-editor-tour-seen", "1"); } catch {}
+  }
+  function nextTourStep() {
+    setTourStep(i => {
+      if (i + 1 >= TOOLBAR_TOUR_STEPS.length) { dismissTour(); return i; }
+      return i + 1;
+    });
+  }
+  function backTourStep() {
+    setTourStep(i => Math.max(0, i - 1));
+  }
+
   // Typography / colour state (persisted in draft HTML via wrapper div style)
   const [fontFamily,   setFontFamily]   = useState(FONT_FAMILIES[0].value);
   const [fontSize,     setFontSize]     = useState(FONT_SIZES[1].value);
   const [textColor,    setTextColor]    = useState("#2d3748");
   const [bgColor,      setBgColor]      = useState("transparent");
+  const [paperStyle,   setPaperStyle]   = useState("plain");
+  const [indentParagraphs, setIndentParagraphs] = useState(false);
+  const [createdAt,    setCreatedAt]    = useState(null);
 
   const editorRef   = useRef(null);
   const autoSaveRef = useRef(null);
   const titleRef    = useRef(title);
   titleRef.current  = title;
+
+  // Firefox defaults to <br>-only line breaks (no wrapping element per line)
+  // unless told otherwise; Chrome already behaves this way. Sticky notes'
+  // paragraph detection tolerates either style, but forcing "div" here keeps
+  // behavior consistent across browsers going forward.
+  useEffect(() => {
+    try { document.execCommand("defaultParagraphSeparator", false, "div"); } catch {}
+  }, []);
 
   // Expose the raw editor DOM node to the parent so it can read innerHTML/innerText
   // directly at submit time without going through auto-save.
@@ -1318,8 +1712,8 @@ export function WriteEditor({
   }, [contentRef]);
 
   // Keep latest style values accessible in closures without re-creating intervals
-  const styleRef = useRef({ fontFamily, fontSize, textColor, bgColor });
-  useEffect(() => { styleRef.current = { fontFamily, fontSize, textColor, bgColor }; }, [fontFamily, fontSize, textColor, bgColor]);
+  const styleRef = useRef({ fontFamily, fontSize, textColor, bgColor, paperStyle, indentParagraphs });
+  useEffect(() => { styleRef.current = { fontFamily, fontSize, textColor, bgColor, paperStyle, indentParagraphs }; }, [fontFamily, fontSize, textColor, bgColor, paperStyle, indentParagraphs]);
 
   // ── Load initialContent (edit mode — no draftId, content passed directly) ─
   useEffect(() => {
@@ -1332,6 +1726,8 @@ export function WriteEditor({
         if (wrapper.dataset.fontSize)   setFontSize(wrapper.dataset.fontSize);
         if (wrapper.dataset.textColor)  setTextColor(wrapper.dataset.textColor);
         if (wrapper.dataset.bgColor)    setBgColor(wrapper.dataset.bgColor);
+        if (wrapper.dataset.paperStyle) setPaperStyle(wrapper.dataset.paperStyle);
+        setIndentParagraphs(wrapper.dataset.indent === "1");
       }
     }
     const text = editorRef.current?.innerText || "";
@@ -1344,6 +1740,7 @@ export function WriteEditor({
   // ── Load existing draft ───────────────────────────────────────────────────
   useEffect(() => {
     if (!draftId) {
+      setCreatedAt(new Date().toISOString());
       onDraftLoaded?.(0);
       return;
     }
@@ -1361,12 +1758,15 @@ export function WriteEditor({
               if (wrapper.dataset.fontSize)   setFontSize(wrapper.dataset.fontSize);
               if (wrapper.dataset.textColor)  setTextColor(wrapper.dataset.textColor);
               if (wrapper.dataset.bgColor)    setBgColor(wrapper.dataset.bgColor);
+              if (wrapper.dataset.paperStyle) setPaperStyle(wrapper.dataset.paperStyle);
+              setIndentParagraphs(wrapper.dataset.indent === "1");
             }
           }
           const wc = data.draft.wordCount || 0;
           setWordCount(wc);
+          setCreatedAt(data.draft.createdAt || null);
           onWordsUpdate?.(wc);
-          onDraftLoaded?.(wc);
+          onDraftLoaded?.(wc, data.draft.createdAt || null);
         }
       })
       .catch(() => {});
@@ -1374,10 +1774,10 @@ export function WriteEditor({
 
   // ── Get editor HTML with style metadata embedded ──────────────────────────
   function getContentHTML() {
-    const { fontFamily: ff, fontSize: fs, textColor: tc, bgColor: bc } = styleRef.current;
+    const { fontFamily: ff, fontSize: fs, textColor: tc, bgColor: bc, paperStyle: ps, indentParagraphs: ind } = styleRef.current;
     const innerHTML = editorRef.current?.innerHTML || "";
     // Wrap with a marker element that carries style info for restoration on load
-    return `<div data-editor-styles="1" data-font-family="${ff}" data-font-size="${fs}" data-text-color="${tc}" data-bg-color="${bc}" style="display:none"></div>${innerHTML}`;
+    return `<div data-editor-styles="1" data-font-family="${ff}" data-font-size="${fs}" data-text-color="${tc}" data-bg-color="${bc}" data-paper-style="${ps}" data-indent="${ind ? "1" : "0"}" style="display:none"></div>${innerHTML}`;
   }
 
   function getEditorText() {
@@ -1394,6 +1794,75 @@ export function WriteEditor({
     document.execCommand(cmd, false, null);
     editorRef.current?.focus();
   }
+
+  // ── Tab to indent a paragraph, Shift+Tab to remove one level of indent ────
+  const INDENT = "\u00A0\u00A0\u00A0\u00A0"; // 4 non-breaking spaces per indent level
+  function handleEditorKeyDown(e) {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+
+    if (e.shiftKey) {
+      // Outdent: strip one indent's worth of leading whitespace from the
+      // start of the current line, if present.
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0).cloneRange();
+      range.setStart(range.startContainer, 0);
+      const lineStart = range.toString();
+      const match = lineStart.match(/^(\u00A0| ){1,4}/);
+      if (match) {
+        const removeRange = document.createRange();
+        removeRange.setStart(range.startContainer, 0);
+        removeRange.setEnd(range.startContainer, match[0].length);
+        removeRange.deleteContents();
+      }
+    } else {
+      document.execCommand("insertText", false, INDENT);
+    }
+    handleEditorInput();
+  }
+
+  // ── Apply the document-wide font family/size, clearing any inline
+  //    overrides on existing content so the change takes effect immediately
+  //    everywhere — not only on text that happens to be selected. ──────────
+  function applyFontFamily(value) {
+    setFontFamily(value);
+    editorRef.current?.querySelectorAll("[style]").forEach(el => {
+      el.style.fontFamily = "";
+    });
+  }
+  function applyFontSize(value) {
+    setFontSize(value);
+    editorRef.current?.querySelectorAll("[style]").forEach(el => {
+      el.style.fontSize = "";
+    });
+  }
+
+  // ── Keep the document-wide font enforced as the writer keeps typing ──────
+  // Some browsers (especially on mobile, with autocorrect/predictive text)
+  // silently attach their own inline font-family/font-size to newly created
+  // text nodes as you type — which is what made font changes look like they
+  // only "stuck" on text you'd already selected. This watches for any new
+  // content and strips those stray inline styles the moment they appear, so
+  // the toolbar's chosen font always wins. Text deliberately resized via the
+  // per-selection size tools (marked data-local-size) is left alone.
+  useEffect(() => {
+    if (!editorRef.current) return;
+    const clean = (el) => {
+      if (el.nodeType !== 1) return;
+      if (el.style?.fontFamily) el.style.fontFamily = "";
+      if (el.style?.fontSize && !el.hasAttribute("data-local-size")) el.style.fontSize = "";
+      el.querySelectorAll?.("[style]").forEach(child => {
+        if (child.style.fontFamily) child.style.fontFamily = "";
+        if (child.style.fontSize && !child.hasAttribute("data-local-size")) child.style.fontSize = "";
+      });
+    };
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(m => m.addedNodes.forEach(clean));
+    });
+    observer.observe(editorRef.current, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   // ── Open the link modal, remembering the current selection ──────────────
   function openLinkModal() {
@@ -1591,16 +2060,88 @@ export function WriteEditor({
   const editorContainerStyle = {
     fontFamily,
     fontSize,
-    color:           textColor,
-    backgroundColor: bgColor === "transparent" ? undefined : bgColor,
-    lineHeight:      "1.95",
-    minHeight:       "60vh",
+    color:      textColor,
+    lineHeight: "1.95",
+    minHeight:  "60vh",
+    // text-indent is inherited, so this indents the first line of every
+    // paragraph div individually — not just the very first paragraph.
+    textIndent: indentParagraphs ? "2em" : "0",
   };
 
+  const paper = PAPER_STYLES.find(p => p.key === paperStyle) || PAPER_STYLES[0];
+
+  // Ruled lines scale with the writer's chosen font size (same 1.95 multiplier
+  // as the text's own line-height) so the rules always land under each line
+  // instead of drifting through the text as the font size changes.
+  const fontSizePx = parseFloat(fontSize) || 16;
+  const ruleLineHeightPx = Math.max(20, Math.round(fontSizePx * 1.95));
+
+  // A chosen background colour is a deliberate override of the whole sheet,
+  // not just the title/text strips — applying it here (rather than as a
+  // patch on individual sections further down) means the date line and the
+  // word-count footer pick it up too, instead of staying whatever colour
+  // the paper style happened to be underneath.
+  const sheetStyle = bgColor !== "transparent"
+    ? { background: bgColor }
+    : paper.base
+      ? {
+          background: paper.base,
+          backgroundImage: `repeating-linear-gradient(${paper.base} 0px, ${paper.base} ${ruleLineHeightPx - 1}px, ${paper.ruleColor} ${ruleLineHeightPx}px)`,
+          backgroundSize: `100% ${ruleLineHeightPx}px`,
+        }
+      : { background: paper.background };
+  sheetStyle["--placeholder-color"] = paper.placeholderColor || "#c4bdb4";
+
+  // Switching to the sticky-note paper also switches to its handwritten font
+  // and ink colour, so the writing surface actually matches the sticky note
+  // cards rather than just borrowing their background colour. Switching to
+  // any other paper leaves font/colour choices alone (no snapping back).
+  function handlePaperStyle(key) {
+    setPaperStyle(key);
+    if (key === "sticky") {
+      const stickyPreset = PAPER_STYLES.find(p => p.key === "sticky");
+      setFontFamily(stickyPreset.font);
+      setTextColor(stickyPreset.ink);
+    }
+  }
+
+  function toggleIndentParagraphs() {
+    setIndentParagraphs(p => !p);
+    editorRef.current?.focus();
+  }
+
+  function formatJournalDate(iso) {
+    if (!iso) return "";
+    return new Date(iso).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  }
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col relative" style={sheetStyle}>
+      {/* Sticky-note "tape" + folded corner — only for the sticky-note paper style,
+          matching the sticky note cards' own decoration so the two actually look alike */}
+      {paper.key === "sticky" && (
+        <>
+          <div
+            className="absolute -top-2 left-1/2 -translate-x-1/2 w-24 h-6 rounded-[2px] pointer-events-none z-10"
+            style={{ background: paper.tape, boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-0 h-0 pointer-events-none"
+            style={{ borderStyle: "solid", borderWidth: "0 0 32px 32px", borderColor: "transparent transparent transparent rgba(0,0,0,0.12)" }}
+          />
+        </>
+      )}
+
       {/* Save status */}
-      <div className="flex items-center justify-end px-6 py-2 flex-shrink-0">
+      <div className="flex items-center justify-end gap-3 px-6 py-2 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => { setTourStep(0); setTourActive(true); }}
+          title="Take a quick tour of the toolbar"
+          className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-[#9a8c7a] border border-[#e0d8cc] hover:border-[#d4af37] hover:text-[#d4af37] transition-colors flex-shrink-0"
+        >
+          ?
+        </button>
         {saving ? (
           <span className="text-xs text-[#9a8c7a] flex items-center gap-1.5">
             <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1619,8 +2160,8 @@ export function WriteEditor({
       {/* Formatting toolbar */}
       <RichToolbar
         onCommand={handleCommand}
-        onFontFamily={setFontFamily}
-        onFontSize={setFontSize}
+        onFontFamily={applyFontFamily}
+        onFontSize={applyFontSize}
         currentFont={fontFamily}
         currentSize={fontSize}
         showColorTools={showColorTools}
@@ -1631,15 +2172,32 @@ export function WriteEditor({
         onImagePicked={payload => setImagePick(payload)}
         onLinkClick={openLinkModal}
         onBlockClick={openBlockModal}
+        showBlockTool={showBlockTool}
+        onPaperStyle={handlePaperStyle}
+        currentPaperStyle={paperStyle}
+        indentParagraphs={indentParagraphs}
+        onToggleIndent={toggleIndentParagraphs}
       />
 
+      {/* Journal dateline — the day the entry was first created, like a diary */}
+      {createdAt && (
+        <div className="px-8 pt-5 flex-shrink-0">
+          <p
+            className="text-xs italic text-[#9a8c7a] tracking-wide"
+            style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
+          >
+            {formatJournalDate(createdAt)}
+          </p>
+        </div>
+      )}
+
       {/* Title */}
-      <div className="px-8 pt-6 pb-2 flex-shrink-0" style={{ backgroundColor: bgColor === "transparent" ? undefined : bgColor }}>
+      <div className={`px-8 ${createdAt ? "pt-1" : "pt-6"} pb-2 flex-shrink-0`}>
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="Title (optional)"
-          className="w-full text-2xl font-serif font-bold bg-transparent border-none outline-none placeholder-[#d4cdc4]"
+          className="w-full text-2xl font-serif font-bold bg-transparent border-none outline-none journal-title-input"
           style={{
             fontFamily: "'Georgia', 'Times New Roman', serif",
             color: textColor,
@@ -1656,9 +2214,10 @@ export function WriteEditor({
         contentEditable
         suppressContentEditableWarning
         onInput={handleEditorInput}
+        onKeyDown={handleEditorKeyDown}
         onFocus={() => setEditorFocused(true)}
         onBlur={() => setEditorFocused(false)}
-        data-placeholder="Begin writing…"
+        data-placeholder={placeholder}
         className="px-8 pb-10 outline-none"
         style={editorContainerStyle}
       />
@@ -1674,6 +2233,7 @@ export function WriteEditor({
         onImagePicked={payload => setImagePick(payload)}
         onLinkClick={openLinkModal}
         onBlockClick={openBlockModal}
+        showBlockTool={showBlockTool}
         visible={editorFocused}
       />
 
@@ -1706,11 +2266,27 @@ export function WriteEditor({
         />
       )}
 
+      {/* Toolbar walkthrough overlay */}
+      {tourActive && (
+        <ToolbarTourCard
+          steps={TOOLBAR_TOUR_STEPS}
+          stepIndex={tourStep}
+          onNext={nextTourStep}
+          onBack={backTourStep}
+          onSkip={dismissTour}
+          onFinish={dismissTour}
+        />
+      )}
+
       <style>{`
         [contenteditable]:empty:before {
           content: attr(data-placeholder);
-          color: #c4bdb4;
+          color: var(--placeholder-color, #c4bdb4);
           pointer-events: none;
+        }
+        .journal-title-input::placeholder {
+          color: var(--placeholder-color, #d4cdc4);
+          opacity: 1;
         }
         [contenteditable] ul { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
         [contenteditable] ol { list-style: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }

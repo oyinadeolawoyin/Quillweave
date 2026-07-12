@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
+import { AppMetaTags } from "../utilis/metatags";
 
 // ─── Admin Soundscapes Page ────────────────────────────────────
 // Styled to match the AdminSchedule page pattern.
@@ -92,6 +93,7 @@ export default function AdminSoundscapes() {
 
   return (
     <div className="min-h-screen bg-[#faf7f2]">
+      <AppMetaTags title="Admin · Soundscapes" description="Approve or reject community soundscape submissions on Quillweave." />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14 space-y-6">
 

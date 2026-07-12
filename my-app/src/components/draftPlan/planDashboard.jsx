@@ -16,6 +16,7 @@ import LogProgressModal from "./logProgressModal";
 import API_URL from "../../config/api";
 import { EventJoinBanner } from "../event/eventjoinbanner";
 import { AppMetaTags } from "../utilis/metatags";
+import { StartGroupSprintModal } from "../sprint/groupSprintModal";
 
 const WEEKDAY_ORDER   = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const WEEKDAY_LABEL   = { MON: "M", TUE: "T", WED: "W", THU: "T", FRI: "F", SAT: "S", SUN: "S" };
@@ -76,6 +77,7 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
   const [showLogModal, setShowLogModal]   = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSprintModal, setShowSprintModal] = useState(false);
   const [tadaResult, setTadaResult]       = useState(null);
   const [loggedToday, setLoggedToday]     = useState([]);
   // Writers who share today as a writing day but haven't necessarily logged
@@ -237,6 +239,10 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
     } catch { /* error surfaced inside confirm modal */ }
   }
 
+  function handleSprintCreated(groupSprint, openEditor) {
+    navigate(`/group-sprint/${groupSprint.id}`, { state: { writingMode: openEditor ? "quillweave" : null } });
+  }
+
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-16">
       <AppMetaTags
@@ -262,6 +268,9 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
           </button>
           <SecondaryButton onClick={() => setShowEditModal(true)} className="px-4 py-2.5 text-[13px]">
             Edit project
+          </SecondaryButton>
+          <SecondaryButton onClick={() => setShowSprintModal(true)} className="px-4 py-2.5 text-[13px]">
+            Start a sprint
           </SecondaryButton>
           <PrimaryButton onClick={() => setShowLogModal(true)} className="px-5 py-2.5">
             Log Progress
@@ -530,6 +539,17 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
                 <InspirationGalleryCard plan={plan} onPlanUpdated={handlePlanUpdated} />
               </div>
             </div>
+
+            {/* Related blog posts — kept inside the left column on purpose:
+                the right sidebar (Writers & Their Characters, Writing with
+                you today) can grow much taller than the left column as more
+                writers/details show up, and this used to sit below the whole
+                two-column grid, so it got pushed further and further down
+                whenever the sidebar grew. Living in the left column now, its
+                position only tracks the left column's own height. */}
+            <div>
+              <RelatedArticles tags={["drafting", "successful-stories"]} />
+            </div>
           </div>
 
           {/* RIGHT COLUMN — Writer's Room */}
@@ -712,10 +732,6 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
             )}
           </div>
         </div>
-
-        <div className="mt-8">
-          <RelatedArticles tags={["drafting", "successful-stories"]} />
-        </div>
         </>
       )}
 
@@ -749,6 +765,11 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
           onConfirm={handleDelete}
         />
       )}
+      <StartGroupSprintModal
+        isOpen={showSprintModal}
+        onClose={() => setShowSprintModal(false)}
+        onCreated={handleSprintCreated}
+      />
     </div>
   );
 }

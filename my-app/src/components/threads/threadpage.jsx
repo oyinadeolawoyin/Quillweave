@@ -32,6 +32,22 @@ function parseMediaUrls(raw) {
   return [];
 }
 
+// Tracks whether the viewport is narrower than Tailwind's `sm` breakpoint.
+// Used to switch the deep-reply behavior: past the nesting cap, mobile
+// pushes into a focused "continue this thread" view (like Reddit/Twitter's
+// mobile apps), while wider screens just keep indenting.
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isMobile;
+}
+
 function Avatar({ user, size = 32 }) {
   if (!user) return (
     <div className="rounded-full bg-[#e8e0d0] flex items-center justify-center flex-shrink-0 text-[#9a8c7a] font-bold"
@@ -376,6 +392,53 @@ function LikeButton({ count, liked, onToggle, disabled, size = "md" }) {
 
 // ─── Compose box — with media upload ─────────────────────────────────────────
 
+// ─── Emoji picker ─────────────────────────────────────────────────────────────
+// Small curated set (no external dependency) grouped loosely by theme —
+// plenty for reacting in a comment/reply without needing a huge picker.
+
+const EMOJI_SET = [
+  "😀","😂","😅","😊","😉","😍","🥰","😘","😎","🤔",
+  "😴","😭","😢","😡","🤯","🥳","😱","🙃","😇","🤗",
+  "👍","👎","👏","🙌","🙏","💪","✍️","🤝","👋","✨",
+  "🔥","💯","❤️","💛","💚","💙","💜","🖤","🤍","💔",
+  "📚","📖","✏️","📝","💡","🎉","🎊","☕","🍵","🌙",
+  "⭐","🌟","🚀","🎯","✅","❌","⏰","😬","🥲","🤩",
+];
+
+function EmojiPicker({ onSelect, onClose }) {
+  const boxRef = useRef(null);
+  useEffect(() => {
+    function handleClick(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) onClose();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={boxRef}
+      className="absolute bottom-full left-0 mb-2 z-50 w-64 bg-white border border-[#e8e0d0] rounded-xl p-2.5 overflow-y-auto"
+      style={{ boxShadow: "0 8px 32px rgba(26,26,46,0.16)", maxHeight: "min(260px, 60vh)" }}
+    >
+      <div className="grid grid-cols-8 gap-0.5">
+        {EMOJI_SET.map((emoji, i) => (
+          <button
+            key={i}
+            type="button"
+            onMouseDown={e => { e.preventDefault(); onSelect(emoji); }}
+            className="w-7 h-7 flex items-center justify-center text-[16px] rounded-md hover:bg-[#f4f1ec] transition-colors"
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Compose box (comment / reply textarea, shared) ────────────────────────────
+
 function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, autoFocus = false, compact = false }) {
   const [value, setValue]             = useState("");
   const [files, setFiles]             = useState([]);
@@ -387,6 +450,7 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
   const [mentionIndex, setMentionIndex]   = useState(0);
   const [mentionAnchor, setMentionAnchor] = useState(null); // caret position where @ was typed
   const mentionTimer = useRef(null);
+  const [showEmoji, setShowEmoji] = useState(false);
 
   const textRef = useRef(null);
   const fileRef = useRef(null);
@@ -418,6 +482,20 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
 
   function removeFile(i) {
     setFiles(prev => prev.filter((_, idx) => idx !== i));
+  }
+
+  function insertEmoji(emoji) {
+    const el = textRef.current;
+    const start = el ? el.selectionStart : value.length;
+    const end   = el ? el.selectionEnd   : value.length;
+    const newValue = `${value.slice(0, start)}${emoji}${value.slice(end)}`;
+    setValue(newValue);
+    setShowEmoji(false);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = start + emoji.length;
+      el?.setSelectionRange(pos, pos);
+    });
   }
 
   function wrapSelection(marker, ph) {
@@ -504,7 +582,7 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
   return (
     <div className="relative">
       <div
-        className="rounded-xl border border-[#e8e0d0] bg-white overflow-hidden"
+        className="rounded-xl border border-[#e8e0d0] bg-white"
         style={{ boxShadow: "0 2px 14px rgba(26,26,46,0.07)" }}
       >
         {/* Formatting toolbar */}
@@ -530,6 +608,16 @@ function ComposeBox({ placeholder = "Write something…", onSubmit, onCancel, au
         <div className="flex items-center justify-between px-5 pb-3.5 pt-2 bg-white border-t border-[#f4f1ec]">
           <div className="flex items-center gap-3">
             <span className="text-[11px] text-[#c8b89a]">⌘+Enter to post</span>
+            <div className="relative">
+              <button type="button" onClick={() => setShowEmoji(s => !s)}
+                className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors" title="Add an emoji">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h.01M15 10h.01M8.5 15a4 4 0 007 0" />
+                </svg>
+              </button>
+              {showEmoji && <EmojiPicker onSelect={insertEmoji} onClose={() => setShowEmoji(false)} />}
+            </div>
             <button type="button" onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_IMAGES}
               className="text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors disabled:opacity-30" title="Attach images">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -635,16 +723,105 @@ function ComposeModal({ placeholder, onSubmit, onClose }) {
   );
 }
 
-// ─── Reply row ────────────────────────────────────────────────────────────────
+// ─── Reply tree builder ─────────────────────────────────────────────────────
+// Replies come back from the API as a flat list (each with a parentId — null
+// for a direct reply to the comment, or another reply's id for a nested
+// reply-to-a-reply). This turns that flat list into a tree so we can render
+// it Reddit-style, with each level indented under its parent.
+function buildReplyTree(flat) {
+  const byId = new Map(flat.map(r => [r.id, { ...r, children: [] }]));
+  const roots = [];
+  byId.forEach(node => {
+    if (node.parentId && byId.has(node.parentId)) {
+      byId.get(node.parentId).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  function sortTree(nodes) {
+    nodes.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    nodes.forEach(n => sortTree(n.children));
+  }
+  sortTree(roots);
+  return roots;
+}
 
-function ReplyRow({ reply, user, commentId, threadId, isAdmin, onLikeToggled, onReplyTo, onDeleted, highlightReplyId }) {
+// Reddit-style reply nesting. Replies visually nest three levels deep
+// (depth 0, 1, 2) with a curved connector line joining each reply to its
+// own parent only — never to a sibling branch — so two separate reply
+// chains never appear visually linked. On desktop, once a branch goes
+// past that depth it simply keeps indenting (like old Reddit on a wide
+// screen). On mobile there isn't room to keep indenting, so instead the
+// deepest visible reply gets a "Continue this thread" button: tapping it
+// swaps the whole comment's reply list for a focused view rooted at that
+// reply, exactly like tapping into a sub-thread on Reddit/Twitter mobile.
+const MAX_REPLY_DEPTH = 3;
+
+// Counts every descendant of a node (its children, grandchildren, etc.) —
+// used to show "Continue this thread (12 replies)".
+function countDescendants(node) {
+  if (!node.children?.length) return 0;
+  return node.children.reduce((sum, c) => sum + 1 + countDescendants(c), 0);
+}
+
+// Walks up from a reply to the comment root, returning the chain of
+// ancestor replies (oldest first). Used to show a short breadcrumb above
+// a focused "continue this thread" view so context isn't lost.
+function getAncestorChain(replyId, repliesById) {
+  const chain = [];
+  let current = repliesById.get(replyId);
+  while (current?.parentId && repliesById.has(current.parentId)) {
+    current = repliesById.get(current.parentId);
+    chain.unshift(current);
+  }
+  return chain;
+}
+
+// Curved connector for a reply-to-reply link (depth 1 or 2) — reaches back
+// to the parent reply's own avatar column (28px wide, gap-2/gap-3 apart).
+function ThreadElbow() {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute -left-[22px] sm:-left-[26px] top-[-14px] w-[36px] sm:w-[40px] h-[28px] border-l-2 border-b-2 rounded-bl-2xl"
+      style={{ borderColor: "#e8e0d0" }}
+    />
+  );
+}
+
+// Curved connector for a direct reply to the comment itself — reaches back
+// to the comment's larger avatar column (36px wide, gap-3/gap-4 apart).
+function CommentThreadElbow() {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute -left-[38px] sm:-left-[54px] top-[-14px] w-[52px] sm:w-[68px] h-[30px] border-l-2 border-b-2 rounded-bl-2xl"
+      style={{ borderColor: "#e8e0d0" }}
+    />
+  );
+}
+
+// ─── Reply node (recursive — renders a reply and all of its nested replies) ──
+
+function ReplyNode({ reply, depth, user, commentId, threadId, isAdmin, onReplyTo, onDeleted, onContinueThread, highlightReplyId, repliesById }) {
   const [liked, setLiked]       = useState(reply.likedByMe ?? false);
   const [likes, setLikes]       = useState(reply._count?.likes ?? 0);
   const [toggling, setToggling] = useState(false);
   const [highlighted, setHighlighted] = useState(false);
+  // Long chains collapse by default so a busy thread doesn't turn into a
+  // wall of nested boxes; the user can always toggle it back open.
+  const childCount = reply.children?.length ?? 0;
+  const totalDescendants = countDescendants(reply);
+  const [collapsed, setCollapsed] = useState(totalDescendants > 4);
+  const isMobile = useIsMobile();
 
   const isTarget = highlightReplyId === reply.id;
   const canDelete = user && (user.id === reply.authorId || isAdmin);
+  // Once a reply sits at the deepest allowed level, mobile hands off to a
+  // "Continue this thread" focused view instead of squeezing in another
+  // indent; desktop just keeps nesting normally.
+  const atDepthCap = depth >= MAX_REPLY_DEPTH - 1;
+  const pushToContinueView = atDepthCap && isMobile && childCount > 0;
 
   useEffect(() => {
     if (!isTarget) return;
@@ -664,7 +841,6 @@ function ReplyRow({ reply, user, commentId, threadId, isAdmin, onLikeToggled, on
         const d = await r.json();
         setLiked(d.liked);
         setLikes(d.likesCount);
-        onLikeToggled?.();
       }
     } finally { setToggling(false); }
   }
@@ -678,60 +854,123 @@ function ReplyRow({ reply, user, commentId, threadId, isAdmin, onLikeToggled, on
   }
 
   return (
-    <div id={`reply-${reply.id}`} className="flex gap-4" style={{ scrollMarginTop: 96 }}>
-      <Avatar user={reply.author} size={36} />
-      <div className="flex-1 min-w-0 pb-3">
-        <div
-          className="bg-white rounded-2xl border px-5 py-4 transition-all duration-700"
-          style={{
-            boxShadow:   highlighted ? "0 0 0 3px #d4af37, 0 4px 16px rgba(212,175,55,0.18)" : "0 1px 6px rgba(26,26,46,0.05)",
-            borderColor: highlighted ? "#d4af37" : "#e8e0d0",
-          }}
-        >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex items-baseline gap-2">
-              {reply.author?.id ? (
-                <Link
-                  to={`/profile/${reply.author.id}`}
-                  className="text-[14px] font-bold text-[#1a1a2e] hover:text-[#d4af37] transition-colors"
+    <div id={`reply-${reply.id}`} className="relative" style={{ scrollMarginTop: 96 }}>
+      {depth === 0 ? <CommentThreadElbow /> : <ThreadElbow />}
+      <div className="flex gap-2 sm:gap-3 min-w-0">
+        <div className="flex flex-col items-center flex-shrink-0" style={{ width: 28 }}>
+          <Avatar user={reply.author} size={28} />
+          {childCount > 0 && !collapsed && (
+            <div className="w-0.5 flex-1 mt-2 rounded-full" style={{ background: "#e8e0d0", minHeight: 16 }} />
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 pb-3">
+          <div
+            className="bg-white rounded-2xl border px-3.5 py-2.5 sm:px-4 sm:py-3 transition-all duration-700"
+            style={{
+              boxShadow:   highlighted ? "0 0 0 3px #d4af37, 0 4px 16px rgba(212,175,55,0.18)" : "0 1px 6px rgba(26,26,46,0.05)",
+              borderColor: highlighted ? "#d4af37" : "#e8e0d0",
+            }}
+          >
+            <div className="flex items-start justify-between gap-2 mb-1.5 flex-wrap">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                {reply.author?.id ? (
+                  <Link
+                    to={`/profile/${reply.author.id}`}
+                    className="text-[13px] font-bold text-[#1a1a2e] hover:text-[#d4af37] transition-colors"
+                  >
+                    {reply.author.username}
+                  </Link>
+                ) : (
+                  <span className="text-[13px] font-bold text-[#1a1a2e]">Deleted user</span>
+                )}
+                <span className="text-[11px] text-[#c8b89a]">{timeAgo(reply.createdAt)}</span>
+              </div>
+              {canDelete && (
+                <button
+                  onClick={deleteReply}
+                  className="text-[#c8b89a] hover:text-[#c0392b] transition-colors flex-shrink-0 p-1"
+                  title="Delete reply"
                 >
-                  {reply.author.username}
-                </Link>
-              ) : (
-                <span className="text-[14px] font-bold text-[#1a1a2e]">Deleted user</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               )}
-              <span className="text-[11px] text-[#c8b89a]">{timeAgo(reply.createdAt)}</span>
             </div>
-            {canDelete && (
+            <FormattedText content={reply.content} className="text-[13.5px] text-[#2d2416] leading-relaxed" />
+            {(() => {
+              const urls = parseMediaUrls(reply.mediaUrls);
+              return urls.length > 0
+                ? <ImageSlideshow urls={urls} />
+                : reply.mediaUrl && <MediaBlock url={reply.mediaUrl} />;
+            })()}
+          </div>
+          <div className="flex items-center gap-1 mt-1.5 pl-1 flex-wrap">
+            <LikeButton count={likes} liked={liked} onToggle={toggleLike} disabled={!user || toggling} size="sm" />
+            {user && (
               <button
-                onClick={deleteReply}
-                className="text-[#c8b89a] hover:text-[#c0392b] transition-colors flex-shrink-0 p-1"
-                title="Delete reply"
+                onClick={() => onReplyTo(reply)}
+                className="px-3 py-1.5 text-[12px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] hover:bg-[#f0ebe3] rounded-lg transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                Reply
+              </button>
+            )}
+            {/* Collapse toggle — only shown once a branch has enough nested
+                replies that hiding it is actually useful. */}
+            {childCount > 0 && !pushToContinueView && (
+              <button
+                onClick={() => setCollapsed(c => !c)}
+                className="flex items-center gap-1 px-3 py-1.5 text-[12px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] hover:bg-[#f0ebe3] rounded-lg transition-colors"
+              >
+                <svg className={`w-3 h-3 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                 </svg>
+                {collapsed
+                  ? `Show ${totalDescendants} ${totalDescendants === 1 ? "reply" : "replies"}`
+                  : "Hide replies"}
               </button>
             )}
           </div>
-          <FormattedText content={reply.content} className="text-[14px] text-[#2d2416] leading-relaxed" />
-          {(() => {
-            const urls = parseMediaUrls(reply.mediaUrls);
-            return urls.length > 0
-              ? <ImageSlideshow urls={urls} />
-              : reply.mediaUrl && <MediaBlock url={reply.mediaUrl} />;
-          })()}
-        </div>
-        <div className="flex items-center gap-1 mt-2 pl-1">
-          <LikeButton count={likes} liked={liked} onToggle={toggleLike} disabled={!user || toggling} size="md" />
-          {user && (
-            <button
-              onClick={() => onReplyTo(reply.author?.username)}
-              className="px-3 py-2 text-[13px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] hover:bg-[#f0ebe3] rounded-lg transition-colors"
-            >
-              Reply
-            </button>
+
+          {/* Nested children. Under the depth cap they nest normally, same
+              indent step every level (Reddit desktop-style) and collapse
+              behind a toggle once a branch gets long. On mobile, once a
+              branch would need a 4th indent level, it hands off to a
+              focused "continue this thread" view instead of squeezing in
+              another column. */}
+          {childCount > 0 && !collapsed && (
+            pushToContinueView ? (
+              <button
+                onClick={() => onContinueThread(reply.id)}
+                className="mt-2.5 flex items-center gap-1.5 pl-1 text-[12px] font-bold text-[#1a5fb4] hover:underline"
+              >
+                Continue this thread ({totalDescendants} {totalDescendants === 1 ? "reply" : "replies"})
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            ) : (
+              <div className="mt-2.5 space-y-2.5">
+                {reply.children.map(child => (
+                  <ReplyNode
+                    key={child.id}
+                    reply={child}
+                    depth={depth + 1}
+                    user={user}
+                    commentId={commentId}
+                    threadId={threadId}
+                    isAdmin={isAdmin}
+                    onReplyTo={onReplyTo}
+                    onDeleted={onDeleted}
+                    onContinueThread={onContinueThread}
+                    highlightReplyId={highlightReplyId}
+                    repliesById={repliesById}
+                  />
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>
@@ -741,57 +980,88 @@ function ReplyRow({ reply, user, commentId, threadId, isAdmin, onLikeToggled, on
 
 // ─── Comment card ─────────────────────────────────────────────────────────────
 
-function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, highlightReplyId }) {
+function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, highlightReplyId, onCountChange }) {
   const [liked, setLiked]           = useState(comment.likedByMe ?? false);
   const [likes, setLikes]           = useState(comment._count?.likes ?? 0);
   const [toggling, setToggling]     = useState(false);
-  const [replies, setReplies]       = useState([]);
+  const [replies, setReplies]       = useState([]);     // flat list, as returned by the API
   const [repliesLoaded, setLoaded]  = useState(false);
   const [loadingReplies, setLR]     = useState(false);
   const [showModal, setShowModal]   = useState(false);
-  const [replyPrefix, setReplyPrefix] = useState("");
+  // replyTarget: null = replying to the comment itself; otherwise the reply
+  // node being replied to (so we can nest under it and prefix its @username).
+  const [replyTarget, setReplyTarget] = useState(null);
   const [highlighted, setHighlighted] = useState(false);
+  // On mobile, drilling into "Continue this thread" pushes onto this stack —
+  // each entry is a reply id that became a focused root. "Back" pops one
+  // level at a time (real back-navigation), rather than jumping straight
+  // back to the top no matter how many levels deep the user drilled in.
+  const [focusStack, setFocusStack] = useState([]);
+  const focusedReplyId = focusStack.length ? focusStack[focusStack.length - 1] : null;
 
   const cardRef = useRef(null);
   const replyCount = comment._count?.replies ?? 0;
+  const replyTree = buildReplyTree(replies);
+  // Lookup by id, used to walk parent chains (breadcrumbs for the focused
+  // view) and to build a single reply's subtree when focused.
+  const repliesById = new Map(replies.map(r => [r.id, r]));
+  const focusedReply = focusedReplyId != null ? repliesById.get(focusedReplyId) : null;
+  const focusedAncestors = focusedReply ? getAncestorChain(focusedReplyId, repliesById) : [];
+  const focusedTree = focusedReply ? buildReplyTree(replies.filter(r => {
+    if (r.id === focusedReplyId) return true;
+    // keep anything that descends from the focused reply
+    let cur = r;
+    while (cur?.parentId) {
+      if (cur.parentId === focusedReplyId) return true;
+      cur = repliesById.get(cur.parentId);
+    }
+    return false;
+  })) : [];
+
+  function pushFocus(replyId) {
+    setFocusStack(prev => [...prev, replyId]);
+  }
+  function goBackOneLevel() {
+    setFocusStack(prev => prev.slice(0, -1));
+  }
 
   const isTargetComment = highlightCommentId === comment.id;
   const isTargetReply   = highlightReplyId != null;
 
+  async function loadReplies() {
+    setLR(true);
+    try {
+      const r = await fetch(`${API_URL}/threads/${threadId}/comments/${comment.id}/replies?limit=200`);
+      if (r.ok) {
+        const d = await r.json();
+        setReplies((d.replies ?? []).map(rep => ({ ...rep, mediaUrls: parseMediaUrls(rep.mediaUrls) })));
+        setLoaded(true);
+      }
+    } finally { setLR(false); }
+  }
+
+  // Replies are no longer hidden behind a click — load them as soon as we
+  // know there are any, so the thread reads fully expanded, Reddit-style.
+  useEffect(() => {
+    if (replyCount > 0 && !repliesLoaded) loadReplies();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comment.id]);
+
   // Auto-scroll and highlight when this comment is the notification target
   useEffect(() => {
     if (!isTargetComment && !isTargetReply) return;
-
-    // For reply targets, first load replies then scroll
-    async function scrollToTarget() {
-      if (isTargetReply && !repliesLoaded) {
-        setLR(true);
-        try {
-          const r = await fetch(`${API_URL}/threads/${threadId}/comments/${comment.id}/replies?limit=50`);
-          if (r.ok) {
-            const d = await r.json();
-            setReplies((d.replies ?? []).map(rep => ({ ...rep, mediaUrls: parseMediaUrls(rep.mediaUrls) })));
-            setLoaded(true);
-          }
-        } finally { setLR(false); }
+    setTimeout(() => {
+      const targetEl = isTargetReply
+        ? document.getElementById(`reply-${highlightReplyId}`)
+        : cardRef.current;
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlighted(true);
+        setTimeout(() => setHighlighted(false), 2800);
       }
-
-      // Wait a tick for DOM to update
-      setTimeout(() => {
-        const targetEl = isTargetReply
-          ? document.getElementById(`reply-${highlightReplyId}`)
-          : cardRef.current;
-        if (targetEl) {
-          targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-          setHighlighted(true);
-          setTimeout(() => setHighlighted(false), 2800);
-        }
-      }, 120);
-    }
-
-    scrollToTarget();
+    }, 250);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTargetComment, isTargetReply]);
+  }, [isTargetComment, isTargetReply, repliesLoaded]);
 
   async function toggleLike() {
     if (!user || toggling) return;
@@ -809,22 +1079,10 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
     } finally { setToggling(false); }
   }
 
-  async function loadReplies() {
-    if (repliesLoaded) { setLoaded(false); setReplies([]); return; }
-    setLR(true);
-    try {
-      const r = await fetch(`${API_URL}/threads/${threadId}/comments/${comment.id}/replies?limit=50`);
-      if (r.ok) {
-        const d = await r.json();
-        setReplies((d.replies ?? []).map(rep => ({ ...rep, mediaUrls: parseMediaUrls(rep.mediaUrls) })));
-        setLoaded(true);
-      }
-    } finally { setLR(false); }
-  }
-
   async function submitReply(content, files) {
     const form = new FormData();
-    form.append("content", replyPrefix ? `@${replyPrefix} ${content}` : content);
+    form.append("content", replyTarget?.author?.username ? `@${replyTarget.author.username} ${content}` : content);
+    if (replyTarget) form.append("parentId", String(replyTarget.id));
     if (files && files.length > 0) {
       files.forEach((f, i) => form.append(`media_${i}`, f));
     }
@@ -836,12 +1094,14 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
     const d = await r.json();
     const reply = { ...d.reply, mediaUrls: parseMediaUrls(d.reply.mediaUrls) };
     setReplies(prev => [...prev, reply]);
-    if (!repliesLoaded) setLoaded(true);
-    setReplyPrefix("");
+    setLoaded(true);
+    setReplyTarget(null);
+    onCountChange?.(1);
   }
 
-  function openReply(mentionUsername) {
-    setReplyPrefix(mentionUsername ?? "");
+  // node = null replies to the comment itself; a reply node replies-to-reply
+  function openReply(node) {
+    setReplyTarget(node ?? null);
     setShowModal(true);
   }
 
@@ -855,11 +1115,44 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
 
   const canDelete = user && (user.id === comment.authorId || isAdmin);
 
+  // The backend cascades deletes to child replies too, so we remove the
+  // whole subtree here rather than just one node — otherwise orphaned
+  // children would wrongly re-appear as top-level replies in the rebuilt tree.
+  function handleReplyDeleted(replyId) {
+    setReplies(prev => {
+      const toRemove = new Set([replyId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const r of prev) {
+          if (r.parentId && toRemove.has(r.parentId) && !toRemove.has(r.id)) {
+            toRemove.add(r.id);
+            grew = true;
+          }
+        }
+      }
+      onCountChange?.(-toRemove.size);
+      return prev.filter(r => !toRemove.has(r.id));
+    });
+    // If the deleted branch was somewhere in the drill-down path, drop back
+    // to whatever came before it (or the full tree, if it was the first level).
+    setFocusStack(prev => {
+      const idx = prev.indexOf(replyId);
+      return idx === -1 ? prev : prev.slice(0, idx);
+    });
+  }
+
   return (
-    <div ref={cardRef} className="flex gap-4" style={{ scrollMarginTop: 96 }}>
-      <div className="flex flex-col items-center">
-        <Avatar user={comment.author} size={40} />
-        {(repliesLoaded && replies.length > 0) && (
+    <div ref={cardRef} className="flex gap-3 sm:gap-4 min-w-0" style={{ scrollMarginTop: 96 }}>
+      <div className="flex flex-col items-center flex-shrink-0">
+        <Avatar user={comment.author} size={36} />
+        {/* This line lives inside THIS comment's own flex row, so it can only
+            ever stretch down through THIS comment's own replies — it has no
+            way to reach a different, separate comment below it. Without it,
+            the first reply's curved connector (CommentThreadElbow) has
+            nothing to join onto and looks like it's floating, cut off from
+            the comment above. */}
+        {(replyTree.length > 0 || focusedReply) && (
           <div className="w-px flex-1 mt-2 bg-[#e8e0d0]" style={{ minHeight: 24 }} />
         )}
       </div>
@@ -867,14 +1160,14 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
       <div className="flex-1 min-w-0 pb-5">
         {/* Comment bubble */}
         <div
-          className="bg-white rounded-2xl border px-5 py-4 transition-all duration-700"
+          className="bg-white rounded-2xl border px-4 py-3.5 sm:px-5 sm:py-4 transition-all duration-700"
           style={{
             boxShadow:   highlighted ? "0 0 0 3px #d4af37, 0 4px 16px rgba(212,175,55,0.18)" : "0 1px 6px rgba(26,26,46,0.05)",
             borderColor: highlighted ? "#d4af37" : "#e8e0d0",
           }}
         >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex items-baseline gap-2">
+          <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+            <div className="flex items-baseline gap-2 flex-wrap">
               {comment.author?.id ? (
                 <Link
                   to={`/profile/${comment.author.id}`}
@@ -911,32 +1204,15 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
         </div>
 
         {/* Action bar */}
-        <div className="flex items-center gap-1 mt-2 pl-1">
+        <div className="flex items-center gap-1 mt-2 pl-1 flex-wrap">
           <LikeButton count={likes} liked={liked} onToggle={toggleLike} disabled={!user || toggling} size="md" />
 
           {replyCount > 0 && (
-            <button
-              onClick={loadReplies}
-              className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold text-[#9a8c7a] hover:text-[#1a1a2e] hover:bg-[#f0ebe3] rounded-lg transition-colors"
-            >
-              {loadingReplies ? (
-                "Loading…"
-              ) : repliesLoaded ? (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7"/>
-                  </svg>
-                  Hide {replyCount} {replyCount === 1 ? "reply" : "replies"}
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
-                  </svg>
-                  {replyCount} {replyCount === 1 ? "reply" : "replies"}
-                </>
-              )}
-            </button>
+            <span className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold text-[#9a8c7a]">
+              {loadingReplies
+                ? "Loading replies…"
+                : `${replyCount} ${replyCount === 1 ? "reply" : "replies"}`}
+            </span>
           )}
 
           {user && (
@@ -949,35 +1225,143 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
           )}
         </div>
 
-        {/* Replies list */}
-        {repliesLoaded && replies.length > 0 && (
-          <div className="mt-3 ml-5 space-y-3">
-            {replies.map(reply => (
-              <ReplyRow
+        {/* Reply tree: either the full Reddit-style nest, or — once the
+            user has tapped into "Continue this thread" on mobile — a
+            focused view rooted at just that one reply. */}
+        {replyTree.length > 0 && !focusedReply && (
+          <div className="mt-3 ml-2 sm:ml-5 space-y-4 min-w-0">
+            {replyTree.map(reply => (
+              <ReplyNode
                 key={reply.id}
                 reply={reply}
+                depth={0}
                 user={user}
                 commentId={comment.id}
                 threadId={threadId}
                 isAdmin={isAdmin}
                 onReplyTo={openReply}
-                onDeleted={(replyId) => setReplies(prev => prev.filter(r => r.id !== replyId))}
+                repliesById={repliesById}
+                onDeleted={handleReplyDeleted}
+                onContinueThread={pushFocus}
                 highlightReplyId={highlightReplyId}
               />
             ))}
           </div>
         )}
 
+        {/* Focused "continue this thread" view — replaces the reply list
+            with just the tapped-into branch, plus a breadcrumb trail back
+            up to the comment so context isn't lost, and a real "back"
+            that steps back one drill-down level at a time — if the user
+            has continued into a thread twice, Back returns to the first
+            focused view, not straight out to the full comment. */}
+        {focusedReply && (
+          <div className="mt-3 ml-2 sm:ml-5 min-w-0">
+            <button
+              onClick={goBackOneLevel}
+              className="flex items-center gap-1.5 mb-3 text-[12px] font-bold text-[#1a5fb4] hover:underline"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+              {focusStack.length > 1 ? "Back" : "Back to all replies"}
+            </button>
+            {focusedAncestors.length > 0 && (
+              <p className="mb-3 text-[12px] text-[#c8b89a] leading-relaxed">
+                {focusedAncestors.map((a, i) => (
+                  <span key={a.id}>
+                    {i > 0 && " → "}
+                    <span className="font-semibold text-[#9a8c7a]">@{a.author?.username ?? "Deleted user"}</span>
+                  </span>
+                ))}
+              </p>
+            )}
+            <div className="space-y-4 min-w-0">
+              <ReplyNode
+                reply={focusedTree[0]}
+                depth={0}
+                user={user}
+                commentId={comment.id}
+                threadId={threadId}
+                isAdmin={isAdmin}
+                onReplyTo={openReply}
+                repliesById={repliesById}
+                onDeleted={handleReplyDeleted}
+                onContinueThread={pushFocus}
+                highlightReplyId={highlightReplyId}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Reply compose modal */}
         {showModal && user && (
           <ComposeModal
-            placeholder={replyPrefix ? `Replying to @${replyPrefix}…` : "Write a reply…"}
+            placeholder={replyTarget?.author?.username ? `Replying to @${replyTarget.author.username}…` : "Write a reply…"}
             onSubmit={submitReply}
-            onClose={() => { setShowModal(false); setReplyPrefix(""); }}
+            onClose={() => { setShowModal(false); setReplyTarget(null); }}
           />
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Hero gallery — thread's own images, full-bleed at the top of the card ────
+
+function HeroGallery({ urls }) {
+  const [index, setIndex] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
+
+  if (!urls || urls.length === 0) return null;
+
+  const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(urls[index]);
+  const prev = (e) => { e.stopPropagation(); setIndex(i => (i - 1 + urls.length) % urls.length); };
+  const next = (e) => { e.stopPropagation(); setIndex(i => (i + 1) % urls.length); };
+
+  return (
+    <>
+      <div className="relative cursor-zoom-in group" onClick={() => setLightbox(true)}>
+        {isVideo
+          ? <video src={urls[index]} className="w-full h-auto" muted />
+          : <img src={urls[index]} alt="" className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.01]" />
+        }
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/08 transition-all" />
+        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/55 rounded-full p-2">
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        {urls.length > 1 && (
+          <>
+            <button onClick={prev}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 flex items-center justify-center text-white transition-colors opacity-0 group-hover:opacity-100">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button onClick={next}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 flex items-center justify-center text-white transition-colors opacity-0 group-hover:opacity-100">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {urls.map((_, i) => (
+                <button key={i} onClick={(e) => { e.stopPropagation(); setIndex(i); }}
+                  className="rounded-full transition-all"
+                  style={{ width: i === index ? 16 : 6, height: 6, background: i === index ? "#d4af37" : "rgba(255,255,255,0.7)" }}
+                />
+              ))}
+            </div>
+            <div className="absolute top-3 right-3 bg-black/45 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+              {index + 1}/{urls.length}
+            </div>
+          </>
+        )}
+      </div>
+      {lightbox && <MediaLightbox url={urls[index]} onClose={() => setLightbox(false)} />}
+    </>
   );
 }
 
@@ -999,7 +1383,7 @@ export default function ThreadPage() {
   const [toggling, setToggling]       = useState(false);
   const [threadLikePop, setTLPop]     = useState(false);
   const [showCompose, setShowCompose] = useState(false);
-  const [heroLightbox, setHeroLightbox] = useState(false);
+  const [threadTotalComments, setThreadTotalComments] = useState(0);
   const isAdmin = user?.role === "ADMIN";
 
   // Parse ?comment=X&reply=Y from notification links
@@ -1031,6 +1415,7 @@ export default function ThreadPage() {
       const cData = cRes.ok ? await cRes.json() : { comments: [] };
       setThread(tData.thread);
       setTLikes(tData.thread._count?.likes ?? 0);
+      setThreadTotalComments(tData.thread.totalCommentCount ?? tData.thread._count?.comments ?? 0);
       setComments(
         (cData.comments ?? []).map(c => ({
           ...c,
@@ -1071,6 +1456,7 @@ export default function ThreadPage() {
     const d = await r.json();
     const comment = { ...d.comment, mediaUrls: parseMediaUrls(d.comment.mediaUrls) };
     setComments(prev => [comment, ...prev]);
+    setThreadTotalComments(n => n + 1);
     setShowCompose(false);
   }
 
@@ -1113,24 +1499,8 @@ export default function ThreadPage() {
         <div className="bg-white rounded-2xl border border-[#e8e0d0] overflow-hidden mb-6"
           style={{ boxShadow: "0 2px 16px rgba(26,26,46,0.07)" }}>
 
-          {/* Optional image */}
-          {thread.mediaUrl && (() => {
-            const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(thread.mediaUrl);
-            return (
-              <div className="relative cursor-zoom-in group" onClick={() => setHeroLightbox(true)}>
-                {isVideo
-                  ? <video src={thread.mediaUrl} className="w-full h-auto" muted />
-                  : <img src={thread.mediaUrl} alt="" className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.01]" />
-                }
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/08 transition-all" />
-                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/55 rounded-full p-2">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-              </div>
-            );
-          })()}
+          {/* Optional image(s) */}
+          <HeroGallery urls={parseMediaUrls(thread.mediaUrls).length > 0 ? parseMediaUrls(thread.mediaUrls) : (thread.mediaUrl ? [thread.mediaUrl] : [])} />
 
           <div className="px-6 sm:px-8 pt-6 pb-5">
             {/* Badges */}
@@ -1208,16 +1578,11 @@ export default function ThreadPage() {
                 {threadLikes} {threadLikes === 1 ? "like" : "likes"}
               </button>
               <span className="text-[12px] text-[#c8b89a]">
-                {comments.length} {comments.length === 1 ? "comment" : "comments"}
+                {threadTotalComments} {threadTotalComments === 1 ? "comment" : "comments"}
               </span>
             </div>
           </div>
         </div>
-
-      {/* hero lightbox */}
-      {heroLightbox && thread.mediaUrl && (
-        <MediaLightbox url={thread.mediaUrl} onClose={() => setHeroLightbox(false)} />
-      )}
 
       {/* ── Comments section ── */}
       <div className="pb-20">
@@ -1227,8 +1592,8 @@ export default function ThreadPage() {
         {/* Section header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-serif text-[#1a1a2e] text-xl font-bold">
-            {comments.length > 0
-              ? `${comments.length} ${comments.length === 1 ? "Comment" : "Comments"}`
+            {threadTotalComments > 0
+              ? `${threadTotalComments} ${threadTotalComments === 1 ? "Comment" : "Comments"}`
               : "Be the first to comment"}
           </h2>
           {user && !showCompose && (
@@ -1291,6 +1656,7 @@ export default function ThreadPage() {
                 isAdmin={isAdmin}
                 highlightCommentId={targetCommentId}
                 highlightReplyId={targetReplyId}
+                onCountChange={(delta) => setThreadTotalComments(n => Math.max(n + delta, 0))}
               />
             ))}
           </div>

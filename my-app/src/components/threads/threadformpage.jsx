@@ -18,22 +18,39 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
   const [isPinned,   setIsPinned]   = useState(initial?.isPinned   ?? false);
   const [isDeprioritized, setIsDeprioritized] = useState(initial?.isDeprioritized ?? false);
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? initial?.category?.id ?? "");
-  const [mediaFile,  setMediaFile]  = useState(null);
-  const [preview,    setPreview]    = useState(initial?.mediaUrl ?? null);
+  // Multi-image support, same MAX_IMAGES=5 pattern comments/replies already use.
+  // existingUrls = images already saved on the thread (edit mode) that the
+  // writer hasn't removed yet. newFiles = freshly picked File objects to upload.
+  const [existingUrls, setExistingUrls] = useState(() => {
+    if (!initial) return [];
+    if (Array.isArray(initial.mediaUrls) && initial.mediaUrls.length > 0) return initial.mediaUrls;
+    return initial.mediaUrl ? [initial.mediaUrl] : [];
+  });
+  const [newFiles,    setNewFiles]    = useState([]);
   const [saving,     setSaving]     = useState(false);
   const [deleting,   setDeleting]   = useState(false);
   const [err,        setErr]        = useState("");
   const fileRef = useRef(null);
 
   const isEdit = !!initial;
+  const MAX_IMAGES = 5;
+  const totalImages = existingUrls.length + newFiles.length;
 
   const selectedCategory = categories.find(c => String(c.id) === String(categoryId));
 
-  function handleFile(e) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setMediaFile(f);
-    setPreview(URL.createObjectURL(f));
+  function handleFiles(e) {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (picked.length === 0) return;
+    setNewFiles(prev => [...prev, ...picked].slice(0, MAX_IMAGES - existingUrls.length));
+  }
+
+  function removeExisting(url) {
+    setExistingUrls(prev => prev.filter(u => u !== url));
+  }
+
+  function removeNewFile(i) {
+    setNewFiles(prev => prev.filter((_, idx) => idx !== i));
   }
 
   async function handleSubmit() {
@@ -52,7 +69,8 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
       }
       body.append("categoryId", categoryId === "" ? "" : String(categoryId));
       if (link.trim())  body.append("link", link.trim());
-      if (mediaFile)    body.append("media", mediaFile);
+      newFiles.forEach((f, i) => body.append(`media_${i}`, f));
+      if (isEdit) body.append("existingMediaUrls", JSON.stringify(existingUrls));
 
       const url    = isEdit ? `${API_URL}/threads/${initial.id}` : `${API_URL}/threads`;
       const method = isEdit ? "PUT" : "POST";
@@ -180,24 +198,47 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
         {/* Media upload */}
         <div>
           <label className="block text-[11px] font-bold text-[#6b5c4a] uppercase tracking-wide mb-1.5">
-            Image <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— optional</span>
+            Images <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— optional, up to {MAX_IMAGES}</span>
           </label>
 
-          {preview ? (
-            <div className="relative rounded-xl overflow-hidden border border-[#e8e0d0]">
-              <img src={preview} alt="Preview" className="w-full max-h-48 object-cover" />
-              <button
-                onClick={() => { setPreview(null); setMediaFile(null); if (fileRef.current) fileRef.current.value = ""; }}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#1a1a2e]/70 text-white flex items-center justify-center hover:bg-[#1a1a2e] transition-colors"
-                title="Remove image"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
+          {totalImages > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-2">
+              {existingUrls.map(url => (
+                <div key={url} className="relative rounded-lg overflow-hidden border border-[#e8e0d0] aspect-square group">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeExisting(url)}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-[#1a1a2e]/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove image"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {newFiles.map((f, i) => (
+                <div key={i} className="relative rounded-lg overflow-hidden border border-[#e8e0d0] aspect-square group">
+                  <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeNewFile(i)}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-[#1a1a2e]/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove image"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              ))}
             </div>
-          ) : (
+          )}
+
+          {totalImages < MAX_IMAGES && (
             <button
+              type="button"
               onClick={() => fileRef.current?.click()}
               className="w-full flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-[#e8e0d0] rounded-xl text-[#9a8c7a] hover:border-[#d4af37] hover:text-[#b8860b] hover:bg-[#fffdf4] transition-all"
             >
@@ -205,10 +246,12 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
-              <span className="text-[12px] font-medium">Click to upload an image</span>
+              <span className="text-[12px] font-medium">
+                {totalImages > 0 ? `Add another image (${totalImages}/${MAX_IMAGES})` : "Click to upload images"}
+              </span>
             </button>
           )}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
         </div>
 
         {/* Pin toggle — admin only */}
