@@ -169,14 +169,6 @@ function SpotlightRow({ sub }) {
           <span className="text-[10px] text-[#9a8c7a] bg-[#f4f1ec] px-2.5 py-0.5 rounded-full">
             {DRAFT_LABELS[sub.draftStage]}
           </span>
-          {sub.isLongStay && (
-            <span className="text-[10px] font-bold text-[#b8860b] bg-[#fffdf0] border border-[#d4af37]/40 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              10+ days · +2 pts
-            </span>
-          )}
           {sub.feedbackWanted?.slice(0, 2).map((tag, i) => (
             <span key={i} className="text-[10px] text-[#6558d4] bg-[#f2f0fd] px-2 py-0.5 rounded-full">
               {tag}
@@ -296,9 +288,6 @@ export default function FeedbackHub() {
   const [queueGenres, setQueueGenres]     = useState([]);
   const [archiveGenres, setArchiveGenres] = useState([]);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-
-  const waitingSpotlight = spotlight.filter((s) => s.isLongStay);
-  const freshSpotlight   = spotlight.filter((s) => !s.isLongStay);
 
   const canPost =
     wallet?.freePostAvailable ||
@@ -430,37 +419,11 @@ export default function FeedbackHub() {
         </div>
       )}
 
-      {/* ── Waiting for critique — chapters in spotlight 10+ days ── */}
-      {!loading && waitingSpotlight.length > 0 && (
-        <div className="mb-10">
-          <div className="bg-[#fffdf0] border border-[#d4af37]/40 rounded-xl px-5 py-4 mb-4 flex items-start gap-3">
-            <div className="w-7 h-7 rounded-lg bg-[#d4af37] flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg className="w-3.5 h-3.5 text-[#1a1a2e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-semibold text-[#1a1a2e] text-sm mb-0.5">These writers have been waiting a little longer</p>
-              <p className="text-[12px] text-[#6b5c4a] leading-relaxed">
-                A few chapters here for 10+ days, still hoping for a read. Critiquing one earns a{" "}
-                <span className="font-semibold text-[#b8860b]">+2 bonus</span> — and might be exactly
-                what someone needs to keep going.
-              </p>
-            </div>
-          </div>
-          <div className="space-y-2.5">
-            {waitingSpotlight.map((sub) => (
-              <SpotlightRow key={sub.id} sub={sub} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Spotlight header */}
       <div className="flex items-center justify-between gap-3 mb-1">
         <div className="flex items-center gap-3">
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a8c7a]">
-            {waitingSpotlight.length > 0 ? "Recently Posted" : "In the Spotlight"}
+            In the Spotlight
           </h2>
           <span className="text-[10px] text-[#b8a898]">{spotlight.length}/6</span>
         </div>
@@ -494,13 +457,9 @@ export default function FeedbackHub() {
             Submit your first chapter
           </Link>
         </div>
-      ) : freshSpotlight.length === 0 ? (
-        <div className="text-center py-12 bg-white border border-[#e8e0d0] rounded-xl">
-          <p className="text-sm text-[#9a8c7a]">No other chapters posted recently — check back soon.</p>
-        </div>
       ) : (
         <div className="space-y-2.5">
-          {freshSpotlight.map((sub) => (
+          {spotlight.map((sub) => (
             <SpotlightRow key={sub.id} sub={sub} />
           ))}
         </div>
