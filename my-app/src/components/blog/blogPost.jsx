@@ -84,16 +84,85 @@ function normalizePostHtml(html = "") {
   return container.innerHTML;
 }
 
-function PostContent({ content }) {
+function PostContent({ content, onImageClick }) {
+  // Inline post images are injected via dangerouslySetInnerHTML, so we can't
+  // attach an onClick to each <img> directly. Instead, listen on the
+  // wrapping div and use event delegation: any click that bubbles up from
+  // an <img data-inline-image> inside the post body opens the lightbox.
+  function handleContentClick(e) {
+    const img = e.target.closest?.("img[data-inline-image]");
+    if (img && onImageClick) {
+      onImageClick(img.currentSrc || img.src, img.alt || "");
+    }
+  }
+
   if (isHtmlContent(content)) {
     return (
       <div
         className="prose-news text-[#2d2620] leading-[1.9] text-[1.05rem] sm:text-[1.1rem]"
+        onClick={handleContentClick}
         dangerouslySetInnerHTML={{ __html: normalizePostHtml(content) }}
       />
     );
   }
   return <FormattedContent text={content} />;
+}
+
+// Fullscreen click-to-enlarge viewer for post images. Shows the image at
+// its full natural size (scaled to fit the viewport, never cropped),
+// closes on backdrop click, the × button, or Escape.
+function ImageLightbox({ src, alt, onClose }) {
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  if (!src) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8"
+      style={{ background: "rgba(15,12,8,0.92)" }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt || "Expanded image"}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:text-white transition-colors"
+        style={{ background: "rgba(255,255,255,0.12)" }}
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <img
+        src={src}
+        alt={alt || ""}
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg shadow-2xl"
+      />
+      {alt && (
+        <p
+          className="absolute bottom-5 left-1/2 -translate-x-1/2 text-white/70 text-xs sm:text-sm text-center px-4 max-w-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {alt}
+        </p>
+      )}
+    </div>
+  );
 }
 
 // Plain-text posts (older posts, or anything saved via a path that never
@@ -449,6 +518,7 @@ export default function BlogPost() {
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // { src, alt } | null
 
   useEffect(() => { fetchPost(); fetchComments(1); }, [postId]);
 
@@ -575,7 +645,8 @@ export default function BlogPost() {
           <img
             src={post.mediaUrl}
             alt={post.title || ""}
-            className="w-full h-auto max-h-[640px] object-contain mx-auto"
+            onClick={() => setLightbox({ src: post.mediaUrl, alt: post.title || "" })}
+            className="w-full h-auto max-h-[640px] object-contain mx-auto cursor-zoom-in"
           />
         </div>
       )}
@@ -641,7 +712,10 @@ export default function BlogPost() {
 
         {/* Body text — white paper card with newspaper-style drop cap */}
         <article className="mt-8 bg-white rounded-2xl shadow-sm border border-[#e8e0d0] px-6 sm:px-10 py-8 sm:py-10">
-          <PostContent content={post.content} />
+          <PostContent
+            content={post.content}
+            onImageClick={(src, alt) => setLightbox({ src, alt })}
+          />
         </article>
 
         {/* External link */}
@@ -828,6 +902,14 @@ export default function BlogPost() {
         </section>
       </main>
 
+      {lightbox && (
+        <ImageLightbox
+          src={lightbox.src}
+          alt={lightbox.alt}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+
       <style>{`
         .prose-news p { margin: 0 0 1.4em; }
         .prose-news > p:first-child::first-letter {
@@ -849,7 +931,23 @@ export default function BlogPost() {
         .prose-news u { text-decoration: underline; }
         .prose-news a { color: #d4af37; text-decoration: underline; }
         .prose-news blockquote { border-left: 3px solid #d4af37; margin: 1.5em 0; padding: 0.75em 1.25em; font-style: italic; color: #4a3f35; background: rgba(212,175,55,0.04); border-radius: 0 8px 8px 0; }
-        .prose-news img[data-inline-image] { max-width: 100%; height: auto; display: block; margin: 1.5em auto; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        .prose-news img[data-inline-image] {
+          max-width: 100%;
+          width: auto;
+          height: auto !important;
+          max-height: none !important;
+          object-fit: contain;
+          display: block;
+          margin: 1.5em auto;
+          border-radius: 8px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+          cursor: zoom-in;
+          transition: box-shadow 0.15s ease, transform 0.15s ease;
+        }
+        .prose-news img[data-inline-image]:hover {
+          box-shadow: 0 6px 22px rgba(0,0,0,0.16);
+          transform: translateY(-1px);
+        }
         .prose-news [data-editor-styles] { display: none; }
         .prose-news [data-upload-placeholder] { display: none; }
       `}</style>
