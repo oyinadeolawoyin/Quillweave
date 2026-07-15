@@ -251,28 +251,28 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
       />
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-5">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37] mb-1">My Project Plan</p>
           <h1 className="font-serif text-[#1a1a2e] text-2xl sm:text-[28px] font-bold leading-tight truncate">
             {plan.storyTitle}
           </h1>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto sm:flex-wrap pb-1 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
-            className="text-[12px] text-[#9a8c7a] hover:text-[#c0392b] transition-colors px-2 py-2"
+            className="text-[12px] text-[#9a8c7a] hover:text-[#c0392b] transition-colors px-2 py-2 flex-shrink-0"
           >
             Delete project
           </button>
-          <SecondaryButton onClick={() => setShowEditModal(true)} className="px-4 py-2.5 text-[13px]">
+          <SecondaryButton onClick={() => setShowEditModal(true)} className="px-4 py-2.5 text-[13px] flex-shrink-0">
             Edit project
           </SecondaryButton>
-          <SecondaryButton onClick={() => setShowSprintModal(true)} className="px-4 py-2.5 text-[13px]">
+          <SecondaryButton onClick={() => setShowSprintModal(true)} className="px-4 py-2.5 text-[13px] flex-shrink-0">
             Start a sprint
           </SecondaryButton>
-          <PrimaryButton onClick={() => setShowLogModal(true)} className="px-5 py-2.5">
+          <PrimaryButton onClick={() => setShowLogModal(true)} className="px-5 py-2.5 flex-shrink-0">
             Log Progress
           </PrimaryButton>
         </div>

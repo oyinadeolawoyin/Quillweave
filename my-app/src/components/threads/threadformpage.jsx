@@ -11,13 +11,13 @@ import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 // ─── Thread form (create + edit) ──────────────────────────────────────────────
 
-function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
+function ThreadForm({ initial, tags, isAdmin, onSave, onDelete }) {
   const [title,      setTitle]      = useState(initial?.title      ?? "");
   const [context,    setContext]    = useState(initial?.context    ?? "");
   const [link,       setLink]       = useState(initial?.link       ?? "");
   const [isPinned,   setIsPinned]   = useState(initial?.isPinned   ?? false);
   const [isDeprioritized, setIsDeprioritized] = useState(initial?.isDeprioritized ?? false);
-  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? initial?.category?.id ?? "");
+  const [tag,        setTag]        = useState(initial?.tag ?? "");
   // Multi-image support, same MAX_IMAGES=5 pattern comments/replies already use.
   // existingUrls = images already saved on the thread (edit mode) that the
   // writer hasn't removed yet. newFiles = freshly picked File objects to upload.
@@ -35,8 +35,6 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
   const isEdit = !!initial;
   const MAX_IMAGES = 5;
   const totalImages = existingUrls.length + newFiles.length;
-
-  const selectedCategory = categories.find(c => String(c.id) === String(categoryId));
 
   function handleFiles(e) {
     const picked = Array.from(e.target.files ?? []);
@@ -67,7 +65,7 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
         body.append("isPinned", String(isPinned));
         body.append("isDeprioritized", String(isDeprioritized));
       }
-      body.append("categoryId", categoryId === "" ? "" : String(categoryId));
+      body.append("tag", tag === "" ? "" : tag);
       if (link.trim())  body.append("link", link.trim());
       newFiles.forEach((f, i) => body.append(`media_${i}`, f));
       if (isEdit) body.append("existingMediaUrls", JSON.stringify(existingUrls));
@@ -159,25 +157,23 @@ function ThreadForm({ initial, categories, isAdmin, onSave, onDelete }) {
           />
         </div>
 
-        {/* Category */}
+        {/* Tag */}
         <div>
           <label className="block text-[11px] font-bold text-[#6b5c4a] uppercase tracking-wide mb-1.5">
-            Category <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— optional</span>
+            Tag <span className="text-[#9a8c7a] font-normal normal-case tracking-normal">— optional</span>
           </label>
           <select
-            value={categoryId}
-            onChange={e => setCategoryId(e.target.value)}
+            value={tag}
+            onChange={e => setTag(e.target.value)}
             className="w-full px-4 py-2.5 border border-[#e8e0d0] rounded-xl text-[14px] text-[#1a1a2e] focus:outline-none focus:border-[#d4af37] bg-white transition-colors"
           >
-            <option value="">Uncategorized</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            <option value="">Untagged</option>
+            {tags.map(t => (
+              <option key={t} value={t}>{t}</option>
             ))}
           </select>
           <p className="text-[11px] text-[#9a8c7a] mt-1.5">
-            {selectedCategory?.description
-              ? selectedCategory.description
-              : "Pick the category that best fits — it helps other members find your thread."}
+            Pick the tag that best fits — it helps other members find your thread.
           </p>
         </div>
 
@@ -389,7 +385,7 @@ export default function ThreadFormPage() {
 
   const isEdit = !!threadId;
 
-  const [categories, setCategories] = useState([]);
+  const [tags,       setTags]      = useState([]);
   const [thread,      setThread]    = useState(null);
   const [loading,     setLoading]   = useState(isEdit);
   const [notFound,    setNotFound]  = useState(false);
@@ -400,11 +396,11 @@ export default function ThreadFormPage() {
     if (user === null) navigate("/login");
   }, [user, navigate]);
 
-  // ── Load categories ────────────────────────────────────────────────────────
+  // ── Load the fixed tag list ────────────────────────────────────────────────
   useEffect(() => {
-    fetch(`${API_URL}/threads/categories`)
-      .then(r => r.ok ? r.json() : { categories: [] })
-      .then(d => setCategories(d.categories ?? []))
+    fetch(`${API_URL}/threads/tags`)
+      .then(r => r.ok ? r.json() : { tags: [] })
+      .then(d => setTags(d.tags ?? []))
       .catch(() => {});
   }, []);
 
@@ -484,7 +480,7 @@ export default function ThreadFormPage() {
         ) : (
           <ThreadForm
             initial={isEdit ? thread : null}
-            categories={categories}
+            tags={tags}
             isAdmin={isAdmin}
             onSave={handleSaved}
             onDelete={handleDeleted}

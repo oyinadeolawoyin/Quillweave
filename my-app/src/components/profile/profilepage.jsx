@@ -159,6 +159,75 @@ function Pill({ children }) {
   );
 }
 
+// ── Threads modal — shows the full list of threads for either "posted" or
+// "commented on" without navigating away from the profile. Used for both
+// panels since the row shape (title / tag / meta line) is the same. ──────────
+function ThreadsListModal({ title, threads, kind, onClose }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl border border-[#e8e0d0] max-h-[85vh] sm:max-h-[75vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[#f0ebe3] flex-shrink-0">
+          <h3 className="font-serif text-[#1a1a2e] text-base font-bold">{title}</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center text-[#9a8c7a] hover:bg-[#faf7f2] hover:text-[#1a1a2e] transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="overflow-y-auto px-3 sm:px-5 py-3 space-y-1">
+          {threads.length === 0 ? (
+            <p className="text-[13px] text-[#9a8c7a] px-2 py-6 text-center">Nothing here yet.</p>
+          ) : (
+            threads.map((t) => (
+              <Link
+                key={t.id}
+                to={`/threads/${t.id}`}
+                onClick={onClose}
+                className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-[#fafaf7] transition-colors group"
+              >
+                {kind === "comment"
+                  ? <ReplyIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
+                  : <ThreadIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
+                }
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">
+                    {t.title}
+                  </p>
+                  <p className="text-[11px] text-[#9a8c7a]">
+                    {t.tag ?? "Untagged"}
+                    {kind === "comment" && t.author && ` · by ${t.author.username}`}
+                    {" · "}
+                    {kind === "comment"
+                      ? `commented ${formatDate(t.lastCommentAt)}`
+                      : `${t._count?.comments ?? 0} comment${(t._count?.comments ?? 0) !== 1 ? "s" : ""} · ${formatDate(t.createdAt)}`}
+                  </p>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatBadge({ value, label }) {
   return (
     <div className="flex flex-col items-center px-4 py-3 rounded-lg bg-[#fafaf7] border border-[#e8e0d0]">
@@ -569,6 +638,7 @@ export default function ProfilePage() {
   const [profileData, setProfileData] = useState(null);
   const [points, setPoints]           = useState(null);       // owner-only (posting balance)
   const [blockedUsers, setBlockedUsers] = useState([]);
+  const [openThreadsModal, setOpenThreadsModal] = useState(null); // null | "posted" | "comment"
 
   // ── Fetch public profile (single endpoint) ─────────────────────────────────
 
@@ -875,15 +945,19 @@ export default function ProfilePage() {
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">{t.title}</p>
                         <p className="text-[11px] text-[#9a8c7a]">
-                          {t.category?.name ?? "General"} · {t._count?.comments ?? 0} comment{(t._count?.comments ?? 0) !== 1 ? "s" : ""} · {formatDate(t.createdAt)}
+                          {t.tag ?? "Untagged"} · {t._count?.comments ?? 0} comment{(t._count?.comments ?? 0) !== 1 ? "s" : ""} · {formatDate(t.createdAt)}
                         </p>
                       </div>
                     </Link>
                   ))}
                   {threads.length > 5 && (
-                    <Link to={`/forum?author=${userId}`} className="block text-[12px] text-[#b8860b] hover:underline pt-1 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setOpenThreadsModal("posted")}
+                      className="block w-full text-[12px] text-[#b8860b] hover:underline pt-1 text-right"
+                    >
                       View all {threads.length} threads
-                    </Link>
+                    </button>
                   )}
                 </div>
               )
@@ -917,13 +991,22 @@ export default function ProfilePage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">{t.title}</p>
                       <p className="text-[11px] text-[#9a8c7a]">
-                        {t.category?.name ?? "General"}
+                        {t.tag ?? "Untagged"}
                         {t.author && ` · by ${t.author.username}`}
                         {" · "}commented {formatDate(t.lastCommentAt)}
                       </p>
                     </div>
                   </Link>
                 ))}
+                {threadsCommentedOn.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenThreadsModal("comment")}
+                    className="block w-full text-[12px] text-[#b8860b] hover:underline pt-1 text-right"
+                  >
+                    View all {threadsCommentedOn.length} threads
+                  </button>
+                )}
               </div>
             </Card>
           )}
@@ -963,6 +1046,23 @@ export default function ProfilePage() {
 
         </div>
       </div>
+
+      {openThreadsModal === "posted" && (
+        <ThreadsListModal
+          title={`Threads ${isOwner ? "You've" : "They've"} Posted`}
+          threads={threads}
+          kind="posted"
+          onClose={() => setOpenThreadsModal(null)}
+        />
+      )}
+      {openThreadsModal === "comment" && (
+        <ThreadsListModal
+          title={`Threads ${isOwner ? "You've" : "They've"} Joined`}
+          threads={threadsCommentedOn}
+          kind="comment"
+          onClose={() => setOpenThreadsModal(null)}
+        />
+      )}
     </main>
   );
 }

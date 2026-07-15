@@ -17,7 +17,28 @@ function timeAgo(dateStr) {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 7)  return `${d}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    + " · " + new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+// ─── tag colors — mirrors the mapping used on the Threads feed ────────────────
+
+const TAG_STYLES = {
+  "First Draft": { bg: "#fdf6e3", text: "#b8860b" },
+  "Newcomer":    { bg: "#eef5ef", text: "#4a7c59" },
+  "Off-topic":   { bg: "#f0ebe3", text: "#6b5c4a" },
+  "Wins":        { bg: "#fdece0", text: "#c1531b" },
+  "Struggles":   { bg: "#f7e9ec", text: "#a3435a" },
+  "Question":    { bg: "#e8f1f5", text: "#3d6b8a" },
+  "Feedback":    { bg: "#f0e9f5", text: "#6b4a8a" },
+  "Tips":        { bg: "#fff3e0", text: "#9a6f00" },
+  "Sprint":      { bg: "#e6f4f1", text: "#1f7a6c" },
+  "Check-in":    { bg: "#eceaf2", text: "#1a1a2e" },
+};
+const DEFAULT_TAG_STYLE = { bg: "#f4f1ec", text: "#6b5c4a" };
+
+function tagStyle(tag) {
+  return TAG_STYLES[tag] || DEFAULT_TAG_STYLE;
 }
 
 // Prisma Json fields can come back as a parsed array OR a JSON string.
@@ -1382,7 +1403,6 @@ export default function ThreadPage() {
   const [threadLikes, setTLikes]      = useState(0);
   const [toggling, setToggling]       = useState(false);
   const [threadLikePop, setTLPop]     = useState(false);
-  const [showCompose, setShowCompose] = useState(false);
   const [threadTotalComments, setThreadTotalComments] = useState(0);
   const isAdmin = user?.role === "ADMIN";
 
@@ -1484,23 +1504,27 @@ export default function ThreadPage() {
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
 
-        {/* Breadcrumb */}
-        <Link
-          to="/forum"
-          className="inline-flex items-center gap-1.5 text-[12px] text-[#9a8c7a] hover:text-[#b8860b] transition-colors mb-5"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7"/>
-          </svg>
-          Forum
-        </Link>
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-5">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-9 h-9 rounded-full border border-[#e8e0d0] flex items-center justify-center text-[#6b5c4a] hover:text-[#1a1a2e] hover:border-[#1a1a2e] transition-colors flex-shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7"/>
+            </svg>
+          </button>
+          <div>
+            <h2 className="font-serif text-[#1a1a2e] text-lg font-bold leading-tight">Thread</h2>
+            <p className="text-[12px] text-[#9a8c7a]">
+              {threadTotalComments} {threadTotalComments === 1 ? "comment" : "comments"}
+            </p>
+          </div>
+        </div>
 
         {/* ── Thread card ── */}
-        <div className="bg-white rounded-2xl border border-[#e8e0d0] overflow-hidden mb-6"
+        <div className="bg-white rounded-2xl border border-[#e8e0d0] overflow-hidden mb-10"
           style={{ boxShadow: "0 2px 16px rgba(26,26,46,0.07)" }}>
-
-          {/* Optional image(s) */}
-          <HeroGallery urls={parseMediaUrls(thread.mediaUrls).length > 0 ? parseMediaUrls(thread.mediaUrls) : (thread.mediaUrl ? [thread.mediaUrl] : [])} />
 
           <div className="px-6 sm:px-8 pt-6 pb-5">
             {/* Badges */}
@@ -1509,6 +1533,14 @@ export default function ThreadPage() {
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
                   style={{ color: "#b8860b", background: "#fffdf0", borderColor: "#d4af37" }}>
                   Pinned
+                </span>
+              )}
+              {thread.tag && (
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                  style={{ background: tagStyle(thread.tag).bg, color: tagStyle(thread.tag).text }}
+                >
+                  {thread.tag}
                 </span>
               )}
               {thread.category && (
@@ -1525,7 +1557,9 @@ export default function ThreadPage() {
 
             {/* Author row */}
             <div className="flex items-center gap-3 mb-5">
-              <Avatar user={thread.author} size={34} />
+              <div className="rounded-full flex-shrink-0" style={{ padding: 2, border: "1.5px solid #d4af37" }}>
+                <Avatar user={thread.author} size={42} />
+              </div>
               <div>
                 {thread.author?.id ? (
                   <Link to={`/profile/${thread.author.id}`}
@@ -1543,7 +1577,7 @@ export default function ThreadPage() {
             <div className="h-px bg-[#f0ebe3] mb-5" />
 
             {/* Body */}
-            <FormattedText content={thread.context} className="text-[15px] text-[#2d2416] leading-[1.8]" />
+            <FormattedText content={thread.context} className="text-[16px] text-[#2d2416] leading-[1.75]" />
 
             {thread.link && (
               <a href={thread.link} target="_blank" rel="noopener noreferrer"
@@ -1555,6 +1589,19 @@ export default function ThreadPage() {
                 {thread.link}
               </a>
             )}
+
+            {/* Optional image(s) — shown after the post text */}
+            {(() => {
+              const heroUrls = parseMediaUrls(thread.mediaUrls).length > 0
+                ? parseMediaUrls(thread.mediaUrls)
+                : (thread.mediaUrl ? [thread.mediaUrl] : []);
+              if (heroUrls.length === 0) return null;
+              return (
+                <div className="mt-5 rounded-xl overflow-hidden border border-[#e8e0d0]">
+                  <HeroGallery urls={heroUrls} />
+                </div>
+              );
+            })()}
 
             {/* Like row */}
             <div className="flex items-center gap-4 mt-6 pt-4 border-t border-[#f0ebe3]">
@@ -1590,38 +1637,24 @@ export default function ThreadPage() {
         {showWelcome && <WelcomeChallengeNudge onDismiss={dismissWelcome} />}
 
         {/* Section header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-serif text-[#1a1a2e] text-xl font-bold">
+        <div className="mb-6">
+          <h2 className="font-serif text-[#1a1a2e] text-xl font-bold mb-4">
             {threadTotalComments > 0
               ? `${threadTotalComments} ${threadTotalComments === 1 ? "Comment" : "Comments"}`
               : "Be the first to comment"}
           </h2>
-          {user && !showCompose && (
-            <button
-              onClick={() => setShowCompose(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#d4af37] text-[#1a1a2e] text-[13px] font-bold rounded-xl hover:bg-[#c9a42d] transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
-              </svg>
-              Leave a comment
-            </button>
-          )}
-          {!user && (
+
+          {user ? (
+            <ComposeBox
+              placeholder="What do you think? Share your thoughts…"
+              onSubmit={submitComment}
+            />
+          ) : (
             <Link to="/login" className="text-[13px] font-semibold text-[#1a5fb4] hover:underline">
               Sign in to comment
             </Link>
           )}
         </div>
-
-        {/* Compose modal */}
-        {showCompose && user && (
-          <ComposeModal
-            placeholder="What do you think? Share your thoughts…"
-            onSubmit={submitComment}
-            onClose={() => setShowCompose(false)}
-          />
-        )}
 
         {/* Empty state */}
         {comments.length === 0 && (

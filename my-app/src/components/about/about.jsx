@@ -390,90 +390,73 @@ export default function Homepage() {
 
   const sidebar = (
     <div className="space-y-6">
-      {/* Newest members — last 2 days */}
-      <SidebarWidget
-        title="New Writers to Welcome"
-        action={
-          newcomers.length > SIDEBAR_ROW_CAP && (
-            <button onClick={() => showNudge("Sign up to see all our newest members.", () => navigate("/signup"), "/members")} className="text-[11px] font-semibold hover:underline" style={{ color: "#d4af37" }}>
-              See all →
-            </button>
-          )
-        }
-      >
-        {loading ? (
-          <SidebarSkeletonRows count={3} />
-        ) : newcomers.length > 0 ? (
-          <div className="space-y-3">
-            {newcomers.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
-              const u = entry.user;
-              return (
-                <div key={u?.id ?? entry.rank} className="flex items-center gap-3">
-                  <Avatar user={u} size={7} />
-                  <div className="flex-1 min-w-0">
-                    <Link
-                      to={`/profile/${u?.id}`}
-                      className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
-                    >
-                      {u?.username}
-                    </Link>
-                    <p className="text-[10px] text-[#9a8c7a]">Joined {timeAgo(entry.joinedAt)}</p>
+      {/* Newest members — last 2 days — hidden when empty */}
+      {(loading || newcomers.length > 0) && (
+        <SidebarWidget
+          title="New Writers to Welcome"
+          action={
+            newcomers.length > SIDEBAR_ROW_CAP && (
+              <button onClick={() => showNudge("Sign up to see all our newest members.", () => navigate("/signup"), "/members")} className="text-[11px] font-semibold hover:underline" style={{ color: "#d4af37" }}>
+                See all →
+              </button>
+            )
+          }
+        >
+          {loading ? (
+            <SidebarSkeletonRows count={3} />
+          ) : (
+            <div className="space-y-3">
+              {newcomers.slice(0, SIDEBAR_ROW_CAP).map((entry) => {
+                const u = entry.user;
+                return (
+                  <div key={u?.id ?? entry.rank} className="flex items-center gap-3">
+                    <Avatar user={u} size={7} />
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        to={`/profile/${u?.id}`}
+                        className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block"
+                      >
+                        {u?.username}
+                      </Link>
+                      <p className="text-[10px] text-[#9a8c7a]">Joined {timeAgo(entry.joinedAt)}</p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <SidebarEmptyRow>
-            No new writers in the last couple of days —{" "}
-            <button onClick={() => navigate("/signup")} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
-              be the next one to join
-            </button>.
-          </SidebarEmptyRow>
-        )}
-      </SidebarWidget>
+                );
+              })}
+            </div>
+          )}
+        </SidebarWidget>
+      )}
 
-      {/* Writers who logged progress today */}
-      <SidebarWidget title="Writers Logged Progress Today">
-        {loading ? (
-          <SidebarSkeletonRows count={3} />
-        ) : progressLoggers.length > 0 ? (
-          <div className="space-y-3">
-            {progressLoggers.slice(0, SIDEBAR_ROW_CAP).map((entry) => (
-              <div key={entry.user.id} className="flex items-center gap-3">
-                <Avatar user={entry.user} size={7} />
-                <div className="flex-1 min-w-0">
-                  <Link to={`/profile/${entry.user.id}`} className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block">
-                    {entry.user.username}
-                  </Link>
-                  <p className="text-[10px] text-[#9a8c7a]">
-                    {(entry.countLogged ?? 0).toLocaleString()}{" "}
-                    {{ CHAPTERS: "chapters", SCENES: "scenes", WORDS: "words" }[entry.goalType] ?? "words"}
-                  </p>
+      {/* Writers who logged progress today — hidden when empty */}
+      {(loading || progressLoggers.length > 0) && (
+        <SidebarWidget title="Writers Logged Progress Today">
+          {loading ? (
+            <SidebarSkeletonRows count={3} />
+          ) : (
+            <div className="space-y-3">
+              {progressLoggers.slice(0, SIDEBAR_ROW_CAP).map((entry) => (
+                <div key={entry.user.id} className="flex items-center gap-3">
+                  <Avatar user={entry.user} size={7} />
+                  <div className="flex-1 min-w-0">
+                    <Link to={`/profile/${entry.user.id}`} className="text-[12px] font-semibold text-[#1a1a2e] hover:text-[#b8860b] transition-colors truncate block">
+                      {entry.user.username}
+                    </Link>
+                    <p className="text-[10px] text-[#9a8c7a]">
+                      {(entry.countLogged ?? 0).toLocaleString()}{" "}
+                      {{ CHAPTERS: "chapters", SCENES: "scenes", WORDS: "words" }[entry.goalType] ?? "words"}
+                    </p>
+                  </div>
+                  <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#1a7a4c" }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#1a7a4c" }} />
+                    Logged Today
+                  </span>
                 </div>
-                <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: "#1a7a4c" }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#1a7a4c" }} />
-                  Logged Today
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <SidebarEmptyRow>
-            No one's logged their progress yet today —{" "}
-            {user ? (
-              <button onClick={() => navigate("/draftplan")} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
-                log yours
-              </button>
-            ) : (
-              <button onClick={() => showNudge("Create a free account to start logging your writing progress.", () => navigate("/signup"))} className="font-semibold hover:underline" style={{ color: "#d4af37" }}>
-                be the first
-              </button>
-            )}
-            .
-          </SidebarEmptyRow>
-        )}
-      </SidebarWidget>
+              ))}
+            </div>
+          )}
+        </SidebarWidget>
+      )}
 
       {/* Members active in threads today — hidden when empty */}
       {(loading || threadCommenters.length > 0) && (
