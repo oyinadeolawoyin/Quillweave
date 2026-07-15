@@ -142,6 +142,67 @@ function UsernameLink({ user, className }) {
   );
 }
 
+// ─── Formatted text — preserves paragraphs/line breaks, supports **bold** and *italic*/_italic_ ──
+// Mirrors the renderer used on the thread detail page so posts look the same
+// in the feed as they do once opened.
+
+// Splits a single line into text/bold/italic/@mention segments.
+function parseInlineFormatting(line, keyPrefix) {
+  // Order: bold (**) → italic (* or _) → @mention
+  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_|@[a-zA-Z0-9_]+)/g;
+  const parts = line.split(pattern);
+  return parts.map((part, i) => {
+    if (!part) return null;
+    const key = `${keyPrefix}-${i}`;
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={key}>{part.slice(2, -2)}</strong>;
+    }
+    if (
+      (part.startsWith("*") && part.endsWith("*") && part.length > 2) ||
+      (part.startsWith("_") && part.endsWith("_") && part.length > 2)
+    ) {
+      return <em key={key}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith("@") && part.length > 1) {
+      const username = part.slice(1);
+      return (
+        <Link key={key} to={`/profile/${username}`}
+          className="font-semibold text-[#1a5fb4] hover:underline"
+          onClick={(e) => e.stopPropagation()}>
+          {part}
+        </Link>
+      );
+    }
+    return part;
+  });
+}
+
+// Renders text content with paragraphs preserved (blank-line separated),
+// single line breaks kept within a paragraph, and **bold**/*italic* support.
+function FormattedText({ content, className = "" }) {
+  if (!content) return null;
+
+  const paragraphs = content.split(/\n{2,}/);
+
+  return (
+    <div className={className}>
+      {paragraphs.map((para, pIdx) => {
+        const lines = para.split("\n");
+        return (
+          <p key={pIdx} className={pIdx > 0 ? "mt-3" : ""}>
+            {lines.map((line, lIdx) => (
+              <span key={lIdx}>
+                {parseInlineFormatting(line, `${pIdx}-${lIdx}`)}
+                {lIdx < lines.length - 1 && <br />}
+              </span>
+            ))}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── media lightbox — supports multiple items, arrows, keyboard, thumbnails ───
 
 function MediaLightbox({ urls, startIndex = 0, onClose }) {
@@ -442,6 +503,24 @@ function ComposeBox({ user, tags, onSubmit }) {
     });
   }
 
+  // Wraps the current selection (or a placeholder, if nothing's selected) in
+  // ** or * so the compose box supports the same bold/italic markup the
+  // thread detail page renders. Mirrors threadFormPage/threadPage's toolbar.
+  function wrapSelection(marker, placeholder) {
+    const el = textRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end   = el.selectionEnd;
+    const selected = value.slice(start, end);
+    const text = selected || placeholder;
+    const newValue = `${value.slice(0, start)}${marker}${text}${marker}${value.slice(end)}`;
+    setValue(newValue);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + marker.length, start + marker.length + text.length);
+    });
+  }
+
   function handleKeyDown(e) {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit();
   }
@@ -512,6 +591,23 @@ function ComposeBox({ user, tags, onSubmit }) {
 
           <div className="flex items-center justify-between pb-2 pt-3 mt-1">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => wrapSelection("**", "bold text")}
+                title="Bold"
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold text-[#9a8c7a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors"
+              >
+                B
+              </button>
+              <button
+                type="button"
+                onClick={() => wrapSelection("*", "italic text")}
+                title="Italic"
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] italic font-semibold text-[#9a8c7a] hover:bg-[#f4f1ec] hover:text-[#1a1a2e] transition-colors"
+              >
+                I
+              </button>
+              <span className="w-px h-4 bg-[#e8e0d0]" />
               <div className="relative">
                 <button
                   type="button"
@@ -627,9 +723,10 @@ function PostCard({ thread, user, onToggleLike }) {
             )}
           </div>
 
-          <p className="mt-1.5 text-[14px] text-[#2d2416] leading-relaxed whitespace-pre-wrap">
-            {thread.context}
-          </p>
+          <FormattedText
+            content={thread.context}
+            className="mt-1.5 text-[14px] text-[#2d2416] leading-relaxed"
+          />
 
           <MediaGrid urls={mediaUrls} />
 

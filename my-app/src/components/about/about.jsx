@@ -857,7 +857,7 @@ export default function Homepage() {
                 </div>
                 <div className="mt-2 text-right">
                   <button
-                    onClick={() => showNudge("Sign up to join the forum and start or reply to threads.", () => navigate("/signup"), "/forum")}
+                    onClick={() => showNudge("Sign up to join the forum and start or reply to threads.", () => navigate("/signup"), "/threads")}
                     className="text-[12px] font-semibold hover:underline"
                     style={{ color: "#d4af37" }}
                   >

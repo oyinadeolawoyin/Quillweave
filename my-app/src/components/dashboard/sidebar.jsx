@@ -176,7 +176,7 @@ const PRIMARY_NAV = [
 const COMMUNITY_NAV = [
   { to: "/sprint-room",  label: "Sprint Room",    Icon: SprintIcon },
   { to: "/critique",     label: "Critique Now",   Icon: CritiqueIcon },
-  { to: "/forum",        label: "Forum",          Icon: CommunityIcon },
+  { to: "/threads",        label: "Forum",          Icon: CommunityIcon },
   { to: "/members",      label: "Members",        Icon: MembersIcon },
 ];
 

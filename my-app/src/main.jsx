@@ -48,8 +48,7 @@ import DraftPlanNewPage from './components/draftPlan/draftplannewpage';
 import DaysChallengeNewPage from './components/daysChallenge/dayschallengenewpage';
 
 import ThreadPage from './components/threads/threadpage';
-import ForumPage from './components/threads/forumpage';
-import CategoryPage from './components/threads/categorypage';
+import ThreadsFeedPage from './components/threads/threads';
 import ThreadFormPage from './components/threads/threadformpage';
 import AdminThreadsPage from './components/threads/adminthreadspage';
 
@@ -136,8 +135,8 @@ const router = createBrowserRouter([
         element: <MembersPage />
       },
       {
-        path: "forum",
-        element: <ForumPage />
+        path: "threads",
+        element: <ThreadsFeedPage />
       },
       {
         path: "threads/:threadId",
@@ -150,10 +149,6 @@ const router = createBrowserRouter([
       {
         path: "threads/:threadId/edit",
         element: <ThreadFormPage />
-      },
-      {
-        path: "/forum/category/:categoryId",
-        element: <CategoryPage />
       },
       {
         path: "admin/threads",
