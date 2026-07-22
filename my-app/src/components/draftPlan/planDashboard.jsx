@@ -16,7 +16,7 @@ import LogProgressModal from "./logProgressModal";
 import API_URL from "../../config/api";
 import { EventJoinBanner } from "../event/eventjoinbanner";
 import { AppMetaTags } from "../utilis/metatags";
-import { StartGroupSprintModal } from "../sprint/groupSprintModal";
+// (Sprint Room replaces the old standalone group-sprint workspace — see the "Sprint" button below.)
 
 const WEEKDAY_ORDER   = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const WEEKDAY_LABEL   = { MON: "M", TUE: "T", WED: "W", THU: "T", FRI: "F", SAT: "S", SUN: "S" };
@@ -77,7 +77,6 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
   const [showLogModal, setShowLogModal]   = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showSprintModal, setShowSprintModal] = useState(false);
   const [tadaResult, setTadaResult]       = useState(null);
   const [loggedToday, setLoggedToday]     = useState([]);
   // Writers who share today as a writing day but haven't necessarily logged
@@ -239,10 +238,6 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
     } catch { /* error surfaced inside confirm modal */ }
   }
 
-  function handleSprintCreated(groupSprint, openEditor) {
-    navigate(`/group-sprint/${groupSprint.id}`, { state: { writingMode: openEditor ? "quillweave" : null } });
-  }
-
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-16">
       <AppMetaTags
@@ -269,8 +264,8 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
           <SecondaryButton onClick={() => setShowEditModal(true)} className="px-4 py-2.5 text-[13px] flex-shrink-0">
             Edit project
           </SecondaryButton>
-          <SecondaryButton onClick={() => setShowSprintModal(true)} className="px-4 py-2.5 text-[13px] flex-shrink-0">
-            Start a sprint
+          <SecondaryButton onClick={() => navigate("/sprint-room")} className="px-4 py-2.5 text-[13px] flex-shrink-0">
+            Sprint
           </SecondaryButton>
           <PrimaryButton onClick={() => setShowLogModal(true)} className="px-5 py-2.5 flex-shrink-0">
             Log Progress
@@ -765,11 +760,6 @@ export default function PlanDashboard({ plan: initialPlan, onPlanUpdated, onPlan
           onConfirm={handleDelete}
         />
       )}
-      <StartGroupSprintModal
-        isOpen={showSprintModal}
-        onClose={() => setShowSprintModal(false)}
-        onCreated={handleSprintCreated}
-      />
     </div>
   );
 }

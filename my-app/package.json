@@ -21,6 +21,7 @@
     "react-router-dom": "^7.13.0",
     "react-timezone-select": "^3.2.8",
     "remark-gfm": "^4.0.1",
+    "socket.io-client": "^4.8.3",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {

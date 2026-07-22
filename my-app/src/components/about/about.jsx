@@ -17,6 +17,19 @@ function getExcerpt(content = "", length = 120) {
   return text.length > length ? text.slice(0, length) + "…" : text;
 }
 
+// A thread's title is optional. When the author didn't set one, fall back to
+// a short, markdown-stripped excerpt of the body instead of showing blank.
+function getThreadTitle(thread, length = 80) {
+  if (thread?.title && thread.title.trim()) return thread.title.trim();
+  const raw = stripHtml(thread?.context || "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .trim();
+  if (!raw) return "Untitled thread";
+  return raw.length > length ? raw.slice(0, length) + "…" : raw;
+}
+
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
@@ -229,7 +242,7 @@ function ThreadCard({ thread, onNudge }) {
       <Avatar user={thread.author} size={8} onClick={(e) => { e?.stopPropagation?.(); }} />
       <div className="flex-1 min-w-0">
         <h4 className="text-[13px] font-semibold text-[#1a1a2e] line-clamp-2 group-hover:text-[#b8860b] transition-colors leading-snug">
-          {thread.title}
+          {getThreadTitle(thread)}
         </h4>
         <div className="flex items-center gap-2 mt-1 text-[11px] text-[#9a8c7a]">
           <span className="font-medium text-[#6b5c4a]">{thread.author?.username}</span>

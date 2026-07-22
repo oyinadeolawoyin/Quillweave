@@ -174,7 +174,7 @@ const PRIMARY_NAV = [
 // Forum, Members folded into Community section. Messages + Notifications get badges.
 // Community Updates moved to bottom of community (low urgency unless badged).
 const COMMUNITY_NAV = [
-  { to: "/sprint-room",  label: "Sprint Room",    Icon: SprintIcon },
+  { to: "/sprint-room",  label: "Sprint Room",    Icon: SprintIcon, badgeKey: "sprintRoom" },
   { to: "/critique",     label: "Critique Now",   Icon: CritiqueIcon },
   { to: "/threads",        label: "Forum",          Icon: CommunityIcon },
   { to: "/members",      label: "Members",        Icon: MembersIcon },
@@ -188,7 +188,7 @@ const EVENT_NAV = [
 const INBOX_NAV = [
   { to: "/messages",          label: "Messages",           Icon: MessagesIcon, badgeKey: "messages" },
   { to: "/notifications",     label: "Notifications",      Icon: BellIcon,     badgeKey: "notifications" },
-  { to: "/community-update",  label: "Community Updates",  Icon: NewsIcon,     badgeKey: "communityUpdates" },
+  { to: "/community-update",              label: "Community update",  Icon: NewsIcon,     badgeKey: "communityUpdates" },
 ];
 
 function buildDashboardNav(userId) {
@@ -301,6 +301,7 @@ export function Sidebar({ mobileNavOpen = false, onCloseMobileNav = () => {} }) 
     notifications:    0,
     messages:         0,
     communityUpdates: 0,
+    sprintRoom:       0,
   });
 
   const suppressUntil = useRef(0);
@@ -336,6 +337,13 @@ export function Sidebar({ mobileNavOpen = false, onCloseMobileNav = () => {} }) 
     }
     if (pathname === "/messages" || pathname.startsWith("/messages/")) {
       setCounts((prev) => ({ ...prev, messages: 0 }));
+      suppressUntil.current = Date.now() + 5_000;
+    }
+    // Mirrors the messages pattern above — the chat panel itself also calls
+    // /sprint-room/notifications/read on mount, but that badge should drop
+    // to 0 the instant the writer is on the page, not on the next 60s poll.
+    if (pathname === "/sprint-room" || pathname.startsWith("/sprint-room/")) {
+      setCounts((prev) => ({ ...prev, sprintRoom: 0 }));
       suppressUntil.current = Date.now() + 5_000;
     }
   }, [pathname]);

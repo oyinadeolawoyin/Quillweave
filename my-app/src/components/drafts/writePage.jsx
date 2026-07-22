@@ -3,7 +3,7 @@ import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
 import { WriteEditor, ThesaurusDrawer } from "./writeeditorshared";
-import { StartGroupSprintModal } from "../sprint/groupSprintModal";
+// (Sprint Room replaces the old standalone group-sprint workspace — see the Sprint button below.)
 import {
   useStickyNotes,
   useHandwrittenFont,
@@ -188,7 +188,6 @@ export default function WritePage() {
   const [thesaurusOpen, setThesaurusOpen] = useState(false);
   const [saving, setSaving]               = useState(false);
   const [toast, setToast]                 = useState(null);
-  const [sprintOpen, setSprintOpen]       = useState(false);
   const [sidebarOpen, setSidebarOpen]     = useState(false); // mobile off-canvas toggle
 
   // saveRef — WriteEditor will set this to a function that triggers a save
@@ -449,7 +448,7 @@ export default function WritePage() {
 
           {/* Continue in sprint */}
           <button
-            onClick={() => setSprintOpen(true)}
+            onClick={() => navigate("/sprint-room", { state: { draftId: activeDraftId } })}
             title="Continue writing in a sprint"
             className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#e8dcc8] text-[#7a6a50] rounded-lg text-xs font-semibold hover:border-[#2d3748] hover:text-[#2d3748] transition-all flex-shrink-0">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -591,19 +590,6 @@ export default function WritePage() {
         onCreate={(payload) => createStickyNote({ ...payload, paragraphIndex: stickyPanel?.paragraphIndex ?? null })}
         onUpdate={updateStickyNote}
         onDelete={deleteStickyNote}
-      />
-
-      {/* ── Sprint modal ── */}
-      <StartGroupSprintModal
-        isOpen={sprintOpen}
-        onClose={() => setSprintOpen(false)}
-        onCreated={(groupSprint, isQuillweave) => {
-          setSprintOpen(false);
-          navigate(`/group-sprint/${groupSprint.id}`, {
-            state: { writingMode: isQuillweave ? "quillweave" : "external", draftId: activeDraftId }
-          });
-        }}
-        prefillDraftId={activeDraftId}
       />
 
       {/* ── Toast ── */}

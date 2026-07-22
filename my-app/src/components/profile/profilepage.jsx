@@ -4,7 +4,7 @@
 // Public data fetched from GET /api/profile/:userId (single endpoint).
 // Owner-only extras: posting balance, blocked users list.
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
@@ -86,6 +86,21 @@ const MessageIcon = (p) => (
     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
   </svg>
 );
+const EditIcon = (p) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  </svg>
+);
+const DeleteIcon = (p) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+  </svg>
+);
+const DotsIcon = (p) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
+    <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+  </svg>
+);
 const ReplyIcon = (p) => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...p}>
     <polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 00-4-4H4" />
@@ -120,6 +135,20 @@ function formatDate(iso) {
 function daysSince(iso) {
   if (!iso) return 0;
   return Math.floor((Date.now() - new Date(iso)) / 86400000);
+}
+
+// A thread's title is optional. When the author didn't set one, fall back to
+// a short, markdown-stripped excerpt of the body instead of showing blank.
+function getThreadTitle(thread, maxLen = 80) {
+  if (thread?.title && thread.title.trim()) return thread.title.trim();
+  const raw = (thread?.context || thread?.excerpt || "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return "Untitled thread";
+  return raw.length > maxLen ? raw.slice(0, maxLen).trim() + "…" : raw;
 }
 
 function focusLabel(f) {
@@ -159,10 +188,75 @@ function Pill({ children }) {
   );
 }
 
+// ── Three-dot edit/delete menu — shown next to a thread the profile owner
+// authored, in both the "Threads Posted" card and its "view all" modal. ────
+function ThreadOptionsMenu({ threadId, onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  async function handleDelete(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm("Delete this thread? This can't be undone.")) return;
+    setDeleting(true);
+    try {
+      await onDelete(threadId);
+    } finally {
+      setDeleting(false);
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="relative flex-shrink-0" ref={boxRef}>
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(o => !o); }}
+        title="Thread options"
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[#c8b89a] hover:text-[#1a1a2e] hover:bg-[#f4f1ec] transition-colors"
+      >
+        <DotsIcon />
+      </button>
+      {open && (
+        <div
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          className="absolute right-0 top-8 z-20 w-36 bg-white border border-[#e8e0d0] rounded-xl overflow-hidden py-1"
+          style={{ boxShadow: "0 8px 24px rgba(26,26,46,0.14)" }}
+        >
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onEdit(threadId); }}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[12.5px] font-medium text-[#2d2416] hover:bg-[#faf7f2] transition-colors text-left"
+          >
+            <EditIcon className="flex-shrink-0" />
+            Edit
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[12.5px] font-medium text-[#c0392b] hover:bg-red-50 transition-colors text-left disabled:opacity-50"
+          >
+            <DeleteIcon className="flex-shrink-0" />
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Threads modal — shows the full list of threads for either "posted" or
 // "commented on" without navigating away from the profile. Used for both
 // panels since the row shape (title / tag / meta line) is the same. ──────────
-function ThreadsListModal({ title, threads, kind, onClose }) {
+function ThreadsListModal({ title, threads, kind, onClose, isOwner, onEdit, onDelete }) {
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
     window.addEventListener("keydown", onKey);
@@ -196,30 +290,30 @@ function ThreadsListModal({ title, threads, kind, onClose }) {
             <p className="text-[13px] text-[#9a8c7a] px-2 py-6 text-center">Nothing here yet.</p>
           ) : (
             threads.map((t) => (
-              <Link
-                key={t.id}
-                to={`/threads/${t.id}`}
-                onClick={onClose}
-                className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-[#fafaf7] transition-colors group"
-              >
-                {kind === "comment"
-                  ? <ReplyIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
-                  : <ThreadIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
-                }
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">
-                    {t.title}
-                  </p>
-                  <p className="text-[11px] text-[#9a8c7a]">
-                    {t.tag ?? "Untagged"}
-                    {kind === "comment" && t.author && ` · by ${t.author.username}`}
-                    {" · "}
-                    {kind === "comment"
-                      ? `commented ${formatDate(t.lastCommentAt)}`
-                      : `${t._count?.comments ?? 0} comment${(t._count?.comments ?? 0) !== 1 ? "s" : ""} · ${formatDate(t.createdAt)}`}
-                  </p>
-                </div>
-              </Link>
+              <div key={t.id} className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-[#fafaf7] transition-colors group">
+                <Link to={`/threads/${t.id}`} onClick={onClose} className="flex items-start gap-2 min-w-0 flex-1">
+                  {kind === "comment"
+                    ? <ReplyIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
+                    : <ThreadIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
+                  }
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">
+                      {getThreadTitle(t)}
+                    </p>
+                    <p className="text-[11px] text-[#9a8c7a]">
+                      {t.tag ?? "Untagged"}
+                      {kind === "comment" && t.author && ` · by ${t.author.username}`}
+                      {" · "}
+                      {kind === "comment"
+                        ? `commented ${formatDate(t.lastCommentAt)}`
+                        : `${t._count?.comments ?? 0} comment${(t._count?.comments ?? 0) !== 1 ? "s" : ""} · ${formatDate(t.createdAt)}`}
+                    </p>
+                  </div>
+                </Link>
+                {kind === "posted" && isOwner && (
+                  <ThreadOptionsMenu threadId={t.id} onEdit={onEdit} onDelete={onDelete} />
+                )}
+              </div>
             ))
           )}
         </div>
@@ -683,6 +777,21 @@ export default function ProfilePage() {
       .catch(() => {});
   }, [isOwner]);
 
+  // ── Edit/delete a thread the owner authored (from "Threads Posted") ───────
+
+  function handleEditThread(threadId) {
+    navigate(`/threads/${threadId}/edit`);
+  }
+
+  async function handleDeleteThread(threadId) {
+    try {
+      const r = await fetch(`${API_URL}/threads/${threadId}`, { method: "DELETE", credentials: "include" });
+      if (r.ok) {
+        setProfileData((prev) => prev ? { ...prev, threads: prev.threads.filter((t) => t.id !== threadId) } : prev);
+      }
+    } catch {}
+  }
+
   async function handleUnblock(blockedId) {
     try {
       await fetch(`${API_URL}/users/${blockedId}/block`, { method: "DELETE", credentials: "include" });
@@ -936,19 +1045,20 @@ export default function ProfilePage() {
               : (
                 <div className="space-y-2">
                   {threads.slice(0, 5).map((t) => (
-                    <Link
-                      key={t.id}
-                      to={`/threads/${t.id}`}
-                      className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-[#fafaf7] transition-colors group"
-                    >
-                      <ThreadIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">{t.title}</p>
-                        <p className="text-[11px] text-[#9a8c7a]">
-                          {t.tag ?? "Untagged"} · {t._count?.comments ?? 0} comment{(t._count?.comments ?? 0) !== 1 ? "s" : ""} · {formatDate(t.createdAt)}
-                        </p>
-                      </div>
-                    </Link>
+                    <div key={t.id} className="flex items-start gap-2 p-2.5 rounded-lg hover:bg-[#fafaf7] transition-colors group">
+                      <Link to={`/threads/${t.id}`} className="flex items-start gap-2 min-w-0 flex-1">
+                        <ThreadIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" style={{ width: 14, height: 14 }} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">{getThreadTitle(t)}</p>
+                          <p className="text-[11px] text-[#9a8c7a]">
+                            {t.tag ?? "Untagged"} · {t._count?.comments ?? 0} comment{(t._count?.comments ?? 0) !== 1 ? "s" : ""} · {formatDate(t.createdAt)}
+                          </p>
+                        </div>
+                      </Link>
+                      {isOwner && (
+                        <ThreadOptionsMenu threadId={t.id} onEdit={handleEditThread} onDelete={handleDeleteThread} />
+                      )}
+                    </div>
                   ))}
                   {threads.length > 5 && (
                     <button
@@ -989,7 +1099,7 @@ export default function ProfilePage() {
                   >
                     <ReplyIcon className="flex-shrink-0 mt-0.5 text-[#c0b8b0] group-hover:text-[#b8860b] transition-colors" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">{t.title}</p>
+                      <p className="text-[13px] font-medium text-[#2d3748] truncate group-hover:text-[#b8860b] transition-colors">{getThreadTitle(t)}</p>
                       <p className="text-[11px] text-[#9a8c7a]">
                         {t.tag ?? "Untagged"}
                         {t.author && ` · by ${t.author.username}`}
@@ -1053,6 +1163,9 @@ export default function ProfilePage() {
           threads={threads}
           kind="posted"
           onClose={() => setOpenThreadsModal(null)}
+          isOwner={isOwner}
+          onEdit={handleEditThread}
+          onDelete={handleDeleteThread}
         />
       )}
       {openThreadsModal === "comment" && (

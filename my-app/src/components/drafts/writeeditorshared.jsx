@@ -1660,6 +1660,16 @@ export function WriteEditor({
   const [tourActive, setTourActive] = useState(false);
   const [tourStep, setTourStep] = useState(0);
 
+  // Set right after an autosave (interval or manual) creates the draft on
+  // the server for the first time and hands back its new id. The parent
+  // then feeds that id back in as the `draftId` prop, which would otherwise
+  // trigger the "load existing draft" effect below and stomp the writer's
+  // live in-progress content (and cursor position) with the just-saved
+  // snapshot. Recording the id here lets that effect recognize "this isn't
+  // a real draft switch, we already have the freshest content" and skip
+  // the reload.
+  const selfCreatedIdRef = useRef(null);
+
   // Auto-show once per browser, the very first time a writer lands in the
   // editor. After that it's opt-in via the "?" button next to save status.
   useEffect(() => {
@@ -1744,6 +1754,15 @@ export function WriteEditor({
       onDraftLoaded?.(0);
       return;
     }
+    // This id just arrived because our own autosave created the draft and
+    // the parent echoed the new id back in — not because the writer picked
+    // a different draft. We already have the freshest content sitting live
+    // in the DOM (possibly newer than what was just saved), so skip the
+    // fetch-and-overwrite entirely rather than clobbering it.
+    if (selfCreatedIdRef.current === draftId) {
+      selfCreatedIdRef.current = null;
+      return;
+    }
     fetch(`${API_URL}/drafts/${draftId}`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -1767,9 +1786,22 @@ export function WriteEditor({
           setCreatedAt(data.draft.createdAt || null);
           onWordsUpdate?.(wc);
           onDraftLoaded?.(wc, data.draft.createdAt || null);
+        } else {
+          // Fetch succeeded but returned nothing usable (bad id, deleted
+          // draft, etc). Still resolve loading — otherwise draftLoading
+          // stays true forever, the parent's pending sprint rejoin never
+          // fires, and every word typed afterward gets credited to no one.
+          setCreatedAt(new Date().toISOString());
+          onDraftLoaded?.(0);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // Same reasoning: a network failure shouldn't leave the sprint
+        // rejoin permanently stuck waiting on a draftLoading that will
+        // never flip to false.
+        setCreatedAt(new Date().toISOString());
+        onDraftLoaded?.(0);
+      });
   }, [draftId]);
 
   // ── Get editor HTML with style metadata embedded ──────────────────────────
@@ -2033,7 +2065,12 @@ export function WriteEditor({
       const wc = countWords(getEditorText());
       setSaving(true);
       try {
-        await onAutoSave({ draftId, title: titleRef.current, content, wordCount: wc });
+        const result = await onAutoSave({ draftId, title: titleRef.current, content, wordCount: wc });
+        // draftId was null going into this save — if the parent handed
+        // back a fresh id, remember it so the draftId prop update that's
+        // about to arrive doesn't trigger a reload that overwrites what
+        // the writer has kept typing since this save kicked off.
+        if (!draftId && result?.id) selfCreatedIdRef.current = result.id;
         setLastSaved(new Date());
       } catch {}
       finally { setSaving(false); }
@@ -2049,7 +2086,8 @@ export function WriteEditor({
       const wc = countWords(getEditorText());
       setSaving(true);
       try {
-        await onAutoSave({ draftId, title: titleRef.current, content, wordCount: wc, isManual });
+        const result = await onAutoSave({ draftId, title: titleRef.current, content, wordCount: wc, isManual });
+        if (!draftId && result?.id) selfCreatedIdRef.current = result.id;
         setLastSaved(new Date());
       } catch {}
       finally { setSaving(false); }

@@ -53,6 +53,10 @@ function parseMediaUrls(raw) {
   return [];
 }
 
+function isVideoUrl(url) {
+  return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url || "");
+}
+
 // Tracks whether the viewport is narrower than Tailwind's `sm` breakpoint.
 // Used to switch the deep-reply behavior: past the nesting cap, mobile
 // pushes into a focused "continue this thread" view (like Reddit/Twitter's
@@ -1330,58 +1334,205 @@ function CommentCard({ comment, user, threadId, isAdmin, highlightCommentId, hig
 
 // ─── Hero gallery — thread's own images, full-bleed at the top of the card ────
 
-function HeroGallery({ urls }) {
-  const [index, setIndex] = useState(0);
-  const [lightbox, setLightbox] = useState(false);
+// ─── Multi-image lightbox — arrows, keyboard nav, thumbnail strip ─────────────
+// Same interaction pattern as the Threads feed's lightbox, so opening an
+// image here feels identical to opening one from the feed.
 
+function GalleryLightbox({ urls, startIndex = 0, onClose }) {
+  const [index, setIndex] = useState(startIndex);
+  const total = urls.length;
+
+  const prev = useCallback((e) => { e?.stopPropagation(); setIndex(i => (i - 1 + total) % total); }, [total]);
+  const next = useCallback((e) => { e?.stopPropagation(); setIndex(i => (i + 1) % total); }, [total]);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") prev();
+      if (e.key === "ArrowRight") next();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose, prev, next]);
+
+  const url = urls[index];
+  const video = isVideoUrl(url);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/90"
+      style={{ backdropFilter: "blur(12px)", animation: "lbFadeIn 0.15s ease" }}
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+      >
+        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      {total > 1 && (
+        <p className="absolute top-5 left-1/2 -translate-x-1/2 text-white/70 text-[12px] font-semibold tabular-nums">
+          {index + 1} / {total}
+        </p>
+      )}
+
+      <div onClick={e => e.stopPropagation()} className="max-w-[92vw] max-h-[78vh] flex items-center justify-center relative">
+        {total > 1 && (
+          <button onClick={prev} className="absolute -left-14 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 hidden sm:flex items-center justify-center text-white transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+        {video
+          ? <video src={url} controls autoPlay className="max-w-full max-h-[78vh] rounded-xl shadow-2xl" />
+          : <img src={url} alt="" className="max-w-full max-h-[78vh] rounded-xl shadow-2xl object-contain" />
+        }
+        {total > 1 && (
+          <button onClick={next} className="absolute -right-14 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 hidden sm:flex items-center justify-center text-white transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {total > 1 && (
+        <div className="flex gap-2 mt-5 px-4 max-w-[92vw] overflow-x-auto" onClick={e => e.stopPropagation()}>
+          {urls.map((u, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              className="flex-shrink-0 rounded-lg overflow-hidden transition-all"
+              style={{
+                width: 48, height: 48,
+                border: i === index ? "2px solid #d4af37" : "2px solid transparent",
+                opacity: i === index ? 1 : 0.55,
+              }}
+            >
+              {isVideoUrl(u)
+                ? <video src={u} className="w-full h-full object-cover" muted />
+                : <img src={u} alt="" className="w-full h-full object-cover" />
+              }
+            </button>
+          ))}
+        </div>
+      )}
+
+      <p className="absolute bottom-4 text-white/30 text-[11px] hidden sm:block">
+        Esc to close · ← → to navigate
+      </p>
+      <style>{`@keyframes lbFadeIn { from { opacity:0 } to { opacity:1 } }`}</style>
+    </div>
+  );
+}
+
+function GalleryThumb({ url, className = "", style = {} }) {
+  const video = isVideoUrl(url);
+  return (
+    <div className={`relative overflow-hidden bg-[#f0ebe3] ${className}`} style={style}>
+      {video ? (
+        <>
+          <video src={url} className="w-full h-full object-cover" muted />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-full bg-black/45 flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#d4af37] translate-x-[1px]" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
+        </>
+      ) : (
+        <img src={url} alt="" className="w-full h-full object-cover" />
+      )}
+    </div>
+  );
+}
+
+// ─── Hero gallery — same grid layout the Threads feed uses (1/2/3/4+ image
+// arrangements), so a post's images look identical whether viewed from the
+// feed or opened on its own page. Replaces the old single-image-at-a-time
+// slideshow, and lets a lone image display at its full, uncropped height. ────
+
+function HeroGallery({ urls }) {
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   if (!urls || urls.length === 0) return null;
 
-  const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(urls[index]);
-  const prev = (e) => { e.stopPropagation(); setIndex(i => (i - 1 + urls.length) % urls.length); };
-  const next = (e) => { e.stopPropagation(); setIndex(i => (i + 1) % urls.length); };
+  const open = (i) => (e) => { e.stopPropagation(); setLightboxIndex(i); };
+
+  let body;
+  if (urls.length === 1) {
+    const single = urls[0];
+    const video = isVideoUrl(single);
+    body = (
+      <div className="cursor-zoom-in bg-[#f5f3ef] flex items-center justify-center" onClick={open(0)}>
+        {video ? (
+          <video src={single} className="w-full h-auto" style={{ maxHeight: "min(75vh, 700px)" }} muted />
+        ) : (
+          <img
+            src={single}
+            alt=""
+            className="w-full h-auto object-contain"
+            style={{ maxHeight: "min(75vh, 700px)" }}
+          />
+        )}
+      </div>
+    );
+  } else if (urls.length === 2) {
+    body = (
+      <div className="grid grid-cols-2 gap-0.5" style={{ height: 320 }}>
+        {urls.map((u, i) => (
+          <div key={i} className="cursor-zoom-in h-full" onClick={open(i)}>
+            <GalleryThumb url={u} className="w-full h-full" />
+          </div>
+        ))}
+      </div>
+    );
+  } else if (urls.length === 3) {
+    body = (
+      <div className="grid grid-cols-3 gap-0.5" style={{ height: 320 }}>
+        <div className="col-span-2 h-full cursor-zoom-in" onClick={open(0)}>
+          <GalleryThumb url={urls[0]} className="w-full h-full" />
+        </div>
+        <div className="grid grid-rows-2 gap-0.5 h-full">
+          <div className="cursor-zoom-in" onClick={open(1)}><GalleryThumb url={urls[1]} className="w-full h-full" /></div>
+          <div className="cursor-zoom-in" onClick={open(2)}><GalleryThumb url={urls[2]} className="w-full h-full" /></div>
+        </div>
+      </div>
+    );
+  } else {
+    const extra = urls.length - 4;
+    body = (
+      <div className="grid grid-cols-2 grid-rows-2 gap-0.5" style={{ height: 360 }}>
+        {urls.slice(0, 4).map((u, i) => {
+          const isLast = i === 3 && extra > 0;
+          return (
+            <div key={i} className="relative cursor-zoom-in" onClick={open(i)}>
+              <GalleryThumb url={u} className="w-full h-full" />
+              {isLast && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center text-white text-lg font-bold"
+                  style={{ background: "rgba(26,26,46,0.55)", backdropFilter: "blur(2px)" }}
+                >
+                  +{extra} more
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <>
-      <div className="relative cursor-zoom-in group" onClick={() => setLightbox(true)}>
-        {isVideo
-          ? <video src={urls[index]} className="w-full h-auto" muted />
-          : <img src={urls[index]} alt="" className="w-full h-auto object-contain transition-transform duration-500 group-hover:scale-[1.01]" />
-        }
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/08 transition-all" />
-        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/55 rounded-full p-2">
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        {urls.length > 1 && (
-          <>
-            <button onClick={prev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 flex items-center justify-center text-white transition-colors opacity-0 group-hover:opacity-100">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button onClick={next}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 flex items-center justify-center text-white transition-colors opacity-0 group-hover:opacity-100">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {urls.map((_, i) => (
-                <button key={i} onClick={(e) => { e.stopPropagation(); setIndex(i); }}
-                  className="rounded-full transition-all"
-                  style={{ width: i === index ? 16 : 6, height: 6, background: i === index ? "#d4af37" : "rgba(255,255,255,0.7)" }}
-                />
-              ))}
-            </div>
-            <div className="absolute top-3 right-3 bg-black/45 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-              {index + 1}/{urls.length}
-            </div>
-          </>
-        )}
-      </div>
-      {lightbox && <MediaLightbox url={urls[index]} onClose={() => setLightbox(false)} />}
+      {body}
+      {lightboxIndex !== null && (
+        <GalleryLightbox urls={urls} startIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+      )}
     </>
   );
 }

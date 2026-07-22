@@ -330,9 +330,24 @@ function MediaGrid({ urls }) {
 
   let body;
   if (urls.length === 1) {
+    // Single image: let it display at its natural aspect ratio instead of
+    // cropping into a fixed short box — the old 360px cap chopped tall
+    // images on desktop. object-contain + a generous, viewport-relative
+    // cap gives a full, uncropped view on any screen size.
+    const single = urls[0];
+    const video = isVideoUrl(single);
     body = (
-      <div className={`${wrap} cursor-zoom-in`} onClick={open(0)} style={{ maxHeight: 360 }}>
-        <MediaThumb url={urls[0]} className="w-full h-full" style={{ maxHeight: 360 }} />
+      <div className={`${wrap} cursor-zoom-in bg-[#f0ebe3] flex items-center justify-center`} onClick={open(0)}>
+        {video ? (
+          <video src={single} className="w-full h-auto" style={{ maxHeight: "min(70vh, 620px)" }} muted />
+        ) : (
+          <img
+            src={single}
+            alt=""
+            className="w-full h-auto object-contain"
+            style={{ maxHeight: "min(70vh, 620px)" }}
+          />
+        )}
       </div>
     );
   } else if (urls.length === 2) {
@@ -474,6 +489,7 @@ function MediaPreviewStrip({ files, onRemove }) {
 function ComposeBox({ user, tags, onSubmit }) {
   const [expanded, setExpanded] = useState(false);
   const [value, setValue]       = useState("");
+  const [title, setTitle]       = useState("");
   const [tag, setTag]           = useState(null);
   const [files, setFiles]       = useState([]);
   const [showEmoji, setShowEmoji] = useState(false);
@@ -530,8 +546,8 @@ function ComposeBox({ user, tags, onSubmit }) {
     if (!trimmed || saving) return;
     setSaving(true); setErr("");
     try {
-      await onSubmit(trimmed, tag, files.length > 0 ? files : null);
-      setValue(""); setFiles([]); setTag(null); setExpanded(false);
+      await onSubmit(trimmed, tag, files.length > 0 ? files : null, title.trim());
+      setValue(""); setFiles([]); setTag(null); setTitle(""); setExpanded(false);
     } catch (e) {
       setErr(e.message ?? "Something went wrong. Please try again.");
     } finally {
@@ -563,6 +579,17 @@ function ComposeBox({ user, tags, onSubmit }) {
 
       {expanded && (
         <>
+          {/* Title — optional. If left blank, the feed/homepage/profile will
+              show a short excerpt of the content in its place instead. */}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Add a title (optional)"
+            maxLength={120}
+            className="w-full mt-2 pb-1.5 text-[14.5px] font-bold text-[#1a1a2e] placeholder-[#c8b89a] focus:outline-none bg-transparent border-b border-[#f0ebe3] focus:border-[#d4af37] transition-colors"
+          />
+
           {/* Tag pills — pick one tag for the post, or leave untagged */}
           <div className="flex items-center gap-2 pt-3 pb-1 flex-wrap">
             {tags.map((t) => {
@@ -644,7 +671,7 @@ function ComposeBox({ user, tags, onSubmit }) {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => { setExpanded(false); setValue(""); setFiles([]); setTag(null); }}
+                onClick={() => { setExpanded(false); setValue(""); setFiles([]); setTag(null); setTitle(""); }}
                 className="px-3 py-2 text-[13px] text-[#9a8c7a] hover:text-[#1a1a2e] transition-colors"
               >
                 Cancel
@@ -664,9 +691,81 @@ function ComposeBox({ user, tags, onSubmit }) {
   );
 }
 
+// ─── three-dot edit/delete menu — shown to the post's author (or an admin) ────
+
+function PostOptionsMenu({ thread, onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  async function handleDelete(e) {
+    e.stopPropagation();
+    if (!window.confirm("Delete this thread? This can't be undone.")) return;
+    setDeleting(true);
+    try {
+      await onDelete(thread.id);
+    } finally {
+      setDeleting(false);
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="relative ml-auto flex-shrink-0" ref={boxRef}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        title="Post options"
+        className="w-7 h-7 -mr-1 rounded-full flex items-center justify-center text-[#c8b89a] hover:text-[#1a1a2e] hover:bg-[#f4f1ec] transition-colors"
+      >
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-0 top-8 z-20 w-36 bg-white border border-[#e8e0d0] rounded-xl overflow-hidden py-1"
+          style={{ boxShadow: "0 8px 24px rgba(26,26,46,0.14)" }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit(thread.id); }}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[12.5px] font-medium text-[#2d2416] hover:bg-[#faf7f2] transition-colors text-left"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            Edit
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[12.5px] font-medium text-[#c0392b] hover:bg-red-50 transition-colors text-left disabled:opacity-50"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+            </svg>
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── one post in the feed ──────────────────────────────────────────────────────
 
-function PostCard({ thread, user, onToggleLike }) {
+function PostCard({ thread, user, onToggleLike, onEditThread, onDeleteThread }) {
   const navigate = useNavigate();
   const [liked, setLiked] = useState(!!thread.likedByMe);
   const [likes, setLikes] = useState(thread.likesCount ?? thread._count?.likes ?? 0);
@@ -698,6 +797,8 @@ function PostCard({ thread, user, onToggleLike }) {
   }
 
   const commentCount = thread.totalCommentCount ?? thread._count?.comments ?? 0;
+  const isAdmin = user?.role === "ADMIN";
+  const canManage = user && (String(user.id) === String(thread.author?.id) || isAdmin);
 
   return (
     <div
@@ -721,11 +822,20 @@ function PostCard({ thread, user, onToggleLike }) {
                 Pinned
               </span>
             )}
+            {canManage && (
+              <PostOptionsMenu thread={thread} onEdit={onEditThread} onDelete={onDeleteThread} />
+            )}
           </div>
+
+          {thread.title && thread.title.trim() && (
+            <p className="mt-1.5 text-[14.5px] font-bold text-[#1a1a2e] leading-snug">
+              {thread.title.trim()}
+            </p>
+          )}
 
           <FormattedText
             content={thread.context}
-            className="mt-1.5 text-[14px] text-[#2d2416] leading-relaxed"
+            className={`${thread.title && thread.title.trim() ? "mt-1" : "mt-1.5"} text-[14px] text-[#2d2416] leading-relaxed`}
           />
 
           <MediaGrid urls={mediaUrls} />
@@ -788,6 +898,7 @@ function FeedSkeleton() {
 
 export default function ThreadsFeedPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [tags, setTags] = useState([]);
   const [activeTag, setActiveTag] = useState(null); // null = "All"
@@ -823,10 +934,11 @@ export default function ThreadsFeedPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleCreateThread(context, tag, files) {
+  async function handleCreateThread(context, tag, files, title) {
     const form = new FormData();
     form.append("context", context);
     if (tag) form.append("tag", tag);
+    if (title) form.append("title", title);
     if (files && files.length > 0) {
       files.forEach((f, i) => form.append(`media_${i}`, f));
     }
@@ -844,6 +956,17 @@ export default function ThreadsFeedPage() {
     const r = await fetch(`${API_URL}/threads/${threadId}/like`, { method: "POST", credentials: "include" });
     if (!r.ok) return null;
     return r.json();
+  }
+
+  function handleEditThread(threadId) {
+    navigate(`/threads/${threadId}/edit`);
+  }
+
+  async function handleDeleteThread(threadId) {
+    try {
+      const r = await fetch(`${API_URL}/threads/${threadId}`, { method: "DELETE", credentials: "include" });
+      if (r.ok) setThreads(prev => prev.filter(t => t.id !== threadId));
+    } catch {}
   }
 
   return (
@@ -938,7 +1061,14 @@ export default function ThreadsFeedPage() {
         ) : (
           <div>
             {threads.map(thread => (
-              <PostCard key={thread.id} thread={thread} user={user} onToggleLike={handleToggleLike} />
+              <PostCard
+                key={thread.id}
+                thread={thread}
+                user={user}
+                onToggleLike={handleToggleLike}
+                onEditThread={handleEditThread}
+                onDeleteThread={handleDeleteThread}
+              />
             ))}
           </div>
         )}

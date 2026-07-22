@@ -1,8 +1,8 @@
 // src/pages/DraftsPage.jsx
 // Draft management page — lists all writer drafts with actions:
-// Edit, Delete, Post to Feedback Hub, Continue in Sprint.
+// Edit, Delete, Post to Feedback Hub.
 // Post to Hub opens an inline submission form (same interface as SubmitFeedback).
-// Continue in Sprint loops back to the StartGroupSprintModal pre-filled with the draft.
+// Start Sprint navigates straight to the Sprint Room (/sprint-room).
 //
 // Layout: a fixed-width drafts list on the left (search, star filter, rows
 // with hover actions) and a progress column on the right (sprint calendar
@@ -13,7 +13,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import API_URL from "@/config/api";
-import { StartGroupSprintModal } from "../sprint/groupSprintModal";
 import { AppMetaTags } from "../utilis/metatags";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -541,7 +540,7 @@ function DeleteAction({ onConfirm, loading }) {
 
 // ─── Draft row (list layout) ─────────────────────────────────────────────────
 
-function DraftRow({ draft, walletInfo, onEdit, onDelete, onPostToHub, onDirectPost, postingNow, onContinueSprint, onRepublish, onToggleStar, starLoading, deleteLoading }) {
+function DraftRow({ draft, walletInfo, onEdit, onDelete, onPostToHub, onDirectPost, postingNow, onRepublish, onToggleStar, starLoading, deleteLoading }) {
   const navigate = useNavigate();
   const isLinked = !!draft.sourceSubmissionId;
   const genre = draft.sourceSubmission?.genre;
@@ -597,10 +596,6 @@ function DraftRow({ draft, walletInfo, onEdit, onDelete, onPostToHub, onDirectPo
       <div className="flex items-center gap-0.5 flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity bg-gradient-to-l from-white via-white sm:from-transparent sm:via-transparent to-transparent pl-2">
         <IconAction onClick={() => onEdit(draft)} title="Edit">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-        </IconAction>
-
-        <IconAction onClick={() => onContinueSprint(draft)} title="Continue in sprint">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         </IconAction>
 
         {isLinked ? (
@@ -933,7 +928,7 @@ function DraftsListPanel({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Start sprint
+            Sprint
           </button>
           <button
             onClick={onNewDraft}
@@ -1080,7 +1075,6 @@ export default function DraftsPage() {
 
   // Modals
   const [postingDraft, setPostingDraft]     = useState(null);
-  const [sprintDraft, setSprintDraft]       = useState(null); // triggers StartGroupSprintModal
   // id of the staged draft currently being posted directly (no modal) — drives the spinner on its card
   const [directPosting, setDirectPosting]   = useState(null);
 
@@ -1242,14 +1236,6 @@ export default function DraftsPage() {
     }
   }
 
-  function handleSprintCreated(groupSprint, isQuillweave) {
-    const draftId = sprintDraft?.id || null;
-    setSprintDraft(null);
-    navigate(`/group-sprint/${groupSprint.id}`, {
-      state: { writingMode: isQuillweave ? "quillweave" : "external", draftId }
-    });
-  }
-
   // Starred-first is already how the backend orders `drafts`; search and the
   // starred-only filter narrow the visible set from there.
   const visibleDrafts = useMemo(() => {
@@ -1266,7 +1252,6 @@ export default function DraftsPage() {
     onPostToHub: setPostingDraft,
     onDirectPost: handleDirectPost,
     postingNow: directPosting,
-    onContinueSprint: setSprintDraft,
     onRepublish: handleRepublish,
     onToggleStar: handleToggleStar,
   };
@@ -1294,7 +1279,7 @@ export default function DraftsPage() {
               starLoadingId={starLoadingId}
               deletingId={deletingId}
               wallet={wallet}
-              onStartSprint={() => setSprintDraft({})}
+              onStartSprint={() => navigate("/sprint-room")}
               onNewDraft={() => navigate("/write")}
               {...rowProps}
             />
@@ -1332,16 +1317,6 @@ export default function DraftsPage() {
           onSuccess={handlePostSuccess}
         />
       )}
-
-      {/* Continue in sprint → opens the full StartGroupSprintModal
-          The modal passes writingMode="quillweave" and the draftId to the workspace via route state */}
-      <StartGroupSprintModal
-        isOpen={!!sprintDraft}
-        onClose={() => setSprintDraft(null)}
-        onCreated={handleSprintCreated}
-        prefillDraftId={sprintDraft?.id || null}
-        prefillDraftTitle={sprintDraft?.title || null}
-      />
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

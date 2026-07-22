@@ -10,8 +10,6 @@ import Login from './components/auth/login';
 import ForgotPassword from './components/auth/forgotPassword';
 import ResetPassword from './components/auth/resetPassword';
 
-import GroupSprintWorkspace from './components/sprint/groupSprintWorkspace';
-
 import Notification from './components/notification/notification';
 // import UserFeedbackSubmissions from './components/profile/profile';
 import NotFound from './components/NotFound';
@@ -21,12 +19,14 @@ import Blog from './components/blog/blog';
 import BlogPost from './components/blog/blogPost';
 import BlogSeries from './components/blog/blogSeries';
 import AdminBlog from './components/blog/adminBlog';
+import BlogSubmit from './components/blog/blogsubmit';
+import BlogCategoryArchive from './components/blog/blogcategoryarchive';
 
 import Layout from './components/dashboard/layout';
 import MembersPage from './components/leaderBoard/memberspage';
 
 import AdminSoundscapes from './components/sprint/Adminsoundscapes';
-import SprintRoom from './components/sprint/sprintroom';
+import SprintRoomPage from './components/sprint/sprintroompage';
 
 import Settings from './components/profile/settings';
 import ProfilePage from './components/profile/profilepage';
@@ -99,10 +99,6 @@ const router = createBrowserRouter([
         element: <Settings />
       },
       {
-        path: "group-sprint/:groupSprintId",
-        element: <GroupSprintWorkspace />
-      },
-      {
         path: "notifications",
         element: <Notification />
       },
@@ -123,12 +119,20 @@ const router = createBrowserRouter([
         element: <BlogSeries />
       },
       {
+        path: "blog/submit",
+        element: <BlogSubmit />
+      },
+      {
+        path: "/blog/category/:category",
+        element: <BlogCategoryArchive />
+      },
+      {
         path: "admin/soundscapes",
         element: <AdminSoundscapes />
       },
       {
         path: "sprint-room",
-        element: <SprintRoom />
+        element: <SprintRoomPage />
       },
       {
         path: "members",

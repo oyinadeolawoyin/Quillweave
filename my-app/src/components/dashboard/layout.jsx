@@ -41,14 +41,14 @@ export default function Layout() {
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-[#fafaf9]">
+    <div className="h-dvh flex flex-col bg-[#fafaf9] overflow-hidden">
       <TopBar
         mobileNavOpen={mobileNavOpen}
         onToggleMobileNav={() => setMobileNavOpen((o) => !o)}
         showHamburger={showSidebar}
       />
 
-      <div className="flex">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {showSidebar && (
           <Sidebar
             mobileNavOpen={mobileNavOpen}
@@ -56,7 +56,7 @@ export default function Layout() {
           />
         )}
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
           <Outlet context={{ setLayoutFocusMode: setPageFocusMode }} />
         </div>
       </div>
