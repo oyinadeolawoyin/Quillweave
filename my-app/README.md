@@ -1,18 +1,42 @@
-# React + Vite
+# Quillweave Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Quillweave is a desktop website for writers. It helps writers set a goal for a new draft, track their daily, weekly, and overall progress, sprint in a timed writing room, and send each other encouragement and greeting cards along the way.
 
-Currently, two official plugins are available:
+**Live site:** [quillweave.com.ng](https://quillweave.com.ng/) · **Backend repo:** [QuillweaveBackend](https://github.com/oyinadeolawoyin/QuillweaveBackend)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+![Dashboard](./screenshots/dashboard.png)
+![Sprint Room](./screenshots/sprint-room.png)
+![Drafts](./screenshots/drafts.png)
+![Mailbox](./screenshots/mailbox.png)
+![Community](./screenshots/community.png)
 
-## React Compiler
+## What It Does
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+- **Goals and progress.** Writers set a goal for a new draft and see their daily, weekly, and overall progress, with streaks and a writing activity chart.
+- **Sprint Room.** Writers set a timer and write for a set time in a built-in editor, with live word counts and chat.
+- **Drafts.** Writers organize their drafts in folders and start a sprint on any draft.
+- **Cards.** Writers send and receive encouragement and greeting cards in a mailbox.
+- **Community.** Writers can follow each other and see who has written today.
 
-Note: This will impact Vite dev & build performances.
+## Tech Stack
 
-## Expanding the ESLint configuration
+- **React 19** with **Vite**
+- **Tailwind CSS** and **shadcn/ui** for styling and components
+- **React Router** for navigation
+- **Socket.IO client** for live sprint updates
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The site uses a separate [backend](https://github.com/oyinadeolawoyin/QuillweaveBackend) for data storage and for sending and receiving data, so this project focuses on displaying data and design.
+
+## Running Locally
+
+The frontend needs the Quillweave backend running to work. To see it in action, visit the live site above.
+
+## Roadmap
+
+- [ ] Remove unused files and dependencies
+- [ ] Group draft plan tracking
+
+## What I Learned
+
+- How to build for real users and keep improving based on how they use the site
+- How a frontend and a separate backend work together
