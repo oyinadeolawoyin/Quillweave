@@ -4,11 +4,11 @@ Quillweave is a desktop website for writers. It helps writers set a goal for a n
 
 **Live site:** [quillweave.com.ng](https://quillweave.com.ng/) · **Backend repo:** [QuillweaveBackend](https://github.com/oyinadeolawoyin/QuillweaveBackend)
 
-![Dashboard](./screenshots/dashboard.png)
-![Sprint Room](./screenshots/sprint-room.png)
-![Drafts](./screenshots/drafts.png)
-![Mailbox](./screenshots/mailbox.png)
-![Community](./screenshots/community.png)
+![Dashboard](./my-app/screenshots/dashboard.png)
+![Sprint Room](./my-app/screenshots/sprint-room.png)
+![Drafts](./my-app/screenshots/drafts.png)
+![Mailbox](./my-app/screenshots/mailbox.png)
+![Community](./my-app/screenshots/community.png)
 
 ## What It Does
 
